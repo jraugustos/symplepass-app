@@ -1,0 +1,8 @@
+export { UserPanelTabs } from './user-panel-tabs'
+export { ProfileHeader } from './profile-header'
+export { OverviewTab } from './overview-tab'
+export { EventsTab } from './events-tab'
+export { PersonalDataTab } from './personal-data-tab'
+export { PreferencesTab } from './preferences-tab'
+export { PaymentsTab } from './payments-tab'
+export { SettingsTab } from './settings-tab'

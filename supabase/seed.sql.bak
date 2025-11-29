@@ -1,0 +1,799 @@
+-- Seed data for development and testing
+-- This file populates the database with sample Brazilian sports events
+
+-- IMPORTANT: Before running this seed file, you must create the corresponding auth.users entries
+-- using Supabase Auth API or dashboard for the following user IDs:
+--   - 11111111-1111-1111-1111-111111111111 (organizer1@symplepass.com)
+--   - 22222222-2222-2222-2222-222222222222 (organizer2@symplepass.com)
+--   - 33333333-3333-3333-3333-333333333333 (organizer3@symplepass.com)
+-- The profiles table has a foreign key constraint to auth.users(id).
+
+-- Alternative: Insert into auth.users first (requires service role key)
+-- This can be done via Supabase client in a setup script, not directly in SQL migration
+INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data, is_super_admin, role)
+VALUES
+  ('11111111-1111-1111-1111-111111111111', 'organizer1@symplepass.com', crypt('password123', gen_salt('bf')), NOW(), NOW(), NOW(), '{"provider":"email","providers":["email"]}', '{"full_name":"Paulo Silva"}', false, 'authenticated'),
+  ('22222222-2222-2222-2222-222222222222', 'organizer2@symplepass.com', crypt('password123', gen_salt('bf')), NOW(), NOW(), NOW(), '{"provider":"email","providers":["email"]}', '{"full_name":"Maria Santos"}', false, 'authenticated'),
+  ('33333333-3333-3333-3333-333333333333', 'organizer3@symplepass.com', crypt('password123', gen_salt('bf')), NOW(), NOW(), NOW(), '{"provider":"email","providers":["email"]}', '{"full_name":"Carlos Oliveira"}', false, 'authenticated')
+ON CONFLICT (id) DO NOTHING;
+
+-- Insert sample organizer profiles
+INSERT INTO profiles (id, email, full_name, cpf, phone, role, created_at)
+VALUES
+  ('11111111-1111-1111-1111-111111111111', 'organizer1@symplepass.com', 'Paulo Silva', '123.456.789-01', '+55 11 98765-4321', 'organizer', NOW()),
+  ('22222222-2222-2222-2222-222222222222', 'organizer2@symplepass.com', 'Maria Santos', '987.654.321-09', '+55 11 98765-4322', 'organizer', NOW()),
+  ('33333333-3333-3333-3333-333333333333', 'organizer3@symplepass.com', 'Carlos Oliveira', '456.789.123-45', '+55 11 98765-4323', 'organizer', NOW())
+ON CONFLICT (id) DO NOTHING;
+
+-- Insert sample events with realistic Brazilian sports event data
+INSERT INTO events (
+  id,
+  organizer_id,
+  title,
+  slug,
+  description,
+  sport_type,
+  start_date,
+  end_date,
+  location,
+  banner_url,
+  status,
+  max_participants,
+  registration_start,
+  registration_end,
+  is_featured,
+  created_at
+)
+VALUES
+  -- Featured Events
+  (
+    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    '11111111-1111-1111-1111-111111111111',
+    'Maratona Internacional de São Paulo',
+    'maratona-sp-2025',
+    'A maior maratona do Brasil! Percurso de 42km pelas principais avenidas de São Paulo, com largada no Parque do Ibirapuera e chegada na Av. Paulista.',
+    'corrida',
+    NOW() + INTERVAL '45 days',
+    NOW() + INTERVAL '45 days',
+    '{"city": "São Paulo", "state": "SP", "venue": "Parque do Ibirapuera", "address": "Av. Pedro Álvares Cabral, s/n"}',
+    'https://images.unsplash.com/photo-1452626038306-9aae5e071dd3?w=800',
+    'published',
+    5000,
+    NOW() - INTERVAL '30 days',
+    NOW() + INTERVAL '40 days',
+    true,
+    NOW()
+  ),
+  (
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    '22222222-2222-2222-2222-222222222222',
+    'Ironman Brasil - Florianópolis',
+    'ironman-floripa-2025',
+    'O desafio definitivo do triathlon! Natação de 3.8km, ciclismo de 180km e corrida de 42km nas belas praias de Florianópolis.',
+    'triatlo',
+    NOW() + INTERVAL '60 days',
+    NOW() + INTERVAL '60 days',
+    '{"city": "Florianópolis", "state": "SC", "venue": "Praia de Jurerê", "address": "Av. dos Buzios"}',
+    'https://images.unsplash.com/photo-1530549387789-4c1017266635?w=800',
+    'published',
+    2000,
+    NOW() - INTERVAL '60 days',
+    NOW() + INTERVAL '50 days',
+    true,
+    NOW()
+  ),
+  (
+    'cccccccc-cccc-cccc-cccc-cccccccccccc',
+    '33333333-3333-3333-3333-333333333333',
+    'Volta Ciclística de Curitiba',
+    'volta-curitiba-2025',
+    'Pedal urbano de 50km pelos parques e ciclovias de Curitiba. Percurso plano e super seguro para toda a família!',
+    'ciclismo',
+    NOW() + INTERVAL '30 days',
+    NOW() + INTERVAL '30 days',
+    '{"city": "Curitiba", "state": "PR", "venue": "Parque Barigui", "address": "Rua Cândido de Abreu"}',
+    'https://images.unsplash.com/photo-1541625602330-2277a4c46182?w=800',
+    'published',
+    1500,
+    NOW() - INTERVAL '15 days',
+    NOW() + INTERVAL '25 days',
+    true,
+    NOW()
+  ),
+
+  -- Upcoming Events (not featured)
+  (
+    'dddddddd-dddd-dddd-dddd-dddddddddddd',
+    '11111111-1111-1111-1111-111111111111',
+    'Beach Tennis Open Santos',
+    'beach-tennis-santos-2025',
+    'Torneio de Beach Tennis na orla de Santos. Categorias iniciante, intermediário e avançado. Premiação para os top 3 de cada categoria!',
+    'outro',
+    NOW() + INTERVAL '15 days',
+    NOW() + INTERVAL '17 days',
+    '{"city": "Santos", "state": "SP", "venue": "Praia do Gonzaga", "address": "Av. Presidente Wilson"}',
+    'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=800',
+    'published',
+    200,
+    NOW() - INTERVAL '10 days',
+    NOW() + INTERVAL '10 days',
+    false,
+    NOW()
+  ),
+  (
+    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+    '22222222-2222-2222-2222-222222222222',
+    'Cross Training Challenge Campinas',
+    'cross-training-campinas-2025',
+    'Desafio funcional com 5 provas de alta intensidade. Teste seus limites no WOD mais desafiador da região!',
+    'outro',
+    NOW() + INTERVAL '20 days',
+    NOW() + INTERVAL '20 days',
+    '{"city": "Campinas", "state": "SP", "venue": "Arena Cross Fit", "address": "Av. Norte Sul, 1500"}',
+    'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800',
+    'published',
+    300,
+    NOW() - INTERVAL '5 days',
+    NOW() + INTERVAL '15 days',
+    false,
+    NOW()
+  ),
+  (
+    'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    '33333333-3333-3333-3333-333333333333',
+    'Corrida de Montanha Serra da Mantiqueira',
+    'trail-run-mantiqueira-2025',
+    'Trail running em altitude! Percursos de 10km, 21km e 42km pelas trilhas da Serra da Mantiqueira. Paisagens incríveis!',
+    'corrida',
+    NOW() + INTERVAL '35 days',
+    NOW() + INTERVAL '35 days',
+    '{"city": "Campos do Jordão", "state": "SP", "venue": "Parque Estadual", "address": "Estrada do Horto Florestal"}',
+    'https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=800',
+    'published',
+    800,
+    NOW() - INTERVAL '20 days',
+    NOW() + INTERVAL '30 days',
+    false,
+    NOW()
+  ),
+  (
+    'gggggggg-gggg-gggg-gggg-gggggggggggg',
+    '11111111-1111-1111-1111-111111111111',
+    'Triathlon Sprint Guarujá',
+    'tri-sprint-guaruja-2025',
+    'Triathlon Sprint ideal para iniciantes: 750m natação, 20km bike e 5km corrida. Venha desafiar-se na praia!',
+    'triatlo',
+    NOW() + INTERVAL '50 days',
+    NOW() + INTERVAL '50 days',
+    '{"city": "Guarujá", "state": "SP", "venue": "Praia da Enseada", "address": "Av. Miguel Stefano"}',
+    'https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=800',
+    'published',
+    500,
+    NOW() - INTERVAL '25 days',
+    NOW() + INTERVAL '45 days',
+    false,
+    NOW()
+  ),
+  (
+    'hhhhhhhh-hhhh-hhhh-hhhh-hhhhhhhhhhhh',
+    '22222222-2222-2222-2222-222222222222',
+    'Caminhada Ecológica Parque Ibirapuera',
+    'caminhada-ibirapuera-2025',
+    'Caminhada de 5km pelo Parque Ibirapuera com guia especializado. Conheça a fauna e flora urbana de SP!',
+    'caminhada',
+    NOW() + INTERVAL '10 days',
+    NOW() + INTERVAL '10 days',
+    '{"city": "São Paulo", "state": "SP", "venue": "Parque do Ibirapuera", "address": "Av. Pedro Álvares Cabral"}',
+    'https://images.unsplash.com/photo-1502904550040-7534597429ae?w=800',
+    'published',
+    100,
+    NOW() - INTERVAL '5 days',
+    NOW() + INTERVAL '8 days',
+    false,
+    NOW()
+  );
+
+-- Insert event categories with different price points
+INSERT INTO event_categories (id, event_id, name, description, price, max_participants, current_participants)
+VALUES
+  -- Maratona SP
+  ('cat-aaaa-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Maratona 42km', 'Percurso completo de 42.195km', 180.00, 3000, 1245),
+  ('cat-aaaa-2222-2222-2222-222222222222', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Meia Maratona 21km', 'Percurso de 21km', 120.00, 2000, 856),
+
+  -- Ironman Floripa
+  ('cat-bbbb-1111-1111-1111-111111111111', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Ironman Individual', 'Prova completa individual', 800.00, 1500, 678),
+  ('cat-bbbb-2222-2222-2222-222222222222', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Ironman Revezamento', 'Prova em equipe de 3 pessoas', 1200.00, 500, 234),
+
+  -- Volta Curitiba
+  ('cat-cccc-1111-1111-1111-111111111111', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'Percurso 50km', 'Percurso completo de 50km', 80.00, 1000, 567),
+  ('cat-cccc-2222-2222-2222-222222222222', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'Percurso 25km', 'Percurso reduzido de 25km', 60.00, 500, 289),
+
+  -- Beach Tennis Santos
+  ('cat-dddd-1111-1111-1111-111111111111', 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'Categoria Iniciante', 'Para quem está começando', 150.00, 80, 34),
+  ('cat-dddd-2222-2222-2222-222222222222', 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'Categoria Avançado', 'Para jogadores experientes', 200.00, 120, 67),
+
+  -- Cross Training
+  ('cat-eeee-1111-1111-1111-111111111111', 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'RX - Elite', 'Categoria Elite sem escala', 120.00, 100, 45),
+  ('cat-eeee-2222-2222-2222-222222222222', 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'Scaled', 'Categoria com escalas', 100.00, 200, 89),
+
+  -- Trail Mantiqueira
+  ('cat-ffff-1111-1111-1111-111111111111', 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'Ultra 42km', 'Percurso ultra de 42km', 200.00, 300, 123),
+  ('cat-ffff-2222-2222-2222-222222222222', 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'Trail 21km', 'Percurso de 21km', 150.00, 300, 167),
+  ('cat-ffff-3333-3333-3333-333333333333', 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'Trail 10km', 'Percurso de 10km', 100.00, 200, 98),
+
+  -- Tri Sprint Guarujá
+  ('cat-gggg-1111-1111-1111-111111111111', 'gggggggg-gggg-gggg-gggg-gggggggggggg', 'Individual', 'Prova individual', 180.00, 400, 156),
+  ('cat-gggg-2222-2222-2222-222222222222', 'gggggggg-gggg-gggg-gggg-gggggggggggg', 'Duplas', 'Prova em duplas', 300.00, 100, 45),
+
+  -- Caminhada Ibirapuera
+  ('cat-hhhh-1111-1111-1111-111111111111', 'hhhhhhhh-hhhh-hhhh-hhhh-hhhhhhhhhhhh', 'Geral', 'Caminhada 5km', 40.00, 100, 67);
+
+-- Additional diverse events for testing filters (Rio de Janeiro, Belo Horizonte, etc.)
+INSERT INTO events (
+  id,
+  organizer_id,
+  title,
+  slug,
+  description,
+  sport_type,
+  start_date,
+  end_date,
+  location,
+  banner_url,
+  status,
+  max_participants,
+  registration_start,
+  registration_end,
+  is_featured,
+  created_at
+)
+VALUES
+  -- Rio de Janeiro Events
+  (
+    'iiiiiiii-iiii-iiii-iiii-iiiiiiiiiiii',
+    '11111111-1111-1111-1111-111111111111',
+    'Corrida da Praia do Leme',
+    'corrida-leme-rj-2025',
+    'Corrida de 10km pela orla de Copacabana e Leme. Vista deslumbrante do mar!',
+    'corrida',
+    NOW() + INTERVAL '25 days',
+    NOW() + INTERVAL '25 days',
+    '{"city": "Rio de Janeiro", "state": "RJ", "venue": "Praia do Leme", "address": "Av. Atlântica"}',
+    'https://images.unsplash.com/photo-1483721310020-03333e577078?w=800',
+    'published',
+    1000,
+    NOW() - INTERVAL '15 days',
+    NOW() + INTERVAL '20 days',
+    false,
+    NOW()
+  ),
+  (
+    'jjjjjjjj-jjjj-jjjj-jjjj-jjjjjjjjjjjj',
+    '22222222-2222-2222-2222-222222222222',
+    'Natação em Águas Abertas - Baía de Guanabara',
+    'natacao-guanabara-2025',
+    'Travessia de 3km na Baía de Guanabara. Evento tradicional com vista para o Cristo Redentor!',
+    'natacao',
+    NOW() + INTERVAL '40 days',
+    NOW() + INTERVAL '40 days',
+    '{"city": "Rio de Janeiro", "state": "RJ", "venue": "Marina da Glória", "address": "Av. Infante Dom Henrique"}',
+    'https://images.unsplash.com/photo-1519315901367-f34ff9154487?w=800',
+    'published',
+    600,
+    NOW() - INTERVAL '20 days',
+    NOW() + INTERVAL '35 days',
+    false,
+    NOW()
+  ),
+  -- Belo Horizonte Events
+  (
+    'kkkkkkkk-kkkk-kkkk-kkkk-kkkkkkkkkkkk',
+    '33333333-3333-3333-3333-333333333333',
+    'Ciclismo de Estrada - Circuito Pampulha',
+    'ciclismo-pampulha-2025',
+    'Pedal de 60km ao redor da Lagoa da Pampulha. Percurso técnico e desafiador!',
+    'ciclismo',
+    NOW() + INTERVAL '55 days',
+    NOW() + INTERVAL '55 days',
+    '{"city": "Belo Horizonte", "state": "MG", "venue": "Lagoa da Pampulha", "address": "Av. Otacílio Negrão de Lima"}',
+    'https://images.unsplash.com/photo-1517649763962-0c623066013b?w=800',
+    'published',
+    800,
+    NOW() - INTERVAL '30 days',
+    NOW() + INTERVAL '50 days',
+    false,
+    NOW()
+  ),
+  (
+    'llllllll-llll-llll-llll-llllllllllll',
+    '11111111-1111-1111-1111-111111111111',
+    'CrossFit Games BH',
+    'crossfit-bh-2025',
+    'Competição oficial de CrossFit com WODs surpresa. Prove que você é o mais fit de BH!',
+    'crossfit',
+    NOW() + INTERVAL '70 days',
+    NOW() + INTERVAL '72 days',
+    '{"city": "Belo Horizonte", "state": "MG", "venue": "Expominas", "address": "Av. Amazonas, 6000"}',
+    'https://images.unsplash.com/photo-1534367507873-d2d7e24c797f?w=800',
+    'published',
+    400,
+    NOW() - INTERVAL '40 days',
+    NOW() + INTERVAL '65 days',
+    false,
+    NOW()
+  ),
+  -- Porto Alegre Events
+  (
+    'mmmmmmmm-mmmm-mmmm-mmmm-mmmmmmmmmmmm',
+    '22222222-2222-2222-2222-222222222222',
+    'Maratona de Porto Alegre',
+    'maratona-poa-2025',
+    'Maratona completa de 42km pelas ruas históricas de Porto Alegre. Clima ameno garantido!',
+    'corrida',
+    NOW() + INTERVAL '80 days',
+    NOW() + INTERVAL '80 days',
+    '{"city": "Porto Alegre", "state": "RS", "venue": "Parque da Redenção", "address": "Av. José Bonifácio"}',
+    'https://images.unsplash.com/photo-1513593771513-7b58b6c4af38?w=800',
+    'published',
+    3000,
+    NOW() - INTERVAL '50 days',
+    NOW() + INTERVAL '75 days',
+    false,
+    NOW()
+  ),
+  (
+    'nnnnnnnn-nnnn-nnnn-nnnn-nnnnnnnnnnnn',
+    '33333333-3333-3333-3333-333333333333',
+    'Triathlon Olímpico Guaíba',
+    'tri-guaiba-2025',
+    'Triathlon distância olímpica: 1.5km natação no Guaíba, 40km bike e 10km corrida.',
+    'triatlo',
+    NOW() + INTERVAL '90 days',
+    NOW() + INTERVAL '90 days',
+    '{"city": "Porto Alegre", "state": "RS", "venue": "Orla do Guaíba", "address": "Av. Edvaldo Pereira Paiva"}',
+    'https://images.unsplash.com/photo-1571008887538-b36bb32f4571?w=800',
+    'published',
+    1000,
+    NOW() - INTERVAL '60 days',
+    NOW() + INTERVAL '85 days',
+    false,
+    NOW()
+  ),
+  -- Brasília Events
+  (
+    'oooooooo-oooo-oooo-oooo-oooooooooooo',
+    '11111111-1111-1111-1111-111111111111',
+    'Corrida do Eixo Monumental',
+    'corrida-eixo-bsb-2025',
+    'Corrida de 15km pelo Eixo Monumental de Brasília. Percurso plano e rápido!',
+    'corrida',
+    NOW() + INTERVAL '100 days',
+    NOW() + INTERVAL '100 days',
+    '{"city": "Brasília", "state": "DF", "venue": "Eixo Monumental", "address": "Esplanada dos Ministérios"}',
+    'https://images.unsplash.com/photo-1426150657668-9f3fbe4b6f88?w=800',
+    'published',
+    2000,
+    NOW() - INTERVAL '70 days',
+    NOW() + INTERVAL '95 days',
+    false,
+    NOW()
+  ),
+  (
+    'pppppppp-pppp-pppp-pppp-pppppppppppp',
+    '22222222-2222-2222-2222-222222222222',
+    'Ciclismo MTB Paranoá',
+    'mtb-paranoa-2025',
+    'Mountain bike ao redor do Lago Paranoá. Trilhas técnicas de 30km com vistas incríveis!',
+    'ciclismo',
+    NOW() + INTERVAL '110 days',
+    NOW() + INTERVAL '110 days',
+    '{"city": "Brasília", "state": "DF", "venue": "Lago Paranoá", "address": "Península dos Ministros"}',
+    'https://images.unsplash.com/photo-1544191696-102dbdaeeea0?w=800',
+    'published',
+    500,
+    NOW() - INTERVAL '80 days',
+    NOW() + INTERVAL '105 days',
+    false,
+    NOW()
+  ),
+  -- Salvador Events
+  (
+    'qqqqqqqq-qqqq-qqqq-qqqq-qqqqqqqqqqqq',
+    '33333333-3333-3333-3333-333333333333',
+    'Travessia Salvador-Itaparica',
+    'travessia-salvador-2025',
+    'Travessia de natação de 12km da Bahia de Todos os Santos. Desafio extremo!',
+    'natacao',
+    NOW() + INTERVAL '120 days',
+    NOW() + INTERVAL '120 days',
+    '{"city": "Salvador", "state": "BA", "venue": "Porto da Barra", "address": "Av. Sete de Setembro"}',
+    'https://images.unsplash.com/photo-1560089000-7433a4ebbd64?w=800',
+    'published',
+    300,
+    NOW() - INTERVAL '90 days',
+    NOW() + INTERVAL '115 days',
+    false,
+    NOW()
+  ),
+  -- Recife Events
+  (
+    'rrrrrrrr-rrrr-rrrr-rrrr-rrrrrrrrrrrr',
+    '11111111-1111-1111-1111-111111111111',
+    'Meia Maratona de Recife',
+    'meia-recife-2025',
+    'Meia maratona de 21km pela orla de Boa Viagem. Temperatura perfeita para correr!',
+    'corrida',
+    NOW() + INTERVAL '130 days',
+    NOW() + INTERVAL '130 days',
+    '{"city": "Recife", "state": "PE", "venue": "Praia de Boa Viagem", "address": "Av. Boa Viagem"}',
+    'https://images.unsplash.com/photo-1489089905289-16f2d47562e7?w=800',
+    'published',
+    1500,
+    NOW() - INTERVAL '100 days',
+    NOW() + INTERVAL '125 days',
+    false,
+    NOW()
+  ),
+  -- Free/Low-cost Events
+  (
+    'ssssssss-ssss-ssss-ssss-ssssssssssss',
+    '22222222-2222-2222-2222-222222222222',
+    'Caminhada pela Vida - São Paulo',
+    'caminhada-vida-sp-2025',
+    'Evento gratuito de caminhada de 3km pelo Parque Villa-Lobos. Promovendo saúde e bem-estar!',
+    'caminhada',
+    NOW() + INTERVAL '12 days',
+    NOW() + INTERVAL '12 days',
+    '{"city": "São Paulo", "state": "SP", "venue": "Parque Villa-Lobos", "address": "Av. Prof. Fonseca Rodrigues, 2001"}',
+    'https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=800',
+    'published',
+    500,
+    NOW() - INTERVAL '5 days',
+    NOW() + INTERVAL '10 days',
+    false,
+    NOW()
+  ),
+  (
+    'tttttttt-tttt-tttt-tttt-tttttttttttt',
+    '33333333-3333-3333-3333-333333333333',
+    'Pedalada Noturna Rio',
+    'pedalada-noturna-rio-2025',
+    'Pedal noturno gratuito de 20km pela orla do Rio. Traga sua bike e venha se divertir!',
+    'ciclismo',
+    NOW() + INTERVAL '18 days',
+    NOW() + INTERVAL '18 days',
+    '{"city": "Rio de Janeiro", "state": "RJ", "venue": "Lagoa Rodrigo de Freitas", "address": "Av. Borges de Medeiros"}',
+    'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800',
+    'published',
+    800,
+    NOW() - INTERVAL '8 days',
+    NOW() + INTERVAL '15 days',
+    false,
+    NOW()
+  ),
+  -- Premium Events
+  (
+    'uuuuuuuu-uuuu-uuuu-uuuu-uuuuuuuuuuuu',
+    '11111111-1111-1111-1111-111111111111',
+    'Ultramaratona Costa Verde',
+    'ultra-costa-verde-2025',
+    'Ultramaratona de 100km pela Costa Verde do Rio de Janeiro. Paisagens paradisíacas, desafio extremo!',
+    'corrida',
+    NOW() + INTERVAL '150 days',
+    NOW() + INTERVAL '152 days',
+    '{"city": "Paraty", "state": "RJ", "venue": "Centro Histórico", "address": "Praça da Matriz"}',
+    'https://images.unsplash.com/photo-1552674605-db6ffd4facb5?w=800',
+    'published',
+    200,
+    NOW() - INTERVAL '110 days',
+    NOW() + INTERVAL '145 days',
+    false,
+    NOW()
+  ),
+  (
+    'vvvvvvvv-vvvv-vvvv-vvvv-vvvvvvvvvvvv',
+    '22222222-2222-2222-2222-222222222222',
+    'Ironman 70.3 Barretos',
+    'ironman-70-barretos-2025',
+    'Meio Ironman: 1.9km natação, 90km bike, 21km corrida. Classificatória para o Mundial!',
+    'triatlo',
+    NOW() + INTERVAL '160 days',
+    NOW() + INTERVAL '160 days',
+    '{"city": "Barretos", "state": "SP", "venue": "Parque do Peão", "address": "Av. Monções"}',
+    'https://images.unsplash.com/photo-1502904550040-7534597429ae?w=800',
+    'published',
+    1200,
+    NOW() - INTERVAL '120 days',
+    NOW() + INTERVAL '155 days',
+    false,
+    NOW()
+  ),
+  -- Upcoming events in various dates
+  (
+    'wwwwwwww-wwww-wwww-wwww-wwwwwwwwwwww',
+    '33333333-3333-3333-3333-333333333333',
+    'Natação Circuito Paulista',
+    'natacao-circuito-sp-2025',
+    'Etapa do circuito paulista de natação. Provas de 50m, 100m e 200m em todas as categorias.',
+    'natacao',
+    NOW() + INTERVAL '28 days',
+    NOW() + INTERVAL '28 days',
+    '{"city": "Ribeirão Preto", "state": "SP", "venue": "Clube Recreativo", "address": "Av. do Café, 1234"}',
+    'https://images.unsplash.com/photo-1519315901367-f34ff9154487?w=800',
+    'published',
+    400,
+    NOW() - INTERVAL '12 days',
+    NOW() + INTERVAL '25 days',
+    false,
+    NOW()
+  );
+
+-- Additional event categories for the new events
+INSERT INTO event_categories (id, event_id, name, description, price, max_participants, current_participants)
+VALUES
+  -- Corrida Leme RJ
+  ('cat-iiii-1111-1111-1111-111111111111', 'iiiiiiii-iiii-iiii-iiii-iiiiiiiiiiii', '10km Geral', 'Percurso de 10km', 90.00, 1000, 234),
+
+  -- Natação Guanabara
+  ('cat-jjjj-1111-1111-1111-111111111111', 'jjjjjjjj-jjjj-jjjj-jjjj-jjjjjjjjjjjj', '3km Individual', 'Travessia 3km', 120.00, 600, 156),
+
+  -- Ciclismo Pampulha
+  ('cat-kkkk-1111-1111-1111-111111111111', 'kkkkkkkk-kkkk-kkkk-kkkk-kkkkkkkkkkkk', '60km Elite', 'Percurso 60km', 100.00, 500, 234),
+  ('cat-kkkk-2222-2222-2222-222222222222', 'kkkkkkkk-kkkk-kkkk-kkkk-kkkkkkkkkkkk', '30km Amador', 'Percurso 30km', 70.00, 300, 145),
+
+  -- CrossFit BH
+  ('cat-llll-1111-1111-1111-111111111111', 'llllllll-llll-llll-llll-llllllllllll', 'RX Individual', 'Categoria Elite', 250.00, 200, 89),
+  ('cat-llll-2222-2222-2222-222222222222', 'llllllll-llll-llll-llll-llllllllllll', 'Scaled Individual', 'Categoria Scaled', 180.00, 200, 112),
+
+  -- Maratona POA
+  ('cat-mmmm-1111-1111-1111-111111111111', 'mmmmmmmm-mmmm-mmmm-mmmm-mmmmmmmmmmmm', 'Maratona 42km', 'Percurso completo', 160.00, 2000, 567),
+  ('cat-mmmm-2222-2222-2222-222222222222', 'mmmmmmmm-mmmm-mmmm-mmmm-mmmmmmmmmmmm', 'Meia 21km', 'Meia maratona', 110.00, 1000, 389),
+
+  -- Tri Guaíba
+  ('cat-nnnn-1111-1111-1111-111111111111', 'nnnnnnnn-nnnn-nnnn-nnnn-nnnnnnnnnnnn', 'Individual Olímpico', 'Distância olímpica', 220.00, 800, 345),
+  ('cat-nnnn-2222-2222-2222-222222222222', 'nnnnnnnn-nnnn-nnnn-nnnn-nnnnnnnnnnnn', 'Revezamento', 'Equipe de 3', 450.00, 200, 78),
+
+  -- Corrida Eixo BSB
+  ('cat-oooo-1111-1111-1111-111111111111', 'oooooooo-oooo-oooo-oooo-oooooooooooo', '15km Geral', 'Percurso 15km', 85.00, 2000, 456),
+
+  -- MTB Paranoá
+  ('cat-pppp-1111-1111-1111-111111111111', 'pppppppp-pppp-pppp-pppp-pppppppppppp', '30km Técnico', 'Trilha técnica', 95.00, 500, 167),
+
+  -- Travessia Salvador
+  ('cat-qqqq-1111-1111-1111-111111111111', 'qqqqqqqq-qqqq-qqqq-qqqq-qqqqqqqqqqqq', '12km Elite', 'Travessia extrema', 180.00, 300, 89),
+
+  -- Meia Recife
+  ('cat-rrrr-1111-1111-1111-111111111111', 'rrrrrrrr-rrrr-rrrr-rrrr-rrrrrrrrrrrr', '21km Geral', 'Meia maratona', 100.00, 1500, 567),
+
+  -- Caminhada Vida SP (FREE)
+  ('cat-ssss-1111-1111-1111-111111111111', 'ssssssss-ssss-ssss-ssss-ssssssssssss', '3km Gratuito', 'Evento gratuito', 0.00, 500, 234),
+
+  -- Pedalada Noturna Rio (FREE)
+  ('cat-tttt-1111-1111-1111-111111111111', 'tttttttt-tttt-tttt-tttt-tttttttttttt', '20km Gratuito', 'Pedal gratuito', 0.00, 800, 345),
+
+  -- Ultra Costa Verde (PREMIUM)
+  ('cat-uuuu-1111-1111-1111-111111111111', 'uuuuuuuu-uuuu-uuuu-uuuu-uuuuuuuuuuuu', '100km Ultra', 'Ultramaratona', 450.00, 200, 67),
+
+  -- Ironman 70.3 Barretos (PREMIUM)
+  ('cat-vvvv-1111-1111-1111-111111111111', 'vvvvvvvv-vvvv-vvvv-vvvv-vvvvvvvvvvvv', '70.3 Individual', 'Meio Ironman', 650.00, 1000, 456),
+  ('cat-vvvv-2222-2222-2222-222222222222', 'vvvvvvvv-vvvv-vvvv-vvvv-vvvvvvvvvvvv', '70.3 Revezamento', 'Equipe de 3', 900.00, 200, 89),
+
+  -- Natação Circuito SP
+  ('cat-wwww-1111-1111-1111-111111111111', 'wwwwwwww-wwww-wwww-wwww-wwwwwwwwwwww', '50m Livre', 'Prova 50m', 60.00, 150, 45),
+  ('cat-wwww-2222-2222-2222-222222222222', 'wwwwwwww-wwww-wwww-wwww-wwwwwwwwwwww', '100m Livre', 'Prova 100m', 70.00, 150, 56),
+  ('cat-wwww-3333-3333-3333-333333333333', 'wwwwwwww-wwww-wwww-wwww-wwwwwwwwwwww', '200m Livre', 'Prova 200m', 80.00, 100, 34);
+
+-- Insert event kit items
+INSERT INTO event_kit_items (id, event_id, name, description, icon, image_url, display_order)
+VALUES
+  -- Maratona SP kit items
+  ('kit-aaaa-1111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Camiseta oficial', 'Camiseta técnica dry-fit com design exclusivo do evento', 'shirt', 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400', 1),
+  ('kit-aaaa-2222', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Número de peito + chip', 'Número de peito personalizado e chip de cronometragem descartável', 'hash', 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=400', 2),
+  ('kit-aaaa-3333', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Medalha finisher', 'Medalha de participação exclusiva para todos os finalizadores', 'medal', 'https://images.unsplash.com/photo-1567427017947-545c5f8d16ad?w=400', 3),
+  ('kit-aaaa-4444', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Sacochila + brindes', 'Sacochila personalizada com brindes dos patrocinadores', 'shopping-bag', 'https://images.unsplash.com/photo-1547949003-9792a18a2601?w=400', 4),
+  ('kit-aaaa-5555', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Hidratação pós-prova', 'Estação de hidratação completa na chegada', 'droplets', NULL, 5),
+  ('kit-aaaa-6666', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Guia do atleta + seguro', 'Material informativo e seguro de vida para a prova', 'book-open', NULL, 6),
+
+  -- Ironman Floripa kit items
+  ('kit-bbbb-1111', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Camiseta oficial Ironman', 'Camiseta técnica oficial Ironman com tecnologia de compressão', 'shirt', 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=400', 1),
+  ('kit-bbbb-2222', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Kit cronometragem', 'Chip profissional de cronometragem e número de peito', 'timer', 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=400', 2),
+  ('kit-bbbb-3333', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Toalha + boné', 'Toalha de microfibra e boné oficial do evento', 'package', 'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=400', 3),
+  ('kit-bbbb-4444', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Medalha Ironman finisher', 'Medalha exclusiva Ironman para quem cruzar a linha de chegada', 'medal', 'https://images.unsplash.com/photo-1567427017947-545c5f8d16ad?w=400', 4),
+  ('kit-bbbb-5555', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Mochila Ironman', 'Mochila de transição oficial Ironman', 'backpack', NULL, 5),
+
+  -- Volta Curitiba kit items
+  ('kit-cccc-1111', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'Camiseta ciclista', 'Camisa ciclista com bolso traseiro e proteção UV', 'shirt', 'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=400', 1),
+  ('kit-cccc-2222', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'Número de guidão', 'Placa de identificação para fixar no guidão', 'bike', 'https://images.unsplash.com/photo-1485965120184-e220f721d03e?w=400', 2),
+  ('kit-cccc-3333', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'Squeeze personalizada', 'Garrafa squeeze com logo do evento', 'cup-soda', NULL, 3),
+  ('kit-cccc-4444', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'Medalha de participação', 'Medalha exclusiva para todos os participantes', 'medal', 'https://images.unsplash.com/photo-1567427017947-545c5f8d16ad?w=400', 4),
+  ('kit-cccc-5555', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'Lanche pós-prova', 'Kit lanche balanceado na chegada', 'apple', NULL, 5);
+
+-- Insert event course information
+INSERT INTO event_course_info (
+  id, event_id, map_image_url, google_maps_url, gpx_file_url,
+  start_finish_location, elevation_gain, elevation_loss, max_elevation,
+  support_points, course_notes
+)
+VALUES
+  -- Maratona SP
+  (
+    'course-aaaa', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    'https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800',
+    'https://maps.google.com/?q=Parque+Ibirapuera+São+Paulo',
+    'https://example.com/gpx/maratona-sp.gpx',
+    'Parque do Ibirapuera — Portão 3',
+    156, 142, 798,
+    '["Hidratação a cada 2,5 km", "Gel energético nos km 15, 25 e 35", "Banheiros químicos a cada 5 km", "Postos médicos a cada 7 km", "Ambulâncias móveis durante todo percurso"]'::JSONB,
+    'Largada às 7h em ondas por categoria. Percurso totalmente sinalizado com cones e faixas. Apoio da CET para segurança.'
+  ),
+  -- Ironman Floripa
+  (
+    'course-bbbb', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+    'https://images.unsplash.com/photo-1589519160732-57fc498494f8?w=800',
+    'https://maps.google.com/?q=Praia+Jurerê+Florianópolis',
+    'https://example.com/gpx/ironman-floripa.gpx',
+    'Praia de Jurerê — Área de transição',
+    1243, 1198, 456,
+    '["Apoio aquático durante natação", "15 postos de hidratação no ciclismo", "Mecânica de apoio no ciclismo", "Hidratação a cada 1,5 km na corrida", "Suporte médico completo", "Nutrição energética disponível"]'::JSONB,
+    'Natação em 2 voltas, ciclismo em percurso costeiro ondulado, corrida em 4 voltas. Área de transição única.'
+  ),
+  -- Volta Curitiba
+  (
+    'course-cccc', 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+    'https://images.unsplash.com/photo-1474552226712-ac0f0961a954?w=800',
+    'https://maps.google.com/?q=Parque+Barigui+Curitiba',
+    'https://example.com/gpx/volta-curitiba.gpx',
+    'Parque Barigui — Estacionamento principal',
+    89, 85, 912,
+    '["Hidratação a cada 10 km", "Suporte mecânico móvel", "Banheiros nos km 0, 25 e 50", "Postos médicos fixos e móveis"]'::JSONB,
+    'Percurso totalmente em ciclovias e vias sinalizadas. Trânsito controlado pela SMTT. Acompanhamento de ciclistas guia.'
+  );
+
+-- Insert event FAQs
+INSERT INTO event_faqs (id, event_id, question, answer, display_order)
+VALUES
+  -- Maratona SP FAQs
+  ('faq-aaaa-1111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+   'Posso trocar minha categoria após a inscrição?',
+   'Sim, trocas de categoria podem ser feitas até 7 dias antes do evento através do seu painel de atleta. Diferenças de valores serão cobradas ou reembolsadas.',
+   1),
+  ('faq-aaaa-2222', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+   'Onde posso guardar meus pertences durante a prova?',
+   'Oferecemos guarda-volumes gratuito na área de largada. Basta apresentar seu número de peito. O serviço funciona das 6h às 14h.',
+   2),
+  ('faq-aaaa-3333', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+   'O que acontece se chover no dia do evento?',
+   'O evento ocorre com chuva. Apenas condições extremas de segurança podem adiar a prova. Acompanhe nossas redes sociais para atualizações.',
+   3),
+  ('faq-aaaa-4444', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+   'Posso retirar o kit por outra pessoa?',
+   'Sim, mediante apresentação de procuração simples, documento com foto do procurador e cópia do documento do atleta.',
+   4),
+  ('faq-aaaa-5555', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+   'Há reembolso em caso de desistência?',
+   'Cancelamentos até 30 dias antes: reembolso de 70%. Entre 30 e 15 dias: 50%. Menos de 15 dias: sem reembolso. Taxa administrativa sempre aplicada.',
+   5),
+
+  -- Ironman Floripa FAQs
+  ('faq-bbbb-1111', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+   'Preciso de bicicleta específica para o Ironman?',
+   'Permitido qualquer tipo de bike de estrada ou triathlon. Bikes contra-relógio são permitidas. Mountain bikes não recomendadas.',
+   1),
+  ('faq-bbbb-2222', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+   'Como funciona a área de transição?',
+   'Área única para T1 e T2. Bags separadas para natação/ciclismo e ciclismo/corrida. Volunteers auxiliam na organização.',
+   2),
+  ('faq-bbbb-3333', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+   'Qual o tempo limite para completar a prova?',
+   'Tempo máximo total: 16 horas. Natação: 2h20min. Ciclismo: 10h30min (tempo acumulado). Corrida: 16h00 (tempo total).',
+   3),
+
+  -- Volta Curitiba FAQs
+  ('faq-cccc-1111', 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+   'Preciso de bike especial?',
+   'Qualquer bicicleta em bom estado. Obrigatório capacete. Recomendamos revisão mecânica prévia.',
+   1),
+  ('faq-cccc-2222', 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+   'Crianças podem participar?',
+   'Menores de 18 anos precisam de autorização dos pais. Menores de 12 devem estar acompanhados de adulto responsável.',
+   2),
+  ('faq-cccc-3333', 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+   'Haverá apoio mecânico?',
+   'Sim, mecânicos posicionados em 3 pontos do percurso e van de apoio móvel. Pequenos reparos gratuitos.',
+   3);
+
+-- Insert event regulations
+INSERT INTO event_regulations (id, event_id, title, content, display_order)
+VALUES
+  -- Maratona SP regulations
+  ('reg-aaaa-1111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+   'Inscrições, cancelamentos e transferências',
+   'As inscrições são pessoais e intransferíveis entre categorias diferentes. Transferências entre pessoas da mesma categoria podem ser solicitadas até 15 dias antes do evento mediante taxa administrativa de R$ 30,00. Cancelamentos seguem a política de reembolso descrita nas FAQs. Comprovante de pagamento e documento com foto são obrigatórios na retirada do kit.',
+   1),
+  ('reg-aaaa-2222', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+   'Retirada de kit e documentos obrigatórios',
+   'A retirada do kit é obrigatória e deve ser feita pessoalmente ou por procurador. Documentos necessários: documento oficial com foto (RG, CNH ou Passaporte), comprovante de inscrição e atestado médico original datado de no máximo 90 dias. Atletas sem atestado não poderão retirar o kit nem participar da prova.',
+   2),
+  ('reg-aaaa-3333', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+   'Segurança e conduta no percurso',
+   'É obrigatório o uso do número de peito visível durante toda a prova. Atletas devem seguir as orientações dos monitores e sinalização. Atalhos ou desvios do percurso oficial resultam em desclassificação. Fones de ouvido são permitidos, mas recomendamos atenção ao entorno. Respeite ciclistas, pedestres e veículos autorizados.',
+   3),
+  ('reg-aaaa-4444', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+   'Tempo limite e resultados',
+   'O tempo máximo para conclusão é de 6 horas. Atletas que ultrapassarem este limite receberão medalha de participação mas não constarão no ranking oficial. A cronometragem é feita por chip descartável. Resultados preliminares divulgados em até 2 horas após término. Resultados oficiais em 48 horas.',
+   4),
+
+  -- Ironman Floripa regulations
+  ('reg-bbbb-1111', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+   'Equipamentos obrigatórios e permitidos',
+   'Natação: touca oficial (fornecida), roupa de neoprene permitida. Ciclismo: capacete certificado obrigatório, bike de estrada ou triathlon, clip-on permitido. Corrida: número de peito visível. Proibido: dispositivos de propulsão, drafting excessivo, música durante ciclismo.',
+   1),
+  ('reg-bbbb-2222', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+   'Penalidades e desclassificação',
+   'Drafting no ciclismo: 4min penalty. Falta de capacete: desclassificação. Assistência externa não autorizada: desclassificação. Conduta antidesportiva: desclassificação e suspensão de eventos futuros. Todas as penalidades são aplicadas em penalty box.',
+   2),
+  ('reg-bbbb-3333', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+   'Classificação para o Mundial',
+   'Este evento é qualificatório para o Ironman World Championship. Vagas distribuídas por faixa etária. Top 3 de cada AG garantem slot. Slots não aceitos passam para próximo colocado no roll down.',
+   3),
+
+  -- Volta Curitiba regulations
+  ('reg-cccc-1111', 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+   'Requisitos e equipamentos',
+   'Obrigatório: capacete certificado, bicicleta em perfeitas condições, luzes dianteira e traseira. Recomendado: kit reparo, câmara reserva, bomba. Proibida participação com bike motorizada ou elétrica.',
+   1),
+  ('reg-cccc-2222', 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+   'Percurso e segurança',
+   'Mantenha-se sempre à direita da via. Ultrapassagens pela esquerda com sinalização. Respeite semáforos e sinalização. Em caso de queda ou acidente, sinalize e aguarde apoio. Ciclistas guia acompanham o pelotão.',
+   2),
+  ('reg-cccc-3333', 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+   'Menores e acompanhantes',
+   'Menores de 12 anos devem pedalar ao lado do responsável. Menores entre 12 e 18 podem pedalar sozinhos com autorização assinada. Pais/responsáveis devem estar presentes na largada e chegada.',
+   3);
+
+-- Insert event organizers
+INSERT INTO event_organizers (id, profile_id, company_name, cnpj, description, logo_url, website, contact_email)
+VALUES
+  (
+    'org-1111', '11111111-1111-1111-1111-111111111111',
+    'SP Run Org', '12.345.678/0001-90',
+    'Organizadora de eventos esportivos com mais de 15 anos de experiência. Já realizamos mais de 200 eventos em todo Brasil, incluindo maratonas, corridas de rua e trail running. Nossa missão é proporcionar experiências inesquecíveis para atletas de todos os níveis.',
+    'https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?w=200',
+    'https://www.sprunorg.com.br',
+    'contato@sprunorg.com.br'
+  ),
+  (
+    'org-2222', '22222222-2222-2222-2222-222222222222',
+    'Brasil Triathlon Events', '98.765.432/0001-10',
+    'Especialista em eventos de triathlon e provas de longa distância. Parceira oficial Ironman no Brasil. Com equipe técnica certificada internacionalmente, garantimos segurança e excelência em cada detalhe do seu desafio.',
+    'https://images.unsplash.com/photo-1560421683-6856ea585c78?w=200',
+    'https://www.brasiltri.com.br',
+    'eventos@brasiltri.com.br'
+  ),
+  (
+    'org-3333', '33333333-3333-3333-3333-333333333333',
+    'Pedal Brasil Eventos', '45.678.912/0001-34',
+    'Organização focada em ciclismo urbano e sustentabilidade. Promovemos o uso da bike como meio de transporte e lazer. Nossos eventos combinam esporte, consciência ambiental e diversão para toda família.',
+    'https://images.unsplash.com/photo-1571333250630-f0230c2b9bcd?w=200',
+    'https://www.pedalbrasil.com.br',
+    'contato@pedalbrasil.com.br'
+  );
+
+-- Update events table with regulation PDF URLs and kit pickup info
+UPDATE events SET
+  regulation_pdf_url = 'https://example.com/regulamentos/maratona-sp-2025.pdf',
+  regulation_updated_at = NOW() - INTERVAL '5 days',
+  kit_pickup_info = '{"dates": "13 e 14 de Mar", "hours": "10h às 20h", "location": "Ginásio do Ibirapuera — Portão 7", "notes": "Documento com foto e comprovante de pagamento obrigatórios"}'::JSONB
+WHERE id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+
+UPDATE events SET
+  regulation_pdf_url = 'https://example.com/regulamentos/ironman-floripa-2025.pdf',
+  regulation_updated_at = NOW() - INTERVAL '10 days',
+  kit_pickup_info = '{"dates": "28 e 29 de Abr", "hours": "9h às 19h", "location": "Centro de Eventos Jurerê — Hall Principal", "notes": "Atestado médico original obrigatório + documento com foto"}'::JSONB
+WHERE id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+
+UPDATE events SET
+  regulation_pdf_url = 'https://example.com/regulamentos/volta-curitiba-2025.pdf',
+  regulation_updated_at = NOW() - INTERVAL '3 days',
+  kit_pickup_info = '{"dates": "28 de Fev", "hours": "14h às 20h", "location": "Parque Barigui — Sede administrativa", "notes": "Documento com foto. Menores devem estar com responsável"}'::JSONB
+WHERE id = 'cccccccc-cccc-cccc-cccc-cccccccccccc';

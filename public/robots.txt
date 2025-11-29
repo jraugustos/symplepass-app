@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Allow: /eventos
+Allow: /eventos/*
+Disallow: /api/
+Disallow: /admin/
+Disallow: /conta/
+Disallow: /inscricao/
+Disallow: /confirmacao/
+
+Sitemap: https://symplepass.com/sitemap.xml

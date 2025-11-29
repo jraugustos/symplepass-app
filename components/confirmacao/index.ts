@@ -1,0 +1,6 @@
+export { ConfirmationSuccessCard } from './confirmation-success-card'
+export { QRCodeDisplay } from './qr-code-display'
+export { RegistrationSummary } from './registration-summary'
+export { ActionButtons } from './action-buttons'
+export { NextSteps } from './next-steps'
+export { ExploreCTA } from './explore-cta'

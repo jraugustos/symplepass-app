@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste Upload Supabase</title>
+</head>
+<body>
+    <h1>Teste de Upload Direto para Supabase</h1>
+    <input type="file" id="fileInput" accept="image/*">
+    <button onclick="testUpload()">Testar Upload</button>
+    <div id="result"></div>
+
+    <script>
+        const SUPABASE_URL = 'https://syatndomjabuvrkjhddl.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN5YXRuZG9tamFidXZya2poZGRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMzMzg2MjksImV4cCI6MjA3ODkxNDYyOX0.Wr_sImexQHqbOyLHKUfpySy4kxkRQu9dSduqH6y0txw';
+
+        async function testUpload() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                alert('Selecione um arquivo primeiro');
+                return;
+            }
+
+            const fileName = `test-${Date.now()}.jpg`;
+            const url = `${SUPABASE_URL}/storage/v1/object/event-banners/${fileName}`;
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type': file.type
+                    },
+                    body: file
+                });
+
+                const result = await response.text();
+                document.getElementById('result').innerHTML = `
+                    <p>Status: ${response.status}</p>
+                    <p>Response: ${result}</p>
+                `;
+            } catch (error) {
+                document.getElementById('result').innerHTML = `
+                    <p>Erro: ${error.message}</p>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

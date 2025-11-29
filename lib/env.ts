@@ -32,15 +32,17 @@ function validateEnv(): EnvironmentConfig {
   const isDevelopment = nodeEnv === 'development'
 
   // Supabase environment variables
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
+  const supabaseAnonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseAnonKey) {
     const message =
       'Missing required Supabase environment variables:\n' +
-      (!supabaseUrl ? '  - NEXT_PUBLIC_SUPABASE_URL\n' : '') +
-      (!supabaseAnonKey ? '  - NEXT_PUBLIC_SUPABASE_ANON_KEY\n' : '') +
-      'Please configure these in your .env.local file.'
+      (!supabaseUrl ? '  - NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL)\n' : '') +
+      (!supabaseAnonKey ? '  - NEXT_PUBLIC_SUPABASE_ANON_KEY (or SUPABASE_ANON_KEY)\n' : '') +
+      'Please configure these in your .env.local file or Vercel project settings.'
 
     if (isDevelopment) {
       console.warn('⚠️  WARNING:', message)
@@ -123,8 +125,11 @@ export function getEnv(): EnvironmentConfig {
   // On client, read public variables directly
   return {
     supabase: {
-      url: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+      url: process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '',
+      anonKey:
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+        process.env.SUPABASE_ANON_KEY ||
+        '',
     },
     stripe: {
       secretKey: '', // Not available on client

@@ -46,6 +46,14 @@ const nextConfig = {
   compress: true,
   reactStrictMode: true,
   swcMinify: true,
+  env: {
+    NEXT_PUBLIC_SUPABASE_URL:
+      process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '',
+    NEXT_PUBLIC_SUPABASE_ANON_KEY:
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+      process.env.SUPABASE_ANON_KEY ??
+      '',
+  },
   // Ignore ESLint warnings during production builds (errors still fail the build)
   eslint: {
     ignoreDuringBuilds: true,

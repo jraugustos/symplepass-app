@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus, Trash2, GripVertical, Upload, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -61,6 +61,16 @@ export function KitItemsForm({
         location: pickupInfo?.location || '',
         notes: pickupInfo?.notes || '',
     })
+
+    // Sync pickupFormData when pickupInfo prop changes (e.g., after save and revalidation)
+    useEffect(() => {
+        setPickupFormData({
+            dates: pickupInfo?.dates || '',
+            hours: pickupInfo?.hours || '',
+            location: pickupInfo?.location || '',
+            notes: pickupInfo?.notes || '',
+        })
+    }, [pickupInfo])
 
     const handleOpenModal = (item?: EventKitItem) => {
         if (item) {

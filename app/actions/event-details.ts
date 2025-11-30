@@ -25,21 +25,25 @@ export async function createKitItemAction(eventId: string, data: KitItemFormData
     revalidatePath(`/eventos/[slug]`) // Revalidate public page too
 }
 
-export async function updateKitItemAction(id: string, data: KitItemFormData) {
+export async function updateKitItemAction(eventId: string, id: string, data: KitItemFormData) {
     const result = await db.updateKitItem(id, data)
     if (result.error) throw new Error(result.error)
-    // We don't know the eventId here easily, but we can rely on client refresh or just revalidate generic paths
-    // Ideally we pass eventId to revalidate specific page
+    revalidatePath(`/admin/eventos/${eventId}/editar`)
+    revalidatePath(`/eventos/[slug]`)
 }
 
-export async function deleteKitItemAction(id: string) {
+export async function deleteKitItemAction(eventId: string, id: string) {
     const result = await db.deleteKitItem(id)
     if (result.error) throw new Error(result.error)
+    revalidatePath(`/admin/eventos/${eventId}/editar`)
+    revalidatePath(`/eventos/[slug]`)
 }
 
-export async function reorderKitItemsAction(items: { id: string; display_order: number }[]) {
+export async function reorderKitItemsAction(eventId: string, items: { id: string; display_order: number }[]) {
     const result = await db.reorderKitItems(items)
     if (result.error) throw new Error(result.error)
+    revalidatePath(`/admin/eventos/${eventId}/editar`)
+    revalidatePath(`/eventos/[slug]`)
 }
 
 export async function updateKitPickupInfoAction(eventId: string, data: any) {
@@ -60,6 +64,7 @@ export async function updateCourseInfoAction(eventId: string, data: CourseInfoFo
     })
     if (result.error) throw new Error(result.error)
     revalidatePath(`/admin/eventos/${eventId}/editar`)
+    revalidatePath(`/eventos/[slug]`)
 }
 
 // FAQs
@@ -72,21 +77,28 @@ export async function createFAQAction(eventId: string, data: FAQFormData) {
     })
     if (result.error) throw new Error(result.error)
     revalidatePath(`/admin/eventos/${eventId}/editar`)
+    revalidatePath(`/eventos/[slug]`)
 }
 
-export async function updateFAQAction(id: string, data: FAQFormData) {
+export async function updateFAQAction(eventId: string, id: string, data: FAQFormData) {
     const result = await db.updateFAQ(id, data)
     if (result.error) throw new Error(result.error)
+    revalidatePath(`/admin/eventos/${eventId}/editar`)
+    revalidatePath(`/eventos/[slug]`)
 }
 
-export async function deleteFAQAction(id: string) {
+export async function deleteFAQAction(eventId: string, id: string) {
     const result = await db.deleteFAQ(id)
     if (result.error) throw new Error(result.error)
+    revalidatePath(`/admin/eventos/${eventId}/editar`)
+    revalidatePath(`/eventos/[slug]`)
 }
 
-export async function reorderFAQsAction(items: { id: string; display_order: number }[]) {
+export async function reorderFAQsAction(eventId: string, items: { id: string; display_order: number }[]) {
     const result = await db.reorderFAQs(items)
     if (result.error) throw new Error(result.error)
+    revalidatePath(`/admin/eventos/${eventId}/editar`)
+    revalidatePath(`/eventos/[slug]`)
 }
 
 // Regulations
@@ -105,6 +117,7 @@ export async function createRegulationAction(eventId: string, data: RegulationFo
         }
 
         revalidatePath(`/admin/eventos/${eventId}/editar`)
+        revalidatePath(`/eventos/[slug]`)
         return result
     } catch (error) {
         console.error('Server action error creating regulation:', error)
@@ -112,23 +125,30 @@ export async function createRegulationAction(eventId: string, data: RegulationFo
     }
 }
 
-export async function updateRegulationAction(id: string, data: RegulationFormData) {
+export async function updateRegulationAction(eventId: string, id: string, data: RegulationFormData) {
     const result = await db.updateRegulation(id, data)
     if (result.error) throw new Error(result.error)
+    revalidatePath(`/admin/eventos/${eventId}/editar`)
+    revalidatePath(`/eventos/[slug]`)
 }
 
-export async function deleteRegulationAction(id: string) {
+export async function deleteRegulationAction(eventId: string, id: string) {
     const result = await db.deleteRegulation(id)
     if (result.error) throw new Error(result.error)
+    revalidatePath(`/admin/eventos/${eventId}/editar`)
+    revalidatePath(`/eventos/[slug]`)
 }
 
-export async function reorderRegulationsAction(items: { id: string; display_order: number }[]) {
+export async function reorderRegulationsAction(eventId: string, items: { id: string; display_order: number }[]) {
     const result = await db.reorderRegulations(items)
     if (result.error) throw new Error(result.error)
+    revalidatePath(`/admin/eventos/${eventId}/editar`)
+    revalidatePath(`/eventos/[slug]`)
 }
 
 export async function updateRegulationPdfAction(eventId: string, url: string) {
     const result = await db.updateRegulationPDF(eventId, url)
     if (result.error) throw new Error(result.error)
     revalidatePath(`/admin/eventos/${eventId}/editar`)
+    revalidatePath(`/eventos/[slug]`)
 }

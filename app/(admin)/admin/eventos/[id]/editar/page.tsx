@@ -80,11 +80,28 @@ export default async function EditarEventoPage({ params }: { params: { id: strin
   const boundUpdateCategory = updateCategoryAction.bind(null, eventId)
   const boundDeleteCategory = deleteCategoryAction.bind(null, eventId)
   const boundReorderCategories = reorderCategoriesAction.bind(null, eventId)
+
+  // Kit items actions
   const boundCreateKitItem = createKitItemAction.bind(null, eventId)
+  const boundUpdateKitItem = updateKitItemAction.bind(null, eventId)
+  const boundDeleteKitItem = deleteKitItemAction.bind(null, eventId)
+  const boundReorderKitItems = reorderKitItemsAction.bind(null, eventId)
   const boundUpdateKitPickupInfo = updateKitPickupInfoAction.bind(null, eventId)
+
+  // Course info
   const boundUpdateCourseInfo = updateCourseInfoAction.bind(null, eventId)
+
+  // FAQs actions
   const boundCreateFAQ = createFAQAction.bind(null, eventId)
+  const boundUpdateFAQ = updateFAQAction.bind(null, eventId)
+  const boundDeleteFAQ = deleteFAQAction.bind(null, eventId)
+  const boundReorderFAQs = reorderFAQsAction.bind(null, eventId)
+
+  // Regulations actions
   const boundCreateRegulation = createRegulationAction.bind(null, eventId)
+  const boundUpdateRegulation = updateRegulationAction.bind(null, eventId)
+  const boundDeleteRegulation = deleteRegulationAction.bind(null, eventId)
+  const boundReorderRegulations = reorderRegulationsAction.bind(null, eventId)
   const boundUpdateRegulationPdf = updateRegulationPdfAction.bind(null, eventId)
 
   return (
@@ -129,18 +146,18 @@ export default async function EditarEventoPage({ params }: { params: { id: strin
               kitPickupInfo={event.kit_pickup_info}
               regulationPdfUrl={event.regulation_pdf_url}
               onKitItemCreate={boundCreateKitItem}
-              onKitItemUpdate={updateKitItemAction}
-              onKitItemDelete={deleteKitItemAction}
-              onKitItemsReorder={reorderKitItemsAction}
+              onKitItemUpdate={boundUpdateKitItem}
+              onKitItemDelete={boundDeleteKitItem}
+              onKitItemsReorder={boundReorderKitItems}
               onCourseInfoUpdate={boundUpdateCourseInfo}
               onFAQCreate={boundCreateFAQ}
-              onFAQUpdate={updateFAQAction}
-              onFAQDelete={deleteFAQAction}
-              onFAQsReorder={reorderFAQsAction}
+              onFAQUpdate={boundUpdateFAQ}
+              onFAQDelete={boundDeleteFAQ}
+              onFAQsReorder={boundReorderFAQs}
               onRegulationCreate={boundCreateRegulation}
-              onRegulationUpdate={updateRegulationAction}
-              onRegulationDelete={deleteRegulationAction}
-              onRegulationsReorder={reorderRegulationsAction}
+              onRegulationUpdate={boundUpdateRegulation}
+              onRegulationDelete={boundDeleteRegulation}
+              onRegulationsReorder={boundReorderRegulations}
               onKitPickupInfoUpdate={boundUpdateKitPickupInfo}
               onRegulationPdfUpdate={boundUpdateRegulationPdf}
             />

@@ -38,6 +38,8 @@ export async function updateEventAction(eventId: string, data: EventFormDataAdmi
       allows_pair_registration: data.allows_pair_registration,
       shirt_sizes: data.shirt_sizes,
       shirt_sizes_config: data.shirt_sizes_config,
+      show_course_info: data.show_course_info,
+      show_championship_format: data.show_championship_format,
     },
     result.user.id,
     result.profile.role

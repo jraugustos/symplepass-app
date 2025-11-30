@@ -18,7 +18,10 @@ import {
 // getBucketConfig available from './storage-config' when needed
 
 export class UploadService {
-  private supabase = createClient();
+  // Get a fresh client for each operation to ensure auth token is current
+  private getClient() {
+    return createClient();
+  }
 
   /**
    * Upload a single file to Supabase Storage
@@ -43,7 +46,10 @@ export class UploadService {
         ? `${options.folder}/${fileName}`
         : fileName;
 
-      const { data, error } = await this.supabase.storage
+      console.log('[UploadService] Starting upload to', options.bucket, 'path:', filePath);
+
+      const supabase = this.getClient();
+      const { data, error } = await supabase.storage
         .from(options.bucket)
         .upload(filePath, file, {
           cacheControl: '3600',
@@ -102,7 +108,8 @@ export class UploadService {
    */
   async deleteFile(bucket: StorageBucket, path: string): Promise<boolean> {
     try {
-      const { error } = await this.supabase.storage
+      const supabase = this.getClient();
+      const { error } = await supabase.storage
         .from(bucket)
         .remove([path]);
 
@@ -126,7 +133,8 @@ export class UploadService {
     paths: string[]
   ): Promise<boolean> {
     try {
-      const { error } = await this.supabase.storage
+      const supabase = this.getClient();
+      const { error } = await supabase.storage
         .from(bucket)
         .remove(paths);
 
@@ -150,8 +158,10 @@ export class UploadService {
     path: string,
     isPublic: boolean = true
   ): Promise<string> {
+    const supabase = this.getClient();
+
     if (isPublic) {
-      const { data } = this.supabase.storage
+      const { data } = supabase.storage
         .from(bucket)
         .getPublicUrl(path);
 
@@ -159,7 +169,7 @@ export class UploadService {
     }
 
     // For private files, generate a signed URL
-    const { data, error } = await this.supabase.storage
+    const { data, error } = await supabase.storage
       .from(bucket)
       .createSignedUrl(path, 3600); // 1 hour expiry
 
@@ -179,7 +189,8 @@ export class UploadService {
     toPath: string
   ): Promise<boolean> {
     try {
-      const { error } = await this.supabase.storage
+      const supabase = this.getClient();
+      const { error } = await supabase.storage
         .from(bucket)
         .move(fromPath, toPath);
 
@@ -204,7 +215,8 @@ export class UploadService {
     toPath: string
   ): Promise<boolean> {
     try {
-      const { error } = await this.supabase.storage
+      const supabase = this.getClient();
+      const { error } = await supabase.storage
         .from(bucket)
         .copy(fromPath, toPath);
 
@@ -236,7 +248,8 @@ export class UploadService {
     }
   ) {
     try {
-      const { data, error } = await this.supabase.storage
+      const supabase = this.getClient();
+      const { data, error } = await supabase.storage
         .from(bucket)
         .list(folder, options);
 
@@ -259,7 +272,8 @@ export class UploadService {
     path: string
   ): Promise<Blob | null> {
     try {
-      const { data, error } = await this.supabase.storage
+      const supabase = this.getClient();
+      const { data, error } = await supabase.storage
         .from(bucket)
         .download(path);
 
@@ -346,7 +360,8 @@ export class UploadService {
    */
   async fileExists(bucket: StorageBucket, path: string): Promise<boolean> {
     try {
-      const { data, error } = await this.supabase.storage
+      const supabase = this.getClient();
+      const { data, error } = await supabase.storage
         .from(bucket)
         .list(path.split('/').slice(0, -1).join('/'), {
           limit: 1,

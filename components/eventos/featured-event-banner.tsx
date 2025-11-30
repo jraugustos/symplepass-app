@@ -76,14 +76,14 @@ export function FeaturedEventBanner({ event }: FeaturedEventBannerProps) {
           )}
 
           {/* Action Buttons */}
-          <div className="flex flex-wrap gap-3">
-            <Link href={`/eventos/${event.slug}`}>
-              <Button variant="primary" size="lg" className="bg-gradient-primary">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Link href={`/eventos/${event.slug}`} className="w-full sm:w-auto">
+              <Button variant="primary" size="lg" className="w-full sm:w-auto bg-gradient-primary">
                 Ver detalhes
               </Button>
             </Link>
-            <Link href={`/eventos/${event.slug}`}>
-              <Button variant="outline" size="lg">
+            <Link href={`/eventos/${event.slug}`} className="w-full sm:w-auto">
+              <Button variant="outline" size="lg" className="w-full sm:w-auto">
                 <Ticket className="w-4 h-4 mr-2" />
                 Garantir ingresso
               </Button>

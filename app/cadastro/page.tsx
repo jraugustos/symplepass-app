@@ -24,7 +24,7 @@ export default async function RegisterPage() {
       {/* Background image with overlay */}
       <div className="absolute inset-0 z-0">
         <Image
-          src="https://images.unsplash.com/photo-1461896836934-ffe607ba8211?q=80&w=2070"
+          src="/assets/login-image.jpeg"
           alt="Esportes"
           fill
           className="object-cover"
@@ -36,15 +36,22 @@ export default async function RegisterPage() {
       {/* Content */}
       <div className="relative z-10 w-full max-w-md">
         {/* Logo */}
-        <div className="text-center mb-8 animate-fade-in">
+        <div className="text-center mb-8 pt-8 animate-fade-in">
           <Link href="/" className="inline-block">
-            <h1 className="text-4xl font-bold text-white mb-2">Symplepass</h1>
+            <Image
+              src="/assets/symplepass-white.svg"
+              alt="Symplepass"
+              width={200}
+              height={48}
+              className="h-12 w-auto mb-2"
+              priority
+            />
           </Link>
           <p className="text-gray-200 text-lg">Seu próximo desafio está a um clique.</p>
         </div>
 
         {/* Register Form Card */}
-        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 animate-slide-up">
+        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-5 sm:p-8 animate-slide-up">
           <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">
             Crie sua conta
           </h2>

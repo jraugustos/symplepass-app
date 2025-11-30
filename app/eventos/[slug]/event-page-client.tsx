@@ -18,6 +18,7 @@ import {
 } from '@/components/evento'
 import { NavigationHeader } from '@/components/molecules/navigation-header'
 import { Footer } from '@/components/layout/footer'
+import { signOut } from '@/lib/auth/actions'
 import type { EventDetailData, EventCategory, UserRole } from '@/types/database.types'
 import type { KitPickupInfo } from '@/types'
 
@@ -74,7 +75,8 @@ export default function EventPageClient({
   }
 
   const handleLogout = async () => {
-    window.location.href = '/api/auth/signout'
+    await signOut()
+    window.location.href = '/'
   }
 
   const handleProfileClick = (destination?: string) => {

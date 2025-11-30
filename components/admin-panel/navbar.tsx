@@ -2,8 +2,9 @@
 
 import { Button } from "@/components/ui/button";
 import { Menu, User, LogOut, Settings, LayoutDashboard, Ticket } from "lucide-react";
-import { cn, getInitials } from "@/lib/utils";
+import { getInitials } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
+import { signOut } from "@/lib/auth/actions";
 
 interface NavbarProps {
     title?: string;
@@ -31,8 +32,9 @@ export function Navbar({ title, user, profile, onMenuClick }: NavbarProps) {
         return () => document.removeEventListener('mousedown', handleClickOutside)
     }, [isUserMenuOpen])
 
-    const handleLogout = () => {
-        window.location.href = '/api/auth/signout'
+    const handleLogout = async () => {
+        await signOut()
+        window.location.href = '/'
     }
 
     const handleProfileClick = (destination: string) => {

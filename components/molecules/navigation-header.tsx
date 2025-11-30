@@ -342,10 +342,26 @@ export function NavigationHeader({
       {isMobileMenuOpen && (
         <div
           className={cn(
-            'md:hidden fixed inset-0 top-16 z-40 overflow-y-auto border-t animate-slide-in-right',
+            'md:hidden fixed inset-0 top-0 z-[60] overflow-y-auto animate-slide-in-right',
             mobileMenuClasses[variant]
           )}
         >
+          {/* Mobile menu header */}
+          <div className="flex items-center justify-between h-16 px-4 border-b border-current/10">
+            <a href="/" className="flex items-center gap-2 font-geist font-bold text-xl">
+              <img src="/assets/symplepass-white.svg" alt="Symplepass" className="h-6 w-auto" />
+            </a>
+            <button
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={cn(
+                'inline-flex items-center justify-center w-10 h-10 rounded-lg transition-colors',
+                variant === 'light' ? 'hover:bg-neutral-100' : 'hover:bg-white/10'
+              )}
+              aria-label="Close menu"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
           <nav className="container mx-auto px-4 py-6 flex flex-col gap-1" aria-label="Mobile navigation">
             {navigationLinks.map((link) => (
               <a

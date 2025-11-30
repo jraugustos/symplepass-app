@@ -31,24 +31,24 @@ export default function AboutPage() {
                         Revolucionando o mercado esportivo
                     </div>
 
-                    <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold font-geist text-white mb-8 tracking-tight leading-tight animate-fade-in-up delay-100">
+                    <h1 className="text-3xl sm:text-5xl md:text-7xl lg:text-8xl font-bold font-geist text-white mb-8 tracking-tight leading-tight animate-fade-in-up delay-100">
                         Conectando <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-orange-600">Paixão</span><br />
                         ao Movimento.
                     </h1>
 
-                    <p className="text-xl md:text-2xl text-neutral-300 max-w-3xl mx-auto font-inter leading-relaxed mb-12 animate-fade-in-up delay-200">
+                    <p className="text-lg sm:text-xl md:text-2xl text-neutral-300 max-w-3xl mx-auto font-inter leading-relaxed mb-12 animate-fade-in-up delay-200">
                         A SymplePass nasceu com um propósito simples: conectar quem produz experiências esportivas a quem vive o esporte.
                     </p>
 
                     <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in-up delay-300 pb-20">
-                        <Link href="/eventos">
-                            <Button size="lg" className="h-14 px-8 text-lg bg-orange-600 hover:bg-orange-700 text-white rounded-full shadow-lg shadow-orange-600/20 hover:shadow-orange-600/40 transition-all hover:-translate-y-1">
+                        <Link href="/eventos" className="w-full sm:w-auto">
+                            <Button size="lg" className="w-full sm:w-auto h-14 px-8 text-lg bg-orange-600 hover:bg-orange-700 text-white rounded-full shadow-lg shadow-orange-600/20 hover:shadow-orange-600/40 transition-all hover:-translate-y-1">
                                 Explorar Eventos
                                 <ArrowRight className="ml-2 h-5 w-5" />
                             </Button>
                         </Link>
-                        <Link href="/criar-evento">
-                            <Button variant="outline" size="lg" className="h-14 px-8 text-lg bg-white/5 backdrop-blur-sm border-white/20 text-white hover:bg-white/10 hover:text-white rounded-full transition-all hover:-translate-y-1">
+                        <Link href="/criar-evento" className="w-full sm:w-auto">
+                            <Button variant="outline" size="lg" className="w-full sm:w-auto h-14 px-8 text-lg bg-white/5 backdrop-blur-sm border-white/20 text-white hover:bg-white/10 hover:text-white rounded-full transition-all hover:-translate-y-1">
                                 Sou Organizador
                             </Button>
                         </Link>
@@ -60,7 +60,7 @@ export default function AboutPage() {
             <section className="py-32 bg-white relative">
                 <div className="container-custom mx-auto">
                     <div className="max-w-4xl mx-auto text-center mb-20">
-                        <h2 className="text-4xl md:text-5xl font-bold font-geist text-neutral-900 mb-8 leading-tight">
+                        <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold font-geist text-neutral-900 mb-8 leading-tight">
                             Acreditamos que o esporte transforma vidas — e que a tecnologia pode transformar o esporte.
                         </h2>
                         <p className="text-xl text-neutral-600 font-inter leading-relaxed">
@@ -106,7 +106,7 @@ export default function AboutPage() {
             <section className="py-24 bg-neutral-50">
                 <div className="container-custom mx-auto">
                     <div className="text-center max-w-3xl mx-auto mb-16">
-                        <h2 className="text-4xl font-bold font-geist text-neutral-900 mb-6">Nosso Ecossistema</h2>
+                        <h2 className="text-2xl sm:text-4xl font-bold font-geist text-neutral-900 mb-6">Nosso Ecossistema</h2>
                         <p className="text-xl text-neutral-600 font-inter">
                             Mais do que uma plataforma, somos um ecossistema. Trabalhamos para fortalecer a comunidade esportiva.
                         </p>
@@ -163,26 +163,26 @@ export default function AboutPage() {
             {/* CTA Section */}
             <section className="py-24 bg-white">
                 <div className="container-custom mx-auto">
-                    <div className="bg-neutral-900 rounded-[2.5rem] p-12 md:p-20 text-center relative overflow-hidden">
+                    <div className="bg-neutral-900 rounded-[2.5rem] p-6 sm:p-12 md:p-20 text-center relative overflow-hidden">
                         <div className="absolute inset-0 bg-[url('/assets/hero-pattern.svg')] opacity-5"></div>
                         <div className="absolute top-0 right-0 w-96 h-96 bg-orange-500/20 rounded-full mix-blend-screen filter blur-[80px]"></div>
                         <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-500/20 rounded-full mix-blend-screen filter blur-[80px]"></div>
 
                         <div className="relative z-10 max-w-3xl mx-auto">
-                            <h2 className="text-4xl md:text-5xl font-bold font-geist text-white mb-6">
+                            <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold font-geist text-white mb-6">
                                 Pronto para começar?
                             </h2>
-                            <p className="text-xl text-neutral-400 mb-10 font-inter">
+                            <p className="text-lg sm:text-xl text-neutral-400 mb-10 font-inter">
                                 Junte-se a milhares de atletas e organizadores que já estão transformando o esporte com a SymplePass.
                             </p>
                             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                                <Link href="/criar-evento">
-                                    <Button size="lg" className="h-14 px-8 text-lg bg-orange-600 hover:bg-orange-700 text-white rounded-full">
+                                <Link href="/criar-evento" className="w-full sm:w-auto">
+                                    <Button size="lg" className="w-full sm:w-auto h-14 px-8 text-lg bg-orange-600 hover:bg-orange-700 text-white rounded-full">
                                         Organizar Evento
                                     </Button>
                                 </Link>
-                                <Link href="/eventos">
-                                    <Button variant="outline" size="lg" className="h-14 px-8 text-lg bg-transparent border-neutral-700 text-white hover:bg-white/10 hover:text-white rounded-full">
+                                <Link href="/eventos" className="w-full sm:w-auto">
+                                    <Button variant="outline" size="lg" className="w-full sm:w-auto h-14 px-8 text-lg bg-transparent border-neutral-700 text-white hover:bg-white/10 hover:text-white rounded-full">
                                         Buscar Eventos
                                     </Button>
                                 </Link>

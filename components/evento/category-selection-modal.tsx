@@ -165,10 +165,10 @@ export default function CategorySelectionModal({
       />
 
       {/* Wrapper */}
-      <div className="absolute inset-x-0 bottom-0 sm:inset-0 sm:flex sm:items-center sm:justify-center w-full sm:max-w-2xl sm:mx-auto px-4 sm:px-0">
+      <div className="absolute inset-0 flex items-center justify-center p-4">
         {/* Card */}
         <div
-          className="w-full sm:w-full max-w-2xl rounded-t-2xl sm:rounded-2xl border border-neutral-200 bg-white p-5 sm:p-6 shadow-xl transition-all duration-300 ease-out animate-fade-in-up"
+          className="w-full max-w-2xl rounded-2xl border border-neutral-200 bg-white p-4 sm:p-6 shadow-xl transition-all duration-300 ease-out animate-fade-in-up max-h-[90vh] overflow-y-auto"
           style={{
             opacity: isOpen ? 1 : 0,
             transform: isOpen ? 'translateY(0)' : 'translateY(20px)'

@@ -13,10 +13,10 @@ export const metadata: Metadata = {
 export default function ContactPage() {
     return (
         <div className="min-h-screen bg-neutral-50 flex flex-col">
-            <Header variant="light" />
+            <Header variant="transparent" className="absolute top-0 left-0 right-0 z-50 border-b-0" />
 
             {/* Hero Section */}
-            <section className="bg-neutral-900 py-20 md:py-28 relative overflow-hidden">
+            <section className="bg-neutral-900 pt-32 pb-20 md:pt-40 md:pb-28 relative overflow-hidden">
                 <div className="absolute inset-0 bg-[url('/assets/hero-pattern.svg')] opacity-5"></div>
                 {/* Gradient Orbs */}
                 <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-orange-500/20 rounded-full mix-blend-screen filter blur-[100px] translate-x-1/2 -translate-y-1/2"></div>
@@ -27,16 +27,16 @@ export default function ContactPage() {
                         <MessageSquare className="w-3 h-3" />
                         Suporte 24/7
                     </div>
-                    <h1 className="text-4xl md:text-6xl font-bold font-geist text-white mb-6">
+                    <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold font-geist text-white mb-6">
                         Como podemos ajudar?
                     </h1>
-                    <p className="text-lg md:text-xl text-neutral-400 max-w-2xl mx-auto font-inter leading-relaxed">
+                    <p className="text-base sm:text-lg md:text-xl text-neutral-400 max-w-2xl mx-auto font-inter leading-relaxed">
                         Tem alguma dúvida, sugestão ou precisa de ajuda com seu evento? Nossa equipe especializada está pronta para atender você.
                     </p>
                 </div>
             </section>
 
-            <div className="flex-grow container-custom mx-auto -mt-16 pb-20 relative z-20">
+            <div className="flex-grow container-custom mx-auto py-12 md:py-20 relative z-20">
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                     {/* Contact Info Cards (Left Side) */}
                     <div className="lg:col-span-4 space-y-6">
@@ -51,9 +51,9 @@ export default function ContactPage() {
                                     <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center text-orange-600 shrink-0">
                                         <Mail className="h-5 w-5" />
                                     </div>
-                                    <div>
+                                    <div className="min-w-0">
                                         <p className="text-sm font-medium text-neutral-500 mb-1">E-mail</p>
-                                        <a href="mailto:contato@symplepass.com.br" className="text-neutral-900 font-semibold hover:text-orange-600 transition-colors">
+                                        <a href="mailto:contato@symplepass.com.br" className="text-neutral-900 font-semibold hover:text-orange-600 transition-colors text-sm sm:text-base break-all">
                                             contato@symplepass.com.br
                                         </a>
                                     </div>

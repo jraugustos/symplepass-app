@@ -133,7 +133,7 @@ export function SearchBar({
             </div>
           )}
           <div className="flex flex-col gap-3">
-            <div className="flex items-stretch gap-3">
+            <div className="flex flex-col sm:flex-row items-stretch gap-3">
               <div className="flex-1 flex items-center gap-2 bg-white/95 border border-white/60 rounded-full px-4 py-0.5 shadow-inner backdrop-blur">
                 <Search className="w-5 h-5 text-neutral-600 flex-shrink-0" />
                 <input
@@ -149,7 +149,7 @@ export function SearchBar({
               </div>
               <button
                 type="submit"
-                className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#4b1f0e] via-[#7c3712] to-[#b3531b] px-5 py-2.5 text-sm font-semibold font-geist text-white shadow-[0_15px_35px_rgba(87,35,15,0.45)] transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-orange-300"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#4b1f0e] via-[#7c3712] to-[#b3531b] px-5 py-2.5 text-sm font-semibold font-geist text-white shadow-[0_15px_35px_rgba(87,35,15,0.45)] transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-orange-300"
               >
                 Buscar
                 <ArrowRight className="w-[18px] h-[18px]" />

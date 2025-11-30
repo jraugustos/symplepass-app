@@ -33,8 +33,8 @@ export function LegalLayout({ children, title, lastUpdated, className }: LegalLa
                 <div className="absolute inset-0 bg-[url('/assets/hero-pattern.svg')] opacity-10"></div>
 
                 <div className="container-custom mx-auto relative z-10">
-                    <h1 className="text-4xl md:text-6xl font-bold font-geist mb-6 tracking-tight">{title}</h1>
-                    <p className="text-white font-inter text-lg md:text-xl max-w-2xl leading-relaxed">
+                    <h1 className="text-2xl sm:text-4xl md:text-6xl font-bold font-geist mb-6 tracking-tight">{title}</h1>
+                    <p className="text-white font-inter text-base sm:text-lg md:text-xl max-w-2xl leading-relaxed">
                         Transparência e segurança para você aproveitar o melhor do esporte.
                     </p>
                 </div>
@@ -72,12 +72,12 @@ export function LegalLayout({ children, title, lastUpdated, className }: LegalLa
 
                     {/* Content */}
                     <div className="lg:col-span-9">
-                        <div className="bg-white rounded-2xl shadow-custom-sm p-8 md:p-12 border border-neutral-200">
+                        <div className="bg-white rounded-2xl shadow-custom-sm p-4 sm:p-8 md:p-12 border border-neutral-200">
                             <div className={cn(
-                                "prose prose-neutral prose-lg max-w-none font-inter",
+                                "prose prose-neutral prose-sm sm:prose-lg max-w-none font-inter",
                                 "prose-headings:font-geist prose-headings:font-bold prose-headings:text-neutral-900",
-                                "prose-h3:text-xl prose-h3:mt-8 prose-h3:mb-4",
-                                "prose-h4:text-lg prose-h4:mt-6 prose-h4:mb-3",
+                                "prose-h3:text-lg sm:prose-h3:text-xl prose-h3:mt-8 prose-h3:mb-4",
+                                "prose-h4:text-base sm:prose-h4:text-lg prose-h4:mt-6 prose-h4:mb-3",
                                 "prose-p:text-neutral-600 prose-p:leading-relaxed prose-p:mb-6",
                                 "prose-li:text-neutral-600 prose-li:mb-2",
                                 "prose-strong:text-neutral-900",

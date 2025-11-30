@@ -8,6 +8,7 @@ import {
   getUserSessions,
   deleteUserSession,
 } from '@/lib/data/user-preferences'
+import { addOrUpdateContact } from '@/lib/email/contacts'
 
 const preferencesSchema = z.object({
   favorite_sports: z.array(z.string()).optional(),
@@ -80,6 +81,14 @@ export async function PATCH(request: NextRequest) {
         { error: result.error || 'Não foi possível atualizar preferências' },
         { status: 400 }
       )
+    }
+
+    // Sync contact with Resend (non-blocking)
+    // Note: Resend's basic API doesn't support custom properties like favorite_sports
+    if (user.email) {
+      addOrUpdateContact({ email: user.email }).catch((err) => {
+        console.error('Failed to sync contact with Resend:', err)
+      })
     }
 
     return NextResponse.json({ data: result.data })

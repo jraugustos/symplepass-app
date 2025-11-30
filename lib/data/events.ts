@@ -145,6 +145,7 @@ export async function getEventBySlug(slug: string): Promise<EventWithCategories 
       `)
       .eq('slug', slug)
       .eq('status', 'published')
+      .order('display_order', { foreignTable: 'event_categories', ascending: true })
       .single()
 
     if (error) {
@@ -181,7 +182,7 @@ export async function getEventDetailBySlug(slug: string): Promise<EventDetailDat
       `)
       .eq('slug', slug)
       .in('status', ['published', 'published_no_registration'])
-      .order('price', { foreignTable: 'event_categories', ascending: true })
+      .order('display_order', { foreignTable: 'event_categories', ascending: true })
       .order('display_order', { foreignTable: 'event_kit_items', ascending: true })
       .order('display_order', { foreignTable: 'event_faqs', ascending: true })
       .order('display_order', { foreignTable: 'event_regulations', ascending: true })

@@ -15,6 +15,7 @@ import {
   createCategoryAction,
   updateCategoryAction,
   deleteCategoryAction,
+  reorderCategoriesAction,
 } from '@/app/actions/admin-events'
 import {
   createKitItemAction,
@@ -78,6 +79,7 @@ export default async function EditarEventoPage({ params }: { params: { id: strin
   const boundCreateCategory = createCategoryAction.bind(null, eventId)
   const boundUpdateCategory = updateCategoryAction.bind(null, eventId)
   const boundDeleteCategory = deleteCategoryAction.bind(null, eventId)
+  const boundReorderCategories = reorderCategoriesAction.bind(null, eventId)
   const boundCreateKitItem = createKitItemAction.bind(null, eventId)
   const boundUpdateKitPickupInfo = updateKitPickupInfoAction.bind(null, eventId)
   const boundUpdateCourseInfo = updateCourseInfoAction.bind(null, eventId)
@@ -116,6 +118,7 @@ export default async function EditarEventoPage({ params }: { params: { id: strin
           onCategoryCreate={boundCreateCategory}
           onCategoryUpdate={boundUpdateCategory}
           onCategoryDelete={boundDeleteCategory}
+          onCategoryReorder={boundReorderCategories}
           eventDetailsSection={
             <EventDetailsTabs
               eventId={eventId}

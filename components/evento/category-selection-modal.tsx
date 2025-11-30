@@ -35,13 +35,27 @@ export default function CategorySelectionModal({
   const shirtSizesConfig: ShirtSizesByGender | null =
     event.shirt_sizes_config || null
 
-  const genderOptions: ShirtGender[] = shirtSizesConfig
-    ? (Object.keys(GENDER_LABELS) as ShirtGender[]).filter(
-      (gender) => shirtSizesConfig[gender] && shirtSizesConfig[gender]!.length > 0
-    )
-    : (Object.keys(GENDER_LABELS) as ShirtGender[]).filter(
-      (gender) => DEFAULT_SHIRT_SIZES_BY_GENDER[gender]?.length > 0
-    )
+  // Check if category has specific gender restrictions (array)
+  const categoryGenders = category?.shirt_genders || null
+
+  // Filter gender options based on category restriction
+  const genderOptions: ShirtGender[] = categoryGenders && categoryGenders.length > 0
+    // If category has specific genders, only show those genders
+    ? categoryGenders.filter((gender) => {
+        // Also ensure the gender has sizes configured
+        if (shirtSizesConfig) {
+          return shirtSizesConfig[gender] && shirtSizesConfig[gender]!.length > 0
+        }
+        return DEFAULT_SHIRT_SIZES_BY_GENDER[gender]?.length > 0
+      })
+    // Otherwise, show all genders that have sizes configured
+    : shirtSizesConfig
+      ? (Object.keys(GENDER_LABELS) as ShirtGender[]).filter(
+        (gender) => shirtSizesConfig[gender] && shirtSizesConfig[gender]!.length > 0
+      )
+      : (Object.keys(GENDER_LABELS) as ShirtGender[]).filter(
+        (gender) => DEFAULT_SHIRT_SIZES_BY_GENDER[gender]?.length > 0
+      )
 
   const getSizesForGender = (gender: ShirtGender | null) => {
     if (!gender) return []
@@ -51,7 +65,7 @@ export default function CategorySelectionModal({
     return DEFAULT_SHIRT_SIZES_BY_GENDER[gender] || []
   }
 
-  // Align selected genders with available options
+  // Align selected genders with available options when category or genderOptions change
   useEffect(() => {
     if (genderOptions.length === 0) {
       setSelectedGender(null)
@@ -61,13 +75,19 @@ export default function CategorySelectionModal({
       return
     }
 
-    setSelectedGender((prev) => (prev && genderOptions.includes(prev) ? prev : genderOptions[0]))
-
-    setPartnerGender((prev) => {
-      if (registrationType !== 'dupla') return null
-      return prev && genderOptions.includes(prev) ? prev : genderOptions[0]
-    })
-  }, [genderOptions, registrationType])
+    // If category has specific genders and only one, force that selection
+    // Otherwise allow selection from available options
+    if (categoryGenders && categoryGenders.length === 1) {
+      setSelectedGender(categoryGenders[0])
+      setPartnerGender(registrationType === 'dupla' ? categoryGenders[0] : null)
+    } else {
+      setSelectedGender((prev) => (prev && genderOptions.includes(prev) ? prev : genderOptions[0]))
+      setPartnerGender((prev) => {
+        if (registrationType !== 'dupla') return null
+        return prev && genderOptions.includes(prev) ? prev : genderOptions[0]
+      })
+    }
+  }, [genderOptions, registrationType, categoryGenders])
 
   // Get available sizes for selected gender(s)
   const availableSizes = getSizesForGender(selectedGender)

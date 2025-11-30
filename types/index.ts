@@ -487,6 +487,7 @@ export interface CategoryFormData {
   description?: string | null
   price: number
   max_participants?: number | null
+  shirt_genders?: ('masculino' | 'feminino' | 'infantil')[] | null
 }
 
 export interface RegistrationFilters {

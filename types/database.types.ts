@@ -10,18 +10,59 @@ export type EventType = 'paid' | 'free' | 'solidarity'
 export const EVENT_FORMATS = ['presencial', 'online', 'workshop', 'hibrido'] as const
 export type EventFormat = typeof EVENT_FORMATS[number]
 export type SportType =
+  // Endurance / Outdoor
   | 'corrida'
-  | 'ciclismo'
-  | 'triatlo'
-  | 'natacao'
   | 'caminhada'
-  | 'crossfit'
-  | 'beach_sports'
   | 'trail_running'
+  | 'ciclismo'
+  | 'mountain_bike'
+  | 'triatlo'
+  | 'duatlo'
+  | 'natacao'
+  | 'aguas_abertas'
+  // Beach Sports
   | 'beach_tenis'
   | 'futevolei'
   | 'volei_praia'
+  | 'surf'
+  | 'bodyboard'
+  | 'kitesurf'
+  | 'windsurf'
   | 'stand_up_paddle'
+  | 'beach_run'
+  // Fitness / Indoor
+  | 'crossfit'
+  | 'funcional'
+  | 'calistenia'
+  | 'academia'
+  | 'spinning'
+  | 'pilates'
+  | 'yoga'
+  // Coletivos
+  | 'futebol'
+  | 'futsal'
+  | 'basquete'
+  | 'volei'
+  | 'handebol'
+  | 'rugby'
+  // Aventura / Natureza
+  | 'canoagem'
+  | 'remo'
+  | 'corrida_montanha'
+  | 'orientacao'
+  | 'rapel'
+  | 'parkour'
+  // Urbanos
+  | 'patins'
+  | 'skate'
+  | 'longboard'
+  | 'bike_urbana'
+  // Precisao
+  | 'tiro_com_arco'
+  | 'tiro_esportivo'
+  // Outros
+  | 'multiesportes'
+  | 'obstaculos'
   | 'outro'
 export type RegistrationStatus = 'pending' | 'confirmed' | 'cancelled'
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded'
@@ -37,6 +78,7 @@ export interface User {
   gender?: string | null
   avatar_url: string | null
   role: UserRole
+  favorite_sports?: string[] | null // Sports of interest for email segmentation
   created_at: string
   updated_at: string
 }
@@ -86,6 +128,8 @@ export interface EventCategory {
   price: number
   max_participants: number | null
   current_participants: number
+  display_order: number
+  shirt_genders: ('masculino' | 'feminino' | 'infantil')[] | null
   created_at: string
   updated_at: string
 }
@@ -105,6 +149,7 @@ export interface Registration {
   partner_name: string | null
   is_partner_registration: boolean
   registration_data: Record<string, any> | null
+  reminder_sent_at: string | null
   created_at: string
   updated_at: string
 }

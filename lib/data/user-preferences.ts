@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database.types'
 import type { SportType, ThemeOption, UserPreferences, UserSession } from '@/types'
+import { getAllSportValues } from '@/lib/constants/sports'
 
 type Result<T> = {
   data: T | null
@@ -11,17 +12,7 @@ type Result<T> = {
 type SupabaseServerClient = SupabaseClient<Database>
 
 const VALID_THEMES: ThemeOption[] = ['light', 'dark', 'system']
-const VALID_SPORTS: SportType[] = [
-  'corrida',
-  'ciclismo',
-  'triatlo',
-  'natacao',
-  'caminhada',
-  'crossfit',
-  'beach_sports',
-  'trail_running',
-  'outro',
-]
+const VALID_SPORTS: string[] = getAllSportValues()
 
 const DEFAULT_PREFERENCES: Omit<UserPreferences, 'id' | 'user_id' | 'created_at' | 'updated_at'> = {
   favorite_sports: [],
@@ -49,11 +40,11 @@ function detectDeviceName(userAgent?: string | null) {
   return 'Dispositivo atual'
 }
 
-function sanitizeSports(sports?: SportType[] | null) {
+function sanitizeSports(sports?: SportType[] | string[] | null): SportType[] {
   if (!sports || sports.length === 0) return []
 
   const validSet = new Set(VALID_SPORTS)
-  return sports.filter((sport) => validSet.has(sport))
+  return sports.filter((sport) => validSet.has(sport)) as SportType[]
 }
 
 function sanitizeTheme(theme?: ThemeOption | null) {

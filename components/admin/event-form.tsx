@@ -9,7 +9,7 @@ import {
 } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Trash2, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Trash2, GripVertical } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
@@ -33,6 +33,7 @@ import {
   ShirtSizesByGender,
 } from "@/types";
 import { formatCurrency } from "@/lib/utils";
+import { GENDER_LABELS } from "@/lib/constants/shirt-sizes";
 
 // Schema for publishing - all validations
 const publishSchema = z
@@ -165,6 +166,7 @@ interface EventFormProps {
     data: CategoryFormData,
   ) => Promise<void>;
   onCategoryDelete?: (categoryId: string) => Promise<void>;
+  onCategoryReorder?: (items: { id: string; display_order: number }[]) => Promise<void>;
   eventDetailsSection?: ReactNode;
 }
 
@@ -177,6 +179,7 @@ export function EventForm({
   onCategoryCreate,
   onCategoryUpdate,
   onCategoryDelete,
+  onCategoryReorder,
   eventDetailsSection,
 }: EventFormProps) {
   const router = useRouter();
@@ -191,6 +194,47 @@ export function EventForm({
     individual: true,
     pair: event?.allows_pair_registration || false
   });
+  const [draggedCategoryIndex, setDraggedCategoryIndex] = useState<number | null>(null);
+  const [localCategories, setLocalCategories] = useState<EventCategory[]>(categories);
+
+  // Keep localCategories in sync with prop
+  useEffect(() => {
+    setLocalCategories(categories);
+  }, [categories]);
+
+  const handleCategoryDragStart = (index: number) => {
+    setDraggedCategoryIndex(index);
+  };
+
+  const handleCategoryDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedCategoryIndex === null || draggedCategoryIndex === index) return;
+
+    const newCategories = [...localCategories];
+    const draggedCategory = newCategories[draggedCategoryIndex];
+    newCategories.splice(draggedCategoryIndex, 1);
+    newCategories.splice(index, 0, draggedCategory);
+
+    // Update display_order
+    const reorderedCategories = newCategories.map((cat, idx) => ({
+      ...cat,
+      display_order: idx,
+    }));
+
+    setLocalCategories(reorderedCategories);
+    setDraggedCategoryIndex(index);
+
+    // Call the reorder action
+    const orderUpdates = reorderedCategories.map((cat) => ({
+      id: cat.id,
+      display_order: cat.display_order,
+    }));
+    onCategoryReorder?.(orderUpdates);
+  };
+
+  const handleCategoryDragEnd = () => {
+    setDraggedCategoryIndex(null);
+  };
 
   const {
     register,
@@ -385,6 +429,14 @@ export function EventForm({
   const handleCategorySubmit = async (data: CategoryFormData) => {
     if (editingCategory) {
       await onCategoryUpdate?.(editingCategory.id, data);
+      // Update local state optimistically
+      setLocalCategories((prev) =>
+        prev.map((cat) =>
+          cat.id === editingCategory.id
+            ? { ...cat, ...data }
+            : cat
+        )
+      );
     } else {
       await onCategoryCreate?.(data);
     }
@@ -443,7 +495,7 @@ export function EventForm({
             </label>
             <FileUpload
               bucket="event-banners"
-              folder={event?.id || event?.slug || ''}
+              folder={event?.id || event?.slug || undefined}
               disabled={!event?.id && !event?.slug}
               value={bannerUrl || undefined}
               onChange={(url) => setValue("banner_url", url)}
@@ -738,7 +790,14 @@ export function EventForm({
       {event && (
         <Card className="p-6">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold">Categorias</h3>
+            <div>
+              <h3 className="text-lg font-semibold">Categorias</h3>
+              {localCategories.length > 1 && (
+                <p className="text-sm text-neutral-500 mt-1">
+                  Arraste para reordenar
+                </p>
+              )}
+            </div>
             <Button
               type="button"
               size="sm"
@@ -752,15 +811,29 @@ export function EventForm({
             </Button>
           </div>
 
-          {categories.length > 0 ? (
+          {localCategories.length > 0 ? (
             <div className="space-y-2">
-              {categories.map((category) => (
+              {localCategories.map((category, index) => (
                 <div
                   key={category.id}
-                  className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg"
+                  draggable
+                  onDragStart={() => handleCategoryDragStart(index)}
+                  onDragOver={(e) => handleCategoryDragOver(e, index)}
+                  onDragEnd={handleCategoryDragEnd}
+                  className="flex items-center gap-3 p-3 bg-neutral-50 rounded-lg cursor-move hover:bg-neutral-100 transition"
                 >
-                  <div>
-                    <p className="font-medium">{category.name}</p>
+                  <GripVertical className="h-5 w-5 text-neutral-400 flex-shrink-0" />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-medium">{category.name}</p>
+                      {category.shirt_genders && category.shirt_genders.length > 0 && (
+                        category.shirt_genders.map((gender) => (
+                          <Badge key={gender} variant="info" className="text-xs">
+                            {GENDER_LABELS[gender]}
+                          </Badge>
+                        ))
+                      )}
+                    </div>
                     <p className="text-sm text-neutral-600">
                       {formatCurrency(category.price)} •{" "}
                       {category.max_participants

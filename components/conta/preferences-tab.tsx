@@ -1,32 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import {
-  Activity,
-  Bike,
-  Flame,
-  Footprints,
-  HeartPulse,
-  Mountain,
-  Waves,
-  Wind,
-} from 'lucide-react'
+import { ChevronDown, ChevronUp, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { SPORT_CATEGORIES, getSportLabel, type SportCategoryKey } from '@/lib/constants/sports'
 import type { SportType, UserPreferences } from '@/types'
 
 const STORAGE_KEY = 'symplepass-preferences'
-
-const SPORT_OPTIONS: { id: SportType; label: string; description: string; icon: React.ReactNode }[] =
-  [
-    { id: 'corrida', label: 'Corrida de rua', description: '5k a maratonas', icon: <Activity /> },
-    { id: 'triatlo', label: 'Triathlon', description: 'Swim, bike, run', icon: <HeartPulse /> },
-    { id: 'ciclismo', label: 'Ciclismo', description: 'Estrada e speed', icon: <Bike /> },
-    { id: 'natacao', label: 'Natação', description: 'Águas abertas', icon: <Waves /> },
-    { id: 'caminhada', label: 'Caminhada', description: 'Experiências leves', icon: <Footprints /> },
-    { id: 'crossfit', label: 'Crossfit', description: 'Força e condicionamento', icon: <Flame /> },
-    { id: 'beach_sports', label: 'Beach Sports', description: 'Beach run, tenis', icon: <Wind /> },
-    { id: 'trail_running', label: 'Trail Running', description: 'Montanha & trilhas', icon: <Mountain /> },
-  ]
 
 type PreferencesTabProps = {
   preferences: UserPreferences
@@ -36,7 +16,9 @@ type PreferencesTabProps = {
 export function PreferencesTab({ preferences, onUpdate }: PreferencesTabProps) {
   const [selectedSports, setSelectedSports] = useState<SportType[]>(preferences.favorite_sports || [])
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
+  const [statusType, setStatusType] = useState<'success' | 'error'>('success')
   const [isSaving, setIsSaving] = useState(false)
+  const [expandedCategories, setExpandedCategories] = useState<Set<SportCategoryKey>>(new Set())
 
   useEffect(() => {
     if (preferences.favorite_sports?.length) {
@@ -59,10 +41,24 @@ export function PreferencesTab({ preferences, onUpdate }: PreferencesTabProps) {
     }
   }, [selectedSports])
 
-  const toggleSport = (sport: SportType) => {
+  const toggleSport = (sport: string) => {
     setSelectedSports((prev) =>
-      prev.includes(sport) ? prev.filter((item) => item !== sport) : [...prev, sport]
+      prev.includes(sport as SportType)
+        ? prev.filter((item) => item !== sport)
+        : [...prev, sport as SportType]
     )
+  }
+
+  const toggleCategory = (categoryKey: SportCategoryKey) => {
+    setExpandedCategories((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(categoryKey)) {
+        newSet.delete(categoryKey)
+      } else {
+        newSet.add(categoryKey)
+      }
+      return newSet
+    })
   }
 
   const handleSave = async () => {
@@ -71,10 +67,17 @@ export function PreferencesTab({ preferences, onUpdate }: PreferencesTabProps) {
     const result = await onUpdate(selectedSports)
     if (result && 'error' in result && result.error) {
       setStatusMessage(result.error)
+      setStatusType('error')
     } else {
       setStatusMessage('Preferências salvas com sucesso!')
+      setStatusType('success')
     }
     setIsSaving(false)
+  }
+
+  const getSelectedCountForCategory = (categoryKey: SportCategoryKey): number => {
+    const category = SPORT_CATEGORIES[categoryKey]
+    return category.items.filter((item) => selectedSports.includes(item.value as SportType)).length
   }
 
   return (
@@ -90,39 +93,121 @@ export function PreferencesTab({ preferences, onUpdate }: PreferencesTabProps) {
         </p>
       </div>
 
-      <div className="grid gap-4 rounded-3xl border border-neutral-200 bg-white p-6 shadow-[0_30px_60px_rgba(15,23,42,0.08)] md:grid-cols-2 lg:grid-cols-3">
-        {SPORT_OPTIONS.map((option) => {
-          const isSelected = selectedSports.includes(option.id)
-          return (
-            <button
-              key={option.id}
-              type="button"
-              onClick={() => toggleSport(option.id)}
-              className={`flex flex-col gap-2 rounded-2xl border p-4 text-left transition-all ${
-                isSelected
-                  ? 'border-orange-400 bg-orange-50 shadow-[0_20px_40px_rgba(251,146,60,0.25)]'
-                  : 'border-neutral-200 bg-neutral-50 hover:border-neutral-300'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="rounded-xl bg-white/70 p-2 text-neutral-700">{option.icon}</div>
-                <span
-                  className={`h-3 w-3 rounded-full border ${
-                    isSelected ? 'border-orange-500 bg-orange-500' : 'border-neutral-300'
-                  }`}
-                />
+      <div className="space-y-3">
+        {(Object.entries(SPORT_CATEGORIES) as [SportCategoryKey, typeof SPORT_CATEGORIES[SportCategoryKey]][]).map(
+          ([categoryKey, category]) => {
+            const isExpanded = expandedCategories.has(categoryKey)
+            const selectedCount = getSelectedCountForCategory(categoryKey)
+
+            return (
+              <div
+                key={categoryKey}
+                className="rounded-2xl border border-neutral-200 bg-white shadow-sm overflow-hidden"
+              >
+                <button
+                  type="button"
+                  onClick={() => toggleCategory(categoryKey)}
+                  className="flex w-full items-center justify-between p-4 text-left hover:bg-neutral-50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-base font-semibold text-neutral-900">
+                      {category.label}
+                    </span>
+                    {selectedCount > 0 && (
+                      <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700">
+                        {selectedCount} selecionado{selectedCount > 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+                  {isExpanded ? (
+                    <ChevronUp className="h-5 w-5 text-neutral-400" />
+                  ) : (
+                    <ChevronDown className="h-5 w-5 text-neutral-400" />
+                  )}
+                </button>
+
+                {isExpanded && (
+                  <div className="border-t border-neutral-100 bg-neutral-50 p-4">
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {category.items.map((item) => {
+                        const isSelected = selectedSports.includes(item.value as SportType)
+                        return (
+                          <button
+                            key={item.value}
+                            type="button"
+                            onClick={() => toggleSport(item.value)}
+                            className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-all ${
+                              isSelected
+                                ? 'border-orange-400 bg-orange-50'
+                                : 'border-neutral-200 bg-white hover:border-neutral-300'
+                            }`}
+                          >
+                            <span
+                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors ${
+                                isSelected
+                                  ? 'border-orange-500 bg-orange-500 text-white'
+                                  : 'border-neutral-300'
+                              }`}
+                            >
+                              {isSelected && <Check className="h-3 w-3" />}
+                            </span>
+                            <span
+                              className={`text-sm ${
+                                isSelected ? 'font-medium text-neutral-900' : 'text-neutral-700'
+                              }`}
+                            >
+                              {item.label}
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
-              <div>
-                <p className="text-base font-semibold text-neutral-900">{option.label}</p>
-                <p className="text-xs text-neutral-500">{option.description}</p>
-              </div>
-            </button>
-          )
-        })}
+            )
+          }
+        )}
       </div>
 
+      {selectedSports.length > 0 && (
+        <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">
+            Seus esportes ({selectedSports.length})
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {selectedSports.map((sport) => {
+              const sportLabel = getSportLabel(sport) || sport
+
+              return (
+                <span
+                  key={sport}
+                  className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-3 py-1 text-sm font-medium text-orange-800"
+                >
+                  {sportLabel}
+                  <button
+                    type="button"
+                    onClick={() => toggleSport(sport)}
+                    className="ml-1 rounded-full hover:bg-orange-200 p-0.5"
+                    aria-label={`Remover ${sportLabel}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {statusMessage && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+        <div
+          className={`rounded-2xl border px-4 py-3 text-sm ${
+            statusType === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : 'border-red-200 bg-red-50 text-red-700'
+          }`}
+        >
           {statusMessage}
         </div>
       )}

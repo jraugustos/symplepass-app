@@ -1,9 +1,8 @@
 import { Metadata } from 'next'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Mail, MapPin, Phone, Send, MessageSquare, Clock } from 'lucide-react'
+import { Mail, MapPin, Phone, Clock } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { Footer } from '@/components/layout/footer'
+import { ContactForm } from '@/components/forms/contact-form'
 
 export const metadata: Metadata = {
     title: 'Contato | SymplePass',
@@ -23,10 +22,6 @@ export default function ContactPage() {
                 <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-500/10 rounded-full mix-blend-screen filter blur-[100px] -translate-x-1/2 translate-y-1/2"></div>
 
                 <div className="container-custom mx-auto relative z-10 text-center">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-orange-400 text-xs font-medium mb-6">
-                        <MessageSquare className="w-3 h-3" />
-                        Suporte 24/7
-                    </div>
                     <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold font-geist text-white mb-6">
                         Como podemos ajudar?
                     </h1>
@@ -117,51 +112,7 @@ export default function ContactPage() {
 
                     {/* Contact Form (Right Side) */}
                     <div className="lg:col-span-8">
-                        <div className="bg-white rounded-2xl shadow-custom-xl border border-neutral-200 p-8 md:p-10 h-full">
-                            <h2 className="text-2xl font-bold font-geist text-neutral-900 mb-2">Envie uma mensagem</h2>
-                            <p className="text-neutral-500 mb-8 font-inter">Preencha o formulário abaixo e retornaremos o mais breve possível.</p>
-
-                            <form className="space-y-6">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-2">
-                                        <label htmlFor="name" className="text-sm font-medium text-neutral-700">Nome completo</label>
-                                        <Input id="name" placeholder="Seu nome" className="bg-neutral-50 border-neutral-200 h-12 focus:ring-orange-500/20 focus:border-orange-500" />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label htmlFor="email" className="text-sm font-medium text-neutral-700">E-mail</label>
-                                        <Input id="email" type="email" placeholder="seu@email.com" className="bg-neutral-50 border-neutral-200 h-12 focus:ring-orange-500/20 focus:border-orange-500" />
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-2">
-                                        <label htmlFor="phone" className="text-sm font-medium text-neutral-700">Telefone (opcional)</label>
-                                        <Input id="phone" placeholder="(00) 00000-0000" className="bg-neutral-50 border-neutral-200 h-12 focus:ring-orange-500/20 focus:border-orange-500" />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label htmlFor="subject" className="text-sm font-medium text-neutral-700">Assunto</label>
-                                        <Input id="subject" placeholder="Como podemos ajudar?" className="bg-neutral-50 border-neutral-200 h-12 focus:ring-orange-500/20 focus:border-orange-500" />
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label htmlFor="message" className="text-sm font-medium text-neutral-700">Mensagem</label>
-                                    <textarea
-                                        id="message"
-                                        rows={6}
-                                        className="flex w-full rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/20 focus-visible:border-orange-500 disabled:cursor-not-allowed disabled:opacity-50 resize-none transition-all"
-                                        placeholder="Escreva sua mensagem aqui..."
-                                    ></textarea>
-                                </div>
-
-                                <div className="pt-4 flex items-center justify-end">
-                                    <Button className="w-full md:w-auto bg-orange-600 hover:bg-orange-700 text-white h-12 px-8 rounded-xl shadow-lg shadow-orange-600/20 hover:shadow-orange-600/40 transition-all hover:-translate-y-1">
-                                        Enviar Mensagem
-                                        <Send className="ml-2 h-4 w-4" />
-                                    </Button>
-                                </div>
-                            </form>
-                        </div>
+                        <ContactForm />
                     </div>
                 </div>
             </div>

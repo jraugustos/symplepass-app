@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { createClient, invalidateClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
 import { signOut as serverSignOut } from '@/lib/auth/actions'
 import { useRouter } from 'next/navigation'
@@ -68,7 +68,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Subscribe to auth changes
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, session) => {
+        // Invalidate cached client on auth state changes to ensure fresh tokens
+        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+          invalidateClient()
+        }
+
         if (session?.user) {
           setUser(session.user)
           const userProfile = await fetchProfile(session.user.id)

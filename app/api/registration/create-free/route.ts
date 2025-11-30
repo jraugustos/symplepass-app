@@ -4,6 +4,7 @@ import { validateEmail, validateCPF } from '@/lib/utils'
 import { createRegistration } from '@/lib/data/registrations'
 import { updateRegistrationQRCode } from '@/lib/data/registrations'
 import { sendConfirmationEmail } from '@/lib/email/send-confirmation'
+import { markContactAsEventParticipant } from '@/lib/email/contacts'
 import { validateRegistration } from '@/lib/validations/registration-guards'
 import type { ShirtSize, PartnerData, ShirtGender, ParticipantData } from '@/types'
 import QRCode from 'qrcode'
@@ -291,6 +292,11 @@ export async function POST(request: Request) {
             console.error('Erro ao enviar e-mail de confirmação:', emailError)
             // Don't fail the registration if email fails
         }
+
+        // Update Resend contact as event participant (non-blocking)
+        markContactAsEventParticipant(normalizedEmail).catch((err) => {
+            console.error('Failed to update Resend contact:', err)
+        })
 
         return NextResponse.json({
             registrationId: registrationResult.data.id,

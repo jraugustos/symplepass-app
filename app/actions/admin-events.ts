@@ -7,6 +7,7 @@ import {
   createCategory,
   updateCategory,
   deleteCategory,
+  reorderCategories,
 } from '@/lib/data/admin-categories'
 import type { EventFormDataAdmin, CategoryFormData } from '@/types'
 
@@ -57,6 +58,7 @@ export async function createCategoryAction(eventId: string, data: CategoryFormDa
     price: data.price,
     description: data.description,
     max_participants: data.max_participants,
+    shirt_genders: data.shirt_genders,
   })
 
   if (result.error) {
@@ -78,6 +80,19 @@ export async function updateCategoryAction(eventId: string, categoryId: string, 
 
 export async function deleteCategoryAction(eventId: string, categoryId: string) {
   const result = await deleteCategory(categoryId)
+
+  if (result.error) {
+    throw new Error(result.error)
+  }
+
+  revalidatePath(`/admin/eventos/${eventId}/editar`)
+}
+
+export async function reorderCategoriesAction(
+  eventId: string,
+  items: { id: string; display_order: number }[]
+) {
+  const result = await reorderCategories(items)
 
   if (result.error) {
     throw new Error(result.error)

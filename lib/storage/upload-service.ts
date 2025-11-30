@@ -24,49 +24,76 @@ export class UploadService {
   }
 
   /**
-   * Upload a single file to Supabase Storage
+   * Validates the current session and refreshes the token if needed.
+   * Throws an error if the user is not authenticated.
+   */
+  private async getValidatedClient() {
+    const supabase = createClient();
+
+    // Verify session exists
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+    if (sessionError || !session) {
+      throw this.createError('AUTH_ERROR', 'Sessão expirada. Por favor, faça login novamente.');
+    }
+
+    // Try to refresh the session to ensure token is fresh
+    const { error: refreshError } = await supabase.auth.refreshSession();
+
+    if (refreshError) {
+      console.warn('[UploadService] Failed to refresh session:', refreshError.message);
+      // Continue with existing session if refresh fails but session exists
+    }
+
+    return supabase;
+  }
+
+  /**
+   * Upload a single file to Supabase Storage via server-side API
+   * This approach bypasses RLS issues by using the admin client on the server
    */
   async uploadFile(
     file: File,
     options: UploadOptions
   ): Promise<UploadResult> {
     try {
-      // Validate file
+      // Validate file locally first (faster feedback)
       const validation = this.validateFile(file, options.bucket);
       if (!validation.valid) {
         throw this.createError('VALIDATION_ERROR', validation.errors.join('; '));
       }
 
-      // Generate file path
-      const fileName = options.fileName
-        ? sanitizeFilename(options.fileName)
-        : generateUniqueFilename(file.name);
-
-      const filePath = options.folder
-        ? `${options.folder}/${fileName}`
-        : fileName;
-
-      console.log('[UploadService] Starting upload to', options.bucket, 'path:', filePath);
-
-      const supabase = this.getClient();
-      const { data, error } = await supabase.storage
-        .from(options.bucket)
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false,
-        });
-
-      if (error) {
-        console.error('Supabase upload error:', error);
-        throw this.createError('UPLOAD_ERROR', error.message, error);
+      // Validate folder is provided for event-related buckets
+      const eventBuckets = ['event-banners', 'event-media', 'event-documents', 'event-routes', 'kit-items'];
+      if (eventBuckets.includes(options.bucket) && !options.folder) {
+        throw this.createError('VALIDATION_ERROR', 'Salve o evento primeiro para habilitar o upload.');
       }
 
-      if (!data) {
-        throw this.createError('UPLOAD_ERROR', 'No data returned from upload');
+      console.log('[UploadService] Starting upload to', options.bucket, 'folder:', options.folder);
+
+      // Create form data for API
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('bucket', options.bucket);
+      if (options.folder) {
+        formData.append('folder', options.folder);
+      }
+      if (options.fileName) {
+        formData.append('fileName', options.fileName);
       }
 
-      // Get public URL if bucket is public
-      const url = await this.getFileUrl(options.bucket, filePath, options.public);
+      // Upload via server-side API (bypasses RLS, validates permissions in code)
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        console.error('API upload error:', result);
+        throw this.createError('UPLOAD_ERROR', result.error || 'Erro ao fazer upload.');
+      }
 
       // Optionally generate thumbnail (for images)
       let thumbnailUrl: string | undefined;
@@ -75,10 +102,10 @@ export class UploadService {
       }
 
       return {
-        url,
-        path: filePath,
-        size: file.size,
-        type: file.type,
+        url: result.url,
+        path: result.path,
+        size: result.size || file.size,
+        type: result.type || file.type,
         thumbnailUrl,
       };
     } catch (error) {
@@ -331,6 +358,28 @@ export class UploadService {
       message,
       details,
     };
+  }
+
+  /**
+   * Maps Supabase storage errors to user-friendly messages
+   */
+  private getUploadErrorMessage(error: any, bucket: string): string {
+    const message = error.message || '';
+
+    if (message.includes('Bucket not found')) {
+      return `Bucket "${bucket}" não encontrado. Verifique a configuração do storage.`;
+    }
+    if (message.includes('row-level security') || message.includes('policy') || message.includes('violates')) {
+      return 'Permissão negada. Verifique se você tem permissão para fazer upload neste evento.';
+    }
+    if (message.includes('JWT') || message.includes('token') || message.includes('expired')) {
+      return 'Sessão expirada. Por favor, faça login novamente.';
+    }
+    if (message.includes('Invalid') || message.includes('malformed')) {
+      return 'Sessão inválida. Por favor, faça login novamente.';
+    }
+
+    return message;
   }
 
   /**

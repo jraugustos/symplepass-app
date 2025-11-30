@@ -49,12 +49,19 @@ export default async function EventPage({ params }: EventPageProps) {
 
   const minPrice = getEventMinPriceFromCategories(eventDetail.categories)
 
-  const kitPickupInfo = eventDetail.kit_pickup_info
+  // Only create kitPickupInfo if there's at least some meaningful content
+  const rawPickupInfo = eventDetail.kit_pickup_info
+  const hasPickupContent = rawPickupInfo && (
+    rawPickupInfo.dates?.trim() ||
+    rawPickupInfo.hours?.trim() ||
+    rawPickupInfo.location?.trim()
+  )
+  const kitPickupInfo = hasPickupContent
     ? {
-        dates: eventDetail.kit_pickup_info.dates || '',
-        hours: eventDetail.kit_pickup_info.hours || '',
-        location: eventDetail.kit_pickup_info.location || '',
-        notes: eventDetail.kit_pickup_info.notes || '',
+        dates: rawPickupInfo.dates || '',
+        hours: rawPickupInfo.hours || '',
+        location: rawPickupInfo.location || '',
+        notes: rawPickupInfo.notes || '',
       }
     : null
 

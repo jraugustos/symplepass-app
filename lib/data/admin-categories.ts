@@ -4,7 +4,7 @@ import { EventCategory } from '@/types/database.types'
 /**
  * Get all categories for an event
  * @param eventId - The event ID
- * @returns Array of event categories ordered by price
+ * @returns Array of event categories ordered by display_order
  */
 export async function getCategoriesByEventId(
   eventId: string
@@ -16,7 +16,7 @@ export async function getCategoriesByEventId(
       .from('event_categories')
       .select('*')
       .eq('event_id', eventId)
-      .order('price', { ascending: true })
+      .order('display_order', { ascending: true })
 
     if (error) {
       console.error('Error fetching categories:', error)
@@ -41,6 +41,7 @@ export async function createCategory(categoryData: {
   price: number
   description?: string | null
   max_participants?: number | null
+  shirt_genders?: ('masculino' | 'feminino' | 'infantil')[] | null
 }) {
   try {
     const supabase = await createClient()
@@ -50,11 +51,24 @@ export async function createCategory(categoryData: {
       return { data: null, error: 'Price must be greater than or equal to 0' }
     }
 
+    // Get the next display_order for this event
+    const { data: existingCategories } = await supabase
+      .from('event_categories')
+      .select('display_order')
+      .eq('event_id', categoryData.event_id)
+      .order('display_order', { ascending: false })
+      .limit(1)
+
+    const nextDisplayOrder = existingCategories && existingCategories.length > 0
+      ? (existingCategories[0].display_order || 0) + 1
+      : 0
+
     const { data, error } = await supabase
       .from('event_categories')
       .insert({
         ...categoryData,
         current_participants: 0,
+        display_order: nextDisplayOrder,
       })
       .select()
       .single()
@@ -235,5 +249,38 @@ export async function updateCategoryParticipants(
   } catch (error) {
     console.error('Error in updateCategoryParticipants:', error)
     return { data: null, error: 'Failed to update category participants' }
+  }
+}
+
+/**
+ * Reorder categories by updating their display_order
+ * @param items - Array of category IDs with their new display_order
+ * @returns Success or error
+ */
+export async function reorderCategories(
+  items: { id: string; display_order: number }[]
+) {
+  try {
+    const supabase = await createClient()
+
+    // Update all items in parallel
+    const updates = items.map((item) =>
+      supabase
+        .from('event_categories')
+        .update({ display_order: item.display_order })
+        .eq('id', item.id)
+    )
+
+    const results = await Promise.all(updates)
+    const errors = results.filter((r) => r.error).map((r) => r.error?.message)
+
+    if (errors.length > 0) {
+      return { error: errors.join(', ') }
+    }
+
+    return { error: null }
+  } catch (error) {
+    console.error('Error in reorderCategories:', error)
+    return { error: 'Failed to reorder categories' }
   }
 }

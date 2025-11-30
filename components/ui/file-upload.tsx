@@ -314,9 +314,26 @@ export function FileUpload({
 
       {/* Error message */}
       {error && (
-        <div className="flex items-start space-x-2 text-sm text-red-500">
-          <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-          <span>{error}</span>
+        <div className="flex flex-col items-start space-y-2">
+          <div className="flex items-start space-x-2 text-sm text-red-500">
+            <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+            <span>{error}</span>
+          </div>
+
+          {/* Show retry button for auth-related errors */}
+          {(error.toLowerCase().includes('sessão') || error.toLowerCase().includes('login') || error.toLowerCase().includes('token')) && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setError(null);
+                setStatus('idle');
+              }}
+            >
+              Tentar novamente
+            </Button>
+          )}
         </div>
       )}
 

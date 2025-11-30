@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { cn } from '@/lib/utils'
-import { Facebook, Instagram, Mail } from 'lucide-react'
+import { Facebook, Instagram } from 'lucide-react'
+import { NewsletterForm } from '@/components/forms/newsletter-form'
 
 export interface FooterProps {
   variant?: 'dark' | 'light'
@@ -86,37 +87,7 @@ export function Footer({ variant = 'dark', className }: FooterProps) {
 
               {/* Newsletter */}
               <div className="mb-6">
-                <h4 className="text-sm font-semibold font-geist mb-3">
-                  Receba novidades
-                </h4>
-                <form className="flex gap-2">
-                  <div className="flex-1 relative">
-                    <Mail
-                      className={cn(
-                        'absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4',
-                        variant === 'dark' ? 'text-neutral-500' : 'text-neutral-400'
-                      )}
-                    />
-                    <input
-                      type="email"
-                      placeholder="Seu e-mail"
-                      className={cn(
-                        'w-full pl-10 pr-3 py-2 rounded-lg border text-sm font-inter outline-none transition-colors',
-                        'focus:ring-2 focus:ring-primary',
-                        variant === 'dark'
-                          ? 'bg-neutral-800 border-neutral-700 text-white placeholder:text-neutral-500'
-                          : 'bg-white border-neutral-300 text-neutral-900 placeholder:text-neutral-400'
-                      )}
-                      aria-label="Email for newsletter"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-gradient-primary text-white rounded-lg text-sm font-medium font-geist transition-all hover:shadow-custom-md hover:-translate-y-0.5"
-                  >
-                    Inscrever
-                  </button>
-                </form>
+                <NewsletterForm variant={variant} />
               </div>
             </div>
 

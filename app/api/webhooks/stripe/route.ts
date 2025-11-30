@@ -10,6 +10,7 @@ import {
 } from '@/lib/data/registrations'
 import { generateQRCode } from '@/lib/qrcode/generate'
 import { sendConfirmationEmail } from '@/lib/email/send-confirmation'
+import { markContactAsEventParticipant } from '@/lib/email/contacts'
 import { generateTicketCode, formatDateTimeLong, extractLocationString } from '@/lib/utils'
 
 export const runtime = 'nodejs'
@@ -130,6 +131,11 @@ export async function POST(request: NextRequest) {
               registrationId: registrationDetails.id,
               qrMissingNote: qrCodeDataUrl ? null : 'QR Code temporariamente indisponível. Entre em contato com o suporte.',
               partnerData,
+            })
+
+            // Update Resend contact as event participant (non-blocking)
+            markContactAsEventParticipant(recipientEmail).catch((err) => {
+              console.error('Failed to update Resend contact:', err)
             })
           } else {
             console.warn('No email available to send confirmation for registration', registrationDetails.id)

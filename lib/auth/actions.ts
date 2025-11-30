@@ -16,6 +16,8 @@ import {
 import { getAuthErrorMessage } from '@/lib/auth/utils'
 import { getEnv } from '@/lib/env'
 import { recordUserSession } from '@/lib/data/user-preferences'
+import { sendWelcomeEmail } from '@/lib/email/send-welcome'
+import { addUserContact } from '@/lib/email/contacts'
 import type { Database } from '@/types/database.types'
 
 // Types for action responses
@@ -162,7 +164,8 @@ export async function signInWithEmail(
 export async function signUpWithEmail(
   email: string,
   password: string,
-  fullName: string
+  fullName: string,
+  favoriteSports?: string[]
 ): Promise<ActionResponse> {
   try {
     // Validate inputs
@@ -192,6 +195,30 @@ export async function signUpWithEmail(
     if (error) {
       console.error('Sign up error:', error)
       return { error: getAuthErrorMessage(error.message) }
+    }
+
+    // Send welcome email (non-blocking)
+    sendWelcomeEmail({
+      userName: fullName,
+      userEmail: email,
+    }).catch((err) => {
+      console.error('Failed to send welcome email:', err)
+    })
+
+    // Add user to Resend contacts (non-blocking)
+    addUserContact({
+      email,
+      fullName,
+    }).catch((err) => {
+      console.error('Failed to add user to Resend contacts:', err)
+    })
+
+    // Update profile with favorite sports if provided
+    if (favoriteSports && favoriteSports.length > 0 && data.user) {
+      await supabase
+        .from('profiles')
+        .update({ favorite_sports: favoriteSports })
+        .eq('id', data.user.id)
     }
 
     revalidatePath('/', 'layout')

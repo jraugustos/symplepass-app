@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import {
@@ -13,8 +13,15 @@ import {
 } from '@/components/ui/modal'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { CategoryFormData } from '@/types'
+import { MultiSelect } from '@/components/ui/select'
+import { CategoryFormData, ShirtGender } from '@/types'
 import { EventCategory, EventType } from '@/types/database.types'
+
+const GENDER_OPTIONS = [
+  { value: 'masculino', label: 'Masculino' },
+  { value: 'feminino', label: 'Feminino' },
+  { value: 'infantil', label: 'Infantil' },
+]
 
 const createCategoryFormSchema = (eventType?: EventType) => {
   return z.object({
@@ -22,6 +29,7 @@ const createCategoryFormSchema = (eventType?: EventType) => {
     description: z.string().optional(),
     price: z.number().min(0, 'Preço deve ser maior ou igual a 0'),
     max_participants: z.number().int().min(0, 'Vagas devem ser maior ou igual a 0').optional().nullable(),
+    shirt_genders: z.array(z.enum(['masculino', 'feminino', 'infantil'])).nullable().optional(),
   }).refine(
     (data) => {
       // For free and solidarity events, price must be 0
@@ -63,9 +71,11 @@ export function CategoryFormModal({
     register,
     handleSubmit,
     reset,
+    control,
     setValue,
-    formState: { errors },
+    formState: { errors, isValid },
   } = useForm<CategoryFormData>({
+    mode: 'onChange',
     resolver: zodResolver(createCategoryFormSchema(eventType)),
     defaultValues: category
       ? {
@@ -73,18 +83,21 @@ export function CategoryFormModal({
         description: category.description || '',
         price: isFreeOrSolidarity ? 0 : category.price,
         max_participants: category.max_participants,
+        shirt_genders: category.shirt_genders || null,
       }
       : {
         name: '',
         description: '',
         price: isFreeOrSolidarity ? 0 : 0,
         max_participants: null,
+        shirt_genders: null,
       },
   })
 
   // Reset form when modal opens/closes or category changes
   useEffect(() => {
     if (isOpen) {
+      const genders = category?.shirt_genders || []
       reset(
         category
           ? {
@@ -92,12 +105,14 @@ export function CategoryFormModal({
             description: category.description || '',
             price: isFreeOrSolidarity ? 0 : category.price,
             max_participants: category.max_participants,
+            shirt_genders: genders.length > 0 ? genders : null,
           }
           : {
             name: '',
             description: '',
             price: isFreeOrSolidarity ? 0 : 0,
             max_participants: null,
+            shirt_genders: null,
           }
       )
       setError(null)
@@ -133,8 +148,13 @@ export function CategoryFormModal({
         </ModalTitle>
       </ModalHeader>
 
-      <form onSubmit={handleSubmit(handleFormSubmit)}>
-        <ModalBody>
+      <form
+        className="flex flex-col max-h-[80vh]"
+        onSubmit={handleSubmit(handleFormSubmit, (errors) => {
+          console.error('Form validation errors:', errors)
+        })}
+      >
+        <ModalBody className="flex-1 min-h-0">
           <div className="space-y-4">
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-neutral-700 mb-1">
@@ -213,9 +233,42 @@ export function CategoryFormModal({
               </p>
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">
+                Gêneros de Camiseta
+              </label>
+              <Controller
+                name="shirt_genders"
+                control={control}
+                render={({ field }) => (
+                  <MultiSelect
+                    options={GENDER_OPTIONS}
+                    value={Array.isArray(field.value) ? field.value : []}
+                    onChange={(values) => field.onChange(values.length > 0 ? values as ShirtGender[] : null)}
+                    placeholder="Selecione os gêneros (deixe vazio para todos)"
+                  />
+                )}
+              />
+              <p className="mt-1 text-xs text-neutral-500">
+                Selecione os gêneros disponíveis para esta categoria. Deixe vazio para permitir todos.
+              </p>
+            </div>
+
             {error && (
               <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">
                 {error}
+              </div>
+            )}
+
+            {/* Debug: Show all form validation errors */}
+            {Object.keys(errors).length > 0 && (
+              <div className="rounded-lg bg-yellow-50 p-3 text-sm text-yellow-800">
+                <p className="font-medium mb-1">Erros de validação:</p>
+                <ul className="list-disc list-inside">
+                  {Object.entries(errors).map(([key, value]) => (
+                    <li key={key}>{key}: {value?.message || 'Valor inválido'}</li>
+                  ))}
+                </ul>
               </div>
             )}
           </div>
@@ -230,7 +283,13 @@ export function CategoryFormModal({
           >
             Cancelar
           </Button>
-          <Button type="submit" disabled={isSubmitting}>
+          <Button
+            type="button"
+            disabled={isSubmitting}
+            onClick={handleSubmit(handleFormSubmit, (errors) => {
+              console.error('Form validation errors:', errors)
+            })}
+          >
             {isSubmitting ? 'Salvando...' : 'Salvar'}
           </Button>
         </ModalFooter>

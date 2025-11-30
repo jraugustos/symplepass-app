@@ -2,19 +2,20 @@ import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth/actions'
-import { getEventByIdForAdmin, updateEvent } from '@/lib/data/admin-events'
-import {
-  getCategoriesByEventId,
-  createCategory,
-  updateCategory,
-  deleteCategory,
-} from '@/lib/data/admin-categories'
+import { getEventByIdForAdmin } from '@/lib/data/admin-events'
+import { getCategoriesByEventId } from '@/lib/data/admin-categories'
 import {
   getKitItemsByEventId,
   getCourseInfoByEventId,
   getFAQsByEventId,
   getRegulationsByEventId,
 } from '@/lib/data/admin-event-details'
+import {
+  updateEventAction,
+  createCategoryAction,
+  updateCategoryAction,
+  deleteCategoryAction,
+} from '@/app/actions/admin-events'
 import {
   createKitItemAction,
   updateKitItemAction,
@@ -33,8 +34,6 @@ import {
   updateRegulationPdfAction,
 } from '@/app/actions/event-details'
 import { EventForm, EventDetailsTabs } from '@/components/admin'
-import { EventFormDataAdmin, CategoryFormData } from '@/types'
-import { revalidatePath } from 'next/cache'
 
 export async function generateMetadata({ params }: { params: { id: string } }) {
   const event = await getEventByIdForAdmin(params.id)
@@ -51,7 +50,7 @@ export default async function EditarEventoPage({ params }: { params: { id: strin
     redirect('/login')
   }
 
-  const { user, profile } = result
+  const eventId = params.id
 
   // Fetch all event data in parallel
   const [
@@ -62,128 +61,29 @@ export default async function EditarEventoPage({ params }: { params: { id: strin
     { data: faqs },
     { data: regulations },
   ] = await Promise.all([
-    getEventByIdForAdmin(params.id),
-    getCategoriesByEventId(params.id),
-    getKitItemsByEventId(params.id),
-    getCourseInfoByEventId(params.id),
-    getFAQsByEventId(params.id),
-    getRegulationsByEventId(params.id),
+    getEventByIdForAdmin(eventId),
+    getCategoriesByEventId(eventId),
+    getKitItemsByEventId(eventId),
+    getCourseInfoByEventId(eventId),
+    getFAQsByEventId(eventId),
+    getRegulationsByEventId(eventId),
   ])
 
   if (!event) {
     notFound()
   }
 
-  async function updateEventAction(data: EventFormDataAdmin) {
-    'use server'
-    const result = await getCurrentUser()
-    if (!result || !result.user || !result.profile) {
-      throw new Error('User not authenticated')
-    }
-
-    const updateResult = await updateEvent(
-      params.id,
-      {
-        title: data.title,
-        description: data.description,
-        location: data.location,
-        start_date: data.start_date,
-        sport_type: data.sport_type as any,
-        event_type: data.event_type,
-        event_format: data.event_format,
-        banner_url: data.banner_url,
-        end_date: data.end_date,
-        max_participants: data.max_participants,
-        registration_start: data.registration_start,
-        registration_end: data.registration_end,
-        solidarity_message: data.solidarity_message,
-        status: data.status as any,
-        is_featured: data.is_featured,
-        allows_pair_registration: data.allows_pair_registration,
-        shirt_sizes: data.shirt_sizes,
-        shirt_sizes_config: data.shirt_sizes_config,
-      },
-      result.user.id,
-      result.profile.role
-    )
-
-    if (updateResult.error) {
-      throw new Error(updateResult.error)
-    }
-
-    revalidatePath(`/admin/eventos/${params.id}/editar`)
-    revalidatePath('/admin/eventos')
-  }
-
-  async function createCategoryAction(data: CategoryFormData) {
-    'use server'
-    const result = await createCategory({
-      event_id: params.id,
-      name: data.name,
-      price: data.price,
-      description: data.description,
-      max_participants: data.max_participants,
-    })
-
-    if (result.error) {
-      throw new Error(result.error)
-    }
-
-    revalidatePath(`/admin/eventos/${params.id}/editar`)
-  }
-
-  async function updateCategoryAction(categoryId: string, data: CategoryFormData) {
-    'use server'
-    const result = await updateCategory(categoryId, data, params.id)
-
-    if (result.error) {
-      throw new Error(result.error)
-    }
-
-    revalidatePath(`/admin/eventos/${params.id}/editar`)
-  }
-
-  async function deleteCategoryAction(categoryId: string) {
-    'use server'
-    const result = await deleteCategory(categoryId)
-
-    if (result.error) {
-      throw new Error(result.error)
-    }
-
-    revalidatePath(`/admin/eventos/${params.id}/editar`)
-  }
-
-  // Wrapper functions for event details actions to bind eventId where needed
-  async function handleKitItemCreate(data: any) {
-    'use server'
-    await createKitItemAction(params.id, data)
-  }
-
-  async function handleKitPickupUpdate(data: any) {
-    'use server'
-    await updateKitPickupInfoAction(params.id, data)
-  }
-
-  async function handleCourseInfoUpdate(data: any) {
-    'use server'
-    await updateCourseInfoAction(params.id, data)
-  }
-
-  async function handleFAQCreate(data: any) {
-    'use server'
-    await createFAQAction(params.id, data)
-  }
-
-  async function handleRegulationCreate(data: any) {
-    'use server'
-    await createRegulationAction({ ...data, event_id: params.id })
-  }
-
-  async function handleRegulationPdfUpdate(url: string) {
-    'use server'
-    await updateRegulationPdfAction(params.id, url)
-  }
+  // Bind eventId to server actions
+  const boundUpdateEvent = updateEventAction.bind(null, eventId)
+  const boundCreateCategory = createCategoryAction.bind(null, eventId)
+  const boundUpdateCategory = updateCategoryAction.bind(null, eventId)
+  const boundDeleteCategory = deleteCategoryAction.bind(null, eventId)
+  const boundCreateKitItem = createKitItemAction.bind(null, eventId)
+  const boundUpdateKitPickupInfo = updateKitPickupInfoAction.bind(null, eventId)
+  const boundUpdateCourseInfo = updateCourseInfoAction.bind(null, eventId)
+  const boundCreateFAQ = createFAQAction.bind(null, eventId)
+  const boundCreateRegulation = createRegulationAction.bind(null, eventId)
+  const boundUpdateRegulationPdf = updateRegulationPdfAction.bind(null, eventId)
 
   return (
     <div className="space-y-6 pb-10">
@@ -212,34 +112,34 @@ export default async function EditarEventoPage({ params }: { params: { id: strin
           event={event}
           categories={categories}
           kitItems={kitItems || []}
-          onSubmit={updateEventAction}
-          onCategoryCreate={createCategoryAction}
-          onCategoryUpdate={updateCategoryAction}
-          onCategoryDelete={deleteCategoryAction}
+          onSubmit={boundUpdateEvent}
+          onCategoryCreate={boundCreateCategory}
+          onCategoryUpdate={boundUpdateCategory}
+          onCategoryDelete={boundDeleteCategory}
           eventDetailsSection={
             <EventDetailsTabs
-              eventId={params.id}
+              eventId={eventId}
               kitItems={kitItems || []}
               courseInfo={courseInfo}
               faqs={faqs || []}
               regulations={regulations || []}
               kitPickupInfo={event.kit_pickup_info}
               regulationPdfUrl={event.regulation_pdf_url}
-              onKitItemCreate={handleKitItemCreate}
+              onKitItemCreate={boundCreateKitItem}
               onKitItemUpdate={updateKitItemAction}
               onKitItemDelete={deleteKitItemAction}
               onKitItemsReorder={reorderKitItemsAction}
-              onCourseInfoUpdate={handleCourseInfoUpdate}
-              onFAQCreate={handleFAQCreate}
+              onCourseInfoUpdate={boundUpdateCourseInfo}
+              onFAQCreate={boundCreateFAQ}
               onFAQUpdate={updateFAQAction}
               onFAQDelete={deleteFAQAction}
               onFAQsReorder={reorderFAQsAction}
-              onRegulationCreate={handleRegulationCreate}
+              onRegulationCreate={boundCreateRegulation}
               onRegulationUpdate={updateRegulationAction}
               onRegulationDelete={deleteRegulationAction}
               onRegulationsReorder={reorderRegulationsAction}
-              onKitPickupInfoUpdate={handleKitPickupUpdate}
-              onRegulationPdfUpdate={handleRegulationPdfUpdate}
+              onKitPickupInfoUpdate={boundUpdateKitPickupInfo}
+              onRegulationPdfUpdate={boundUpdateRegulationPdf}
             />
           }
         />

@@ -86,13 +86,13 @@ export async function reorderFAQsAction(items: { id: string; display_order: numb
 }
 
 // Regulations
-export async function createRegulationAction(data: RegulationFormData & { event_id: string }) {
+export async function createRegulationAction(eventId: string, data: RegulationFormData) {
     try {
-        // Assuming db.createRegulation now returns { data, error } directly
-        // and not { error: string }
         const { data: result, error } = await db.createRegulation({
-            ...data,
-            display_order: 0, // Default order, will be updated by reorder
+            event_id: eventId,
+            title: data.title,
+            content: data.content,
+            display_order: 0,
         })
 
         if (error) {
@@ -100,7 +100,7 @@ export async function createRegulationAction(data: RegulationFormData & { event_
             throw new Error(error)
         }
 
-        revalidatePath(`/admin/eventos/${data.event_id}/editar`)
+        revalidatePath(`/admin/eventos/${eventId}/editar`)
         return result
     } catch (error) {
         console.error('Server action error creating regulation:', error)

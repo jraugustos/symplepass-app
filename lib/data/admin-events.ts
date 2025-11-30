@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import {
   Event,
   EventStatus,
@@ -223,41 +223,62 @@ export async function updateEvent(
   userRole: string,
 ) {
   try {
-    const supabase = await createClient();
+    // Use regular client for initial fetch to respect RLS for reading
+    const supabase = createClient();
 
-    // Verify permissions
-    if (userRole !== "admin") {
-      const { data: event } = await supabase
-        .from("events")
-        .select("organizer_id")
-        .eq("id", eventId)
-        .single();
+    console.log(`[updateEvent] Starting update for event ${eventId} by user ${userId} with role ${userRole}`);
 
-      if (!event || event.organizer_id !== userId) {
-        return { data: null, error: "Unauthorized" };
-      }
+    // Verify permissions and get current event data
+    const { data: existingEvent, error: fetchError } = await supabase
+      .from("events")
+      .select("id, organizer_id")
+      .eq("id", eventId)
+      .single();
+
+    if (fetchError) {
+      console.error("[updateEvent] Error fetching event:", fetchError);
+      return { data: null, error: `Failed to fetch event: ${fetchError.message}` };
+    }
+
+    if (!existingEvent) {
+      console.error("[updateEvent] Event not found");
+      return { data: null, error: "Event not found" };
+    }
+
+    console.log(`[updateEvent] Found event. Organizer: ${existingEvent.organizer_id}, Current user: ${userId}`);
+
+    // Check permissions
+    const isAdmin = userRole === "admin";
+    const isOrganizer = existingEvent.organizer_id === userId;
+
+    if (!isAdmin && !isOrganizer) {
+      console.error("[updateEvent] Unauthorized - user is not admin and not organizer");
+      return { data: null, error: "Unauthorized" };
     }
 
     // Remove shirt_sizes field if present (we only use shirt_sizes_config now)
     const { shirt_sizes, ...dataWithoutShirtSizes } = eventData as any;
 
-    console.log(`[updateEvent] Updating event ${eventId}`);
+    console.log(`[updateEvent] Updating event ${eventId} with data keys: ${Object.keys(dataWithoutShirtSizes).join(', ')}`);
 
-    // Update without using .single() to avoid "cannot coerce" error
-    const { data: updatedData, error } = await supabase
-      .from("events")
+    // Use admin client to bypass RLS for the update
+    // This is safe because we already verified permissions above
+    const adminSupabase = createAdminClient();
+
+    const { data: updatedData, error } = await (adminSupabase
+      .from("events") as any)
       .update(dataWithoutShirtSizes)
       .eq("id", eventId)
       .select();
 
     if (error) {
-      console.error("[updateEvent] Error updating event:", error);
+      console.error("[updateEvent] Supabase update error:", error);
       return { data: null, error: error.message };
     }
 
     // Check if update affected any rows
     if (!updatedData || updatedData.length === 0) {
-      console.error("[updateEvent] Event not found or not updated");
+      console.error("[updateEvent] Update returned no rows");
       return { data: null, error: "Event not found" };
     }
 

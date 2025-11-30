@@ -41,7 +41,7 @@ export function EventsPageHero({ totalEvents, totalCities, totalModalities, onSe
           </p>
 
           <form role="search" className="mt-6" onSubmit={handleSubmit}>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <div className="relative flex-1">
                 <label htmlFor="search-events" className="sr-only">
                   Buscar eventos
@@ -58,7 +58,7 @@ export function EventsPageHero({ totalEvents, totalCities, totalModalities, onSe
               </div>
               <button
                 type="submit"
-                className="px-6 py-3 rounded-full text-white font-semibold font-geist transition-all hover:opacity-90"
+                className="w-full sm:w-auto px-6 py-3 rounded-full text-white font-semibold font-geist transition-all hover:opacity-90"
                 style={{ backgroundImage: 'linear-gradient(to right, rgb(138, 55, 10), rgb(82, 32, 3))' }}
               >
                 Buscar

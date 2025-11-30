@@ -49,14 +49,10 @@ export function EventsGrid({ events, variant = 'grid' }: EventsGridProps) {
           outro: 'Outro',
         }
 
-        // Determine badge for event type
+        // Determine badge for event - only show "Destaque" badge, hide event type badges (solidário/gratuito) to limit to 2 tags
         let eventBadge: { text: string; variant: 'warning' | 'success' | 'info' } | undefined
 
-        if (event.event_type === 'solidarity') {
-          eventBadge = { text: '🤝 Solidário', variant: 'success' }
-        } else if (event.event_type === 'free') {
-          eventBadge = { text: '🎉 Gratuito', variant: 'success' }
-        } else if (event.is_featured) {
+        if (event.is_featured) {
           eventBadge = { text: 'Destaque', variant: 'warning' }
         }
 

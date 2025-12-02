@@ -1,6 +1,6 @@
 'use client'
 
-import type { CSSProperties } from 'react'
+import Image from 'next/image'
 import { SearchBar } from '@/components/molecules/search-bar'
 import { Trophy, Users, MapPin } from 'lucide-react'
 import type { EventStats } from '@/types'
@@ -47,18 +47,16 @@ export function HeroSection({ eventStats, activeSportTypes = [] }: HeroSectionPr
     window.location.href = `/eventos?tag=${encodeURIComponent(tag)}`
   }
 
-  const backgroundAnimationStyles = {
-    animation: 'scrollBlur linear both',
-    animationTimeline: 'view()',
-    animationRange: 'entry 100% entry 200%',
-  } as CSSProperties
-
   return (
     <section className="relative min-h-[700px] md:min-h-[100vh] flex items-center justify-center overflow-hidden border-b border-white/10">
-      <div className="pointer-events-none fixed inset-0 -z-10">
-        <div
-          className="absolute inset-0 bg-[url('/assets/hero-image.jpeg')] bg-cover bg-center"
-          style={backgroundAnimationStyles}
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-gradient-to-br from-orange-600 to-orange-800">
+        <Image
+          src="/assets/hero-image.jpeg"
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover object-center"
           aria-hidden="true"
         />
       </div>

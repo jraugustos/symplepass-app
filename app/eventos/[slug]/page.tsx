@@ -62,6 +62,7 @@ export default async function EventPage({ params }: EventPageProps) {
         hours: rawPickupInfo.hours || '',
         location: rawPickupInfo.location || '',
         notes: rawPickupInfo.notes || '',
+        google_maps_url: rawPickupInfo.google_maps_url || '',
       }
     : null
 

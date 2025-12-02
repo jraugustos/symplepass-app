@@ -153,6 +153,9 @@ export function RegistrationsTable({
                 Status
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-neutral-600 uppercase tracking-wider">
+                Código
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-neutral-600 uppercase tracking-wider">
                 Valor
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-neutral-600 uppercase tracking-wider">
@@ -164,107 +167,124 @@ export function RegistrationsTable({
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-neutral-200">
-            {registrations.map((registration: any) => (
-              <tr key={registration.id} className="hover:bg-neutral-50 transition-colors">
-                <td className="px-4 py-4">
-                  <div>
-                    {registration.profiles?.id ? (
-                      <Link
-                        href={`/admin/usuarios/${registration.profiles.id}`}
-                        className="font-medium text-neutral-900 hover:text-orange-600 transition-colors inline-flex items-center gap-1 group"
-                      >
-                        {registration.profiles?.full_name || 'N/A'}
-                        <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </Link>
-                    ) : (
-                      <p className="font-medium text-neutral-900">
-                        {registration.profiles?.full_name || 'N/A'}
-                      </p>
-                    )}
-                    <p className="text-sm text-neutral-500">
-                      {registration.profiles?.email || 'N/A'}
-                    </p>
-                    {registration.profiles?.cpf && (
-                      <p className="text-xs text-neutral-400">
-                        CPF: {registration.profiles.cpf}
-                      </p>
-                    )}
-                    {registration.profiles?.phone && (
-                      <p className="text-xs text-neutral-400">
-                        Tel: {registration.profiles.phone}
-                      </p>
-                    )}
-                  </div>
-                </td>
-                <td className="px-4 py-4">
-                  {registration.registration_data?.partner ? (
+            {registrations.map((registration: any) => {
+              // Extract just the ID part from ticket_code (last 8 chars after the dash)
+              const shortCode = registration.id?.slice(0, 8).toUpperCase() || null
+
+              return (
+                <tr key={registration.id} className="hover:bg-neutral-50 transition-colors">
+                  <td className="px-4 py-4">
                     <div>
-                      <p className="font-medium text-neutral-900">
-                        {registration.registration_data.partner.name || registration.partner_name || 'N/A'}
+                      {registration.profiles?.id ? (
+                        <Link
+                          href={`/admin/usuarios/${registration.profiles.id}`}
+                          className="font-medium text-neutral-900 hover:text-orange-600 transition-colors inline-flex items-center gap-1 group"
+                        >
+                          {registration.profiles?.full_name || 'N/A'}
+                          <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </Link>
+                      ) : (
+                        <p className="font-medium text-neutral-900">
+                          {registration.profiles?.full_name || 'N/A'}
+                        </p>
+                      )}
+                      <p className="text-sm text-neutral-500">
+                        {registration.profiles?.email || 'N/A'}
                       </p>
-                      {registration.registration_data.partner.email && (
-                        <p className="text-sm text-neutral-500">
-                          {registration.registration_data.partner.email}
+                      {registration.profiles?.cpf && (
+                        <p className="text-xs text-neutral-400">
+                          CPF: {registration.profiles.cpf}
                         </p>
                       )}
-                      {registration.registration_data.partner.cpf && (
+                      {registration.profiles?.phone && (
                         <p className="text-xs text-neutral-400">
-                          CPF: {registration.registration_data.partner.cpf}
-                        </p>
-                      )}
-                      {registration.registration_data.partner.phone && (
-                        <p className="text-xs text-neutral-400">
-                          Tel: {registration.registration_data.partner.phone}
+                          Tel: {registration.profiles.phone}
                         </p>
                       )}
                     </div>
-                  ) : registration.partner_name ? (
-                    <p className="font-medium text-neutral-900">{registration.partner_name}</p>
-                  ) : (
-                    <span className="text-neutral-400">-</span>
-                  )}
-                </td>
-                <td className="px-4 py-4 text-sm text-neutral-600">
-                  {registration.event_categories?.name || 'N/A'}
-                </td>
-                <td className="px-4 py-4">
-                  <Badge variant={getPaymentStatusVariant(registration.payment_status)}>
-                    {getPaymentStatusLabel(registration.payment_status)}
-                  </Badge>
-                </td>
-                <td className="px-4 py-4 text-sm font-medium text-neutral-900">
-                  {formatCurrency(registration.amount_paid || 0)}
-                </td>
-                <td className="px-4 py-4 text-sm text-neutral-600">
-                  {formatDate(registration.created_at)}
-                </td>
-                <td className="px-4 py-4 text-right">
-                  {onDelete && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(registration.id, registration.profiles?.full_name || 'Participante')}
-                      disabled={deletingId === registration.id}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="px-4 py-4">
+                    {registration.registration_data?.partner ? (
+                      <div>
+                        <p className="font-medium text-neutral-900">
+                          {registration.registration_data.partner.name || registration.partner_name || 'N/A'}
+                        </p>
+                        {registration.registration_data.partner.email && (
+                          <p className="text-sm text-neutral-500">
+                            {registration.registration_data.partner.email}
+                          </p>
+                        )}
+                        {registration.registration_data.partner.cpf && (
+                          <p className="text-xs text-neutral-400">
+                            CPF: {registration.registration_data.partner.cpf}
+                          </p>
+                        )}
+                        {registration.registration_data.partner.phone && (
+                          <p className="text-xs text-neutral-400">
+                            Tel: {registration.registration_data.partner.phone}
+                          </p>
+                        )}
+                      </div>
+                    ) : registration.partner_name ? (
+                      <p className="font-medium text-neutral-900">{registration.partner_name}</p>
+                    ) : (
+                      <span className="text-neutral-400">-</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-4 text-sm text-neutral-600">
+                    {registration.event_categories?.name || 'N/A'}
+                  </td>
+                  <td className="px-4 py-4">
+                    <Badge variant={getPaymentStatusVariant(registration.payment_status)}>
+                      {getPaymentStatusLabel(registration.payment_status)}
+                    </Badge>
+                  </td>
+                  <td className="px-4 py-4">
+                    {shortCode ? (
+                      <span className="font-mono text-xs font-medium text-neutral-700 bg-neutral-100 px-2 py-1 rounded">
+                        {shortCode}
+                      </span>
+                    ) : (
+                      <span className="text-neutral-400 text-sm">-</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-4 text-sm font-medium text-neutral-900">
+                    {formatCurrency(registration.amount_paid || 0)}
+                  </td>
+                  <td className="px-4 py-4 text-sm text-neutral-600">
+                    {formatDate(registration.created_at)}
+                  </td>
+                  <td className="px-4 py-4 text-right">
+                    {onDelete && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDelete(registration.id, registration.profiles?.full_name || 'Participante')}
+                        disabled={deletingId === registration.id}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
 
       {/* Mobile Cards */}
       <div className="md:hidden space-y-3">
-        {registrations.map((registration: any) => (
-          <div
-            key={registration.id}
-            className="bg-white rounded-lg border border-neutral-200 p-4"
-          >
-            <div className="flex justify-between items-start mb-2">
+        {registrations.map((registration: any) => {
+          const shortCode = registration.id?.slice(0, 8).toUpperCase() || null
+
+          return (
+            <div
+              key={registration.id}
+              className="bg-white rounded-lg border border-neutral-200 p-4"
+            >
+              <div className="flex justify-between items-start mb-2">
               <div>
                 {(registration.registration_data?.partner || registration.partner_name) && (
                   <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Participante 1</p>
@@ -330,6 +350,12 @@ export function RegistrationsTable({
                   </div>
                 </div>
               )}
+              {shortCode && (
+                <p className="text-neutral-600">
+                  <span className="font-medium">Código:</span>{' '}
+                  <span className="font-mono text-xs bg-neutral-100 px-1.5 py-0.5 rounded">{shortCode}</span>
+                </p>
+              )}
               <p className="text-neutral-600">
                 <span className="font-medium">Valor:</span>{' '}
                 {formatCurrency(registration.amount_paid || 0)}
@@ -353,8 +379,9 @@ export function RegistrationsTable({
                 </Button>
               </div>
             )}
-          </div>
-        ))}
+            </div>
+          )
+        })}
       </div>
 
       {registrations.length === 0 && (

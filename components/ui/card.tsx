@@ -97,6 +97,7 @@ export interface EventCardProps {
   }
   isSoldOut?: boolean
   isVirtual?: boolean
+  isComingSoon?: boolean
   participants?: number
   time?: string
   onRegister?: () => void
@@ -117,6 +118,7 @@ export function EventCard({
   badge,
   isSoldOut,
   isVirtual,
+  isComingSoon,
   participants,
   time,
   onRegister,
@@ -284,15 +286,17 @@ export function EventCard({
             {onRegister && (
               <button
                 type="button"
-                onClick={onRegister}
-                disabled={isSoldOut}
+                onClick={isComingSoon ? undefined : onRegister}
+                disabled={isSoldOut || isComingSoon}
                 className={cn(
-                  'inline-flex w-full items-center justify-center rounded-full px-5 py-2 text-sm font-semibold font-geist text-white shadow-[0_15px_35px_rgba(249,115,22,0.35)] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-orange-400',
-                  'bg-gradient-to-r from-orange-400 to-orange-500',
-                  isSoldOut && 'opacity-60 cursor-not-allowed'
+                  'inline-flex w-full items-center justify-center rounded-full px-5 py-2 text-sm font-semibold font-geist text-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-orange-400',
+                  isComingSoon
+                    ? 'bg-neutral-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-orange-400 to-orange-500 shadow-[0_15px_35px_rgba(249,115,22,0.35)]',
+                  isSoldOut && !isComingSoon && 'opacity-60 cursor-not-allowed'
                 )}
               >
-                {isSoldOut ? 'Esgotado' : 'Ver detalhes'}
+                {isComingSoon ? 'Em breve' : isSoldOut ? 'Esgotado' : 'Ver detalhes'}
               </button>
             )}
           </div>
@@ -371,8 +375,13 @@ export function EventCard({
             </div>
           )}
           {onRegister && (
-            <Button onClick={onRegister} size="sm" disabled={isSoldOut}>
-              {isSoldOut ? 'Esgotado' : 'Ver detalhes'}
+            <Button
+              onClick={isComingSoon ? undefined : onRegister}
+              size="sm"
+              disabled={isSoldOut || isComingSoon}
+              variant={isComingSoon ? 'secondary' : 'primary'}
+            >
+              {isComingSoon ? 'Em breve' : isSoldOut ? 'Esgotado' : 'Ver detalhes'}
             </Button>
           )}
         </CardContent>

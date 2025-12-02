@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils'
 import { Header } from '@/components/layout/header'
 import { Footer } from '@/components/layout/footer'
 import Link from 'next/link'
-import { FileText, Shield, RefreshCw } from 'lucide-react'
+import { FileText, Shield, RefreshCw, Camera } from 'lucide-react'
 
 interface LegalLayoutProps {
     children: React.ReactNode
@@ -16,12 +16,14 @@ export function LegalLayout({ children, title, lastUpdated, className }: LegalLa
     // Map titles to paths for active state check
     const currentPath = title.includes('Privacidade') ? '/privacidade' :
         title.includes('Reembolso') ? '/reembolso' :
-            '/termos';
+            title.includes('Imagem') ? '/uso-de-imagem' :
+                '/termos';
 
     const sidebarLinks = [
         { href: '/termos', label: 'Termos de Uso', icon: FileText },
         { href: '/privacidade', label: 'Política de Privacidade', icon: Shield },
         { href: '/reembolso', label: 'Política de Reembolso', icon: RefreshCw },
+        { href: '/uso-de-imagem', label: 'Uso de Imagem', icon: Camera },
     ]
 
     return (

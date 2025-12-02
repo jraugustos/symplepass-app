@@ -46,6 +46,7 @@ const publishSchema = z
       state: z.string().min(1, "Estado é obrigatório"),
       venue: z.string().optional(),
       address: z.string().optional(),
+      google_maps_url: z.string().optional(),
     }),
     start_date: z.string().min(1, "Data de início é obrigatória"),
     end_date: z.string().nullable().optional(),
@@ -85,6 +86,7 @@ const publishSchema = z
     has_organizer: z.boolean(),
     show_course_info: z.boolean(),
     show_championship_format: z.boolean(),
+    allow_page_access: z.boolean(),
   })
   .refine(
     (data) => {
@@ -113,6 +115,7 @@ const draftSchema = z.object({
       state: z.string().optional(),
       venue: z.string().optional(),
       address: z.string().optional(),
+      google_maps_url: z.string().optional(),
     })
     .optional(),
   start_date: z.string().optional(),
@@ -152,6 +155,7 @@ const draftSchema = z.object({
   has_organizer: z.boolean().optional(),
   show_course_info: z.boolean().optional(),
   show_championship_format: z.boolean().optional(),
+  allow_page_access: z.boolean().optional(),
 });
 
 interface EventFormProps {
@@ -274,12 +278,14 @@ export function EventForm({
           event.show_course_info !== undefined ? event.show_course_info : true,
         show_championship_format:
           event.show_championship_format !== undefined ? event.show_championship_format : true,
+        allow_page_access:
+          event.allow_page_access !== undefined ? event.allow_page_access : true,
       }
       : {
         title: "",
         description: "",
         banner_url: null,
-        location: { city: "", state: "", venue: "", address: "" },
+        location: { city: "", state: "", venue: "", address: "", google_maps_url: "" },
         start_date: "",
         end_date: null,
         sport_type: "corrida" as SportType,
@@ -297,6 +303,7 @@ export function EventForm({
         has_organizer: true,
         show_course_info: true,
         show_championship_format: true,
+        allow_page_access: true,
       },
   });
 
@@ -557,6 +564,19 @@ export function EventForm({
               placeholder="Ex: Av. Pedro Álvares Cabral"
             />
           </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-neutral-700 mb-1">
+              Link Google Maps
+            </label>
+            <Input
+              {...register("location.google_maps_url")}
+              placeholder="Ex: https://maps.google.com/..."
+            />
+            <p className="text-xs text-neutral-500 mt-1">
+              Cole o link do Google Maps para o local do evento
+            </p>
+          </div>
         </div>
       </Card>
 
@@ -577,6 +597,28 @@ export function EventForm({
               <option value="completed">Concluído</option>
             </Select>
           </div>
+
+          {/* Allow page access - Only show when status is published_no_registration */}
+          {status === "published_no_registration" && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  id="allow_page_access"
+                  {...register("allow_page_access")}
+                  className="mt-1 h-4 w-4 text-orange-600 focus:ring-orange-500 border-neutral-300 rounded"
+                />
+                <div>
+                  <label htmlFor="allow_page_access" className="text-sm font-medium text-amber-900 cursor-pointer">
+                    Permitir acesso à página do evento?
+                  </label>
+                  <p className="text-xs text-amber-700 mt-1">
+                    Se desmarcado, os botões nos cards de eventos exibirão "Em breve" e a página do evento não estará acessível.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Date fields */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

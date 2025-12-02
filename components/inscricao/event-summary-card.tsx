@@ -4,6 +4,7 @@ import { BadgeCheck, Medal, Calendar, MapPin, Users } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { Event, EventCategory } from '@/types'
 import { formatDate } from '@/lib/utils'
+import { getSportLabel } from '@/lib/constants/sports'
 
 interface EventSummaryCardProps {
   event: Event
@@ -39,7 +40,7 @@ export function EventSummaryCard({ event, category }: EventSummaryCardProps) {
         </li>
         <li className="flex items-center gap-2">
           <Users className="w-4 h-4" />
-          <span>{event.sport_type || 'Evento'}</span>
+          <span>{getSportLabel(event.sport_type) || event.sport_type || 'Evento'}</span>
         </li>
       </ul>
     </div>

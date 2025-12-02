@@ -268,8 +268,8 @@ export async function POST(request: Request) {
             margin: 2,
         })
 
-        // Save QR code to registration
-        await updateRegistrationQRCode(registrationResult.data.id, qrCodeDataUrl, supabase)
+        // Save QR code and ticket code to registration
+        await updateRegistrationQRCode(registrationResult.data.id, qrCodeDataUrl, ticketCode, supabase)
 
         // Send confirmation email
         try {

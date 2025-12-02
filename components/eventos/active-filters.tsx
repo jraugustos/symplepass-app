@@ -5,6 +5,7 @@ import { FilterPill } from '@/components/molecules/filter-button'
 import { Button } from '@/components/ui/button'
 import type { EventsListFilters } from '@/types'
 import { formatPriceRange } from '@/lib/utils'
+import { getSportLabel } from '@/lib/constants/sports'
 
 interface ActiveFiltersProps {
   filters: EventsListFilters
@@ -17,24 +18,9 @@ export function ActiveFilters({ filters, onRemoveFilter, onClearAll }: ActiveFil
 
   // Build list of active filters
   if (filters.sport_type) {
-    const sportTypeLabels: Record<string, string> = {
-      corrida: 'Corrida',
-      ciclismo: 'Ciclismo',
-      triatlo: 'Triatlo',
-      natacao: 'Natação',
-      caminhada: 'Caminhada',
-      crossfit: 'CrossFit',
-      beach_sports: 'Beach Sports',
-      trail_running: 'Trail Running',
-      beach_tenis: 'Beach Tennis',
-      futevolei: 'Futevôlei',
-      volei_praia: 'Vôlei de Praia',
-      stand_up_paddle: 'Stand Up Paddle',
-      outro: 'Outro',
-    }
     activeFilters.push({
       key: 'sport_type',
-      label: sportTypeLabels[filters.sport_type] || filters.sport_type,
+      label: getSportLabel(filters.sport_type) || filters.sport_type,
     })
   }
 

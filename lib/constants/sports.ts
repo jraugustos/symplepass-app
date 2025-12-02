@@ -21,7 +21,7 @@ export const SPORT_CATEGORIES = {
   beach: {
     label: 'Esportes de Praia',
     items: [
-      { value: 'beach_tenis', label: 'Beach Tênis' },
+      { value: 'beach_tenis', label: 'Beach Tennis' },
       { value: 'futevolei', label: 'Futevôlei' },
       { value: 'volei_praia', label: 'Vôlei de Praia' },
       { value: 'surf', label: 'Surf' },

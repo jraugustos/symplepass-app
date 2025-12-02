@@ -1,11 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Mail, Lock, Eye, EyeOff, AlertCircle, Loader2, User, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
 import { signUpWithEmail, signInWithGoogle } from '@/lib/auth/actions'
 import { registerSchema, validateFormData } from '@/lib/auth/validation'
+import { getCallbackUrl, sanitizeRedirectUrl } from '@/lib/auth/utils'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { getPasswordStrength } from '@/lib/utils'
@@ -23,6 +24,7 @@ export default function RegisterForm() {
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const passwordStrength = password ? getPasswordStrength(password) : null
   const passwordsMatch = confirmPassword && password === confirmPassword
@@ -63,8 +65,10 @@ export default function RegisterForm() {
         return
       }
 
-      // Redirect to account page
-      router.push('/conta')
+      // Redirect to callback URL or account page
+      const callbackUrl = getCallbackUrl(searchParams)
+      const safeUrl = sanitizeRedirectUrl(callbackUrl)
+      router.push(safeUrl)
       router.refresh()
     } catch (err) {
       console.error('Register error:', err)
@@ -78,7 +82,9 @@ export default function RegisterForm() {
     setError('')
 
     try {
-      const result = await signInWithGoogle()
+      // Pass callbackUrl to Google OAuth
+      const callbackUrl = getCallbackUrl(searchParams)
+      const result = await signInWithGoogle(callbackUrl !== '/conta' ? callbackUrl : undefined)
 
       if (result.error) {
         setError(result.error)
@@ -281,12 +287,19 @@ export default function RegisterForm() {
             />
             <span className="text-sm text-gray-600">
               Li e aceito os{' '}
-              <Link href="/termos" className="text-orange-600 hover:text-orange-700 font-medium">
+              <Link
+                href="/termos"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-orange-600 hover:text-orange-700 font-medium"
+              >
                 Termos de Uso
               </Link>{' '}
               e{' '}
               <Link
                 href="/privacidade"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-orange-600 hover:text-orange-700 font-medium"
               >
                 Política de Privacidade

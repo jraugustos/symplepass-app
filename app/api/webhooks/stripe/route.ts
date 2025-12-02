@@ -84,23 +84,29 @@ export async function POST(request: NextRequest) {
           paymentIntentId || undefined
         )
 
-        let qrCodeDataUrl = registration.qr_code
-
-        if (!qrCodeDataUrl) {
-          qrCodeDataUrl = await generateQRCode(registration.id)
-
-          if (qrCodeDataUrl) {
-            await updateRegistrationQRCode(registration.id, qrCodeDataUrl)
-          } else {
-            console.error('Failed to generate QR code for registration:', registration.id)
-          }
-        }
-
         const { data: registrationDetails } =
           await getRegistrationByStripeSessionWithDetails(session.id)
 
+        // Generate ticket code with event slug for better identification
+        const eventSlug = registrationDetails?.event?.slug || 'EVENT'
+        const ticketCode = `${eventSlug.toUpperCase()}-${registration.id.slice(0, 8).toUpperCase()}`
+
+        let qrCodeDataUrl = registration.qr_code
+
+        if (!qrCodeDataUrl) {
+          qrCodeDataUrl = await generateQRCode(ticketCode)
+
+          if (qrCodeDataUrl) {
+            await updateRegistrationQRCode(registration.id, qrCodeDataUrl, ticketCode)
+          } else {
+            console.error('Failed to generate QR code for registration:', registration.id)
+          }
+        } else if (!registration.ticket_code) {
+          // QR code exists but ticket_code doesn't - update only ticket_code
+          await updateRegistrationQRCode(registration.id, qrCodeDataUrl, ticketCode)
+        }
+
         if (registrationDetails) {
-          const ticketCode = generateTicketCode(registrationDetails.id)
           const eventTitle = registrationDetails.event?.title || 'Evento'
           const eventDate = formatDateTimeLong(registrationDetails.event?.start_date || '')
           const eventLocation = extractLocationString(registrationDetails.event?.location)

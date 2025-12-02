@@ -467,15 +467,22 @@ export async function deleteUserAccount(
 
 /**
  * Sign in with Google OAuth
+ * @param callbackUrl - Optional URL to redirect to after successful authentication
  */
-export async function signInWithGoogle(): Promise<ActionResponse<{ url: string }>> {
+export async function signInWithGoogle(callbackUrl?: string): Promise<ActionResponse<{ url: string }>> {
   try {
     const supabase = await createClient()
+
+    // Build redirect URL with optional callbackUrl as query param
+    const redirectTo = new URL('/auth/callback', process.env.NEXT_PUBLIC_SITE_URL)
+    if (callbackUrl) {
+      redirectTo.searchParams.set('callbackUrl', callbackUrl)
+    }
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+        redirectTo: redirectTo.toString(),
       },
     })
 

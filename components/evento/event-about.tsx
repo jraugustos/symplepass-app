@@ -3,6 +3,7 @@ import { formatEventDate, formatTime, extractLocationString, formatCurrency } fr
 import { Badge } from '@/components/ui/badge'
 import type { Event } from '@/types/database.types'
 import { EVENT_PAGE_CONTENT_CLASS } from './layout-constants'
+import { getSportLabel } from '@/lib/constants/sports'
 
 interface EventAboutProps {
   event: Pick<Event, 'description' | 'location' | 'start_date' | 'sport_type' | 'event_format' | 'banner_url' | 'event_type' | 'solidarity_message' | 'allows_pair_registration'>
@@ -15,24 +16,9 @@ export default function EventAbout({ event, minPrice }: EventAboutProps) {
   const state = event.location?.state || ''
   const venue = event.location?.venue || ''
   const address = event.location?.address || ''
+  const googleMapsUrl = event.location?.google_maps_url || ''
   const date = formatEventDate(event.start_date)
   const time = formatTime(event.start_date)
-
-  const sportLabels: Record<string, string> = {
-    corrida: 'Corrida',
-    ciclismo: 'Ciclismo',
-    triatlo: 'Triatlo',
-    natacao: 'Natação',
-    caminhada: 'Caminhada',
-    crossfit: 'CrossFit',
-    beach_sports: 'Esportes de Praia',
-    trail_running: 'Trail Running',
-    beach_tenis: 'Beach Tennis',
-    futevolei: 'Futevôlei',
-    volei_praia: 'Vôlei de Praia',
-    stand_up_paddle: 'Stand Up Paddle',
-    outro: 'Outro',
-  }
 
   const eventFormatLabels: Record<string, string> = {
     presencial: 'Presencial',
@@ -102,7 +88,7 @@ export default function EventAbout({ event, minPrice }: EventAboutProps) {
               <div className="rounded-xl border border-neutral-200 bg-white p-4">
                 <p className="text-sm text-neutral-500 font-geist">Modalidade</p>
                 <p className="font-medium mt-0.5 font-geist">
-                  {sportLabels[event.sport_type] || event.sport_type}
+                  {getSportLabel(event.sport_type) || event.sport_type}
                 </p>
               </div>
 
@@ -133,13 +119,17 @@ export default function EventAbout({ event, minPrice }: EventAboutProps) {
               </div>
             </div>
 
-            {/* Buttons - Ver no mapa, Largada inicial */}
+            {/* Buttons - Ver no mapa */}
             <div className="mt-4 flex flex-wrap gap-2">
-              {((venue && city) || (address && city)) && (
+              {(googleMapsUrl || ((venue && city) || (address && city))) && (
                 <button
                   onClick={() => {
-                    const query = encodeURIComponent(`${city}, ${state}`)
-                    window.open(`https://maps.google.com/?q=${query}`, '_blank')
+                    if (googleMapsUrl) {
+                      window.open(googleMapsUrl, '_blank')
+                    } else {
+                      const query = encodeURIComponent(`${venue || address}, ${city}, ${state}`)
+                      window.open(`https://maps.google.com/?q=${query}`, '_blank')
+                    }
                   }}
                   className="inline-flex items-center gap-2 text-sm font-medium rounded-full px-4 py-2 border border-neutral-200 text-neutral-700 hover:bg-neutral-50 font-geist"
                 >

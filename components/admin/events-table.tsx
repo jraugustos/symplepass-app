@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Event, EventStatus } from '@/types/database.types'
 import { formatDate } from '@/lib/utils'
+import { getSportLabel } from '@/lib/constants/sports'
 import { ConfirmDialog } from '@/components/ui/modal'
 
 interface EventsTableProps {
@@ -156,7 +157,7 @@ export function EventsTable({
                   </div>
                 </td>
                 <td className="px-4 py-4 text-sm text-neutral-600">
-                  {event.sport_type}
+                  {getSportLabel(event.sport_type) || event.sport_type}
                 </td>
                 <td className="px-4 py-4 text-sm text-neutral-600">
                   {formatDate(event.start_date)}

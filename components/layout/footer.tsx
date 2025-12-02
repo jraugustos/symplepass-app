@@ -45,6 +45,7 @@ export function Footer({ variant = 'dark', className }: FooterProps) {
         { label: 'Termos de Uso', href: '/termos' },
         { label: 'Política de Privacidade', href: '/privacidade' },
         { label: 'Política de Reembolso', href: '/reembolso' },
+        { label: 'Uso de Imagem', href: '/uso-de-imagem' },
       ],
     },
   }

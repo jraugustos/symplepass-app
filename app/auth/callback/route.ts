@@ -1,10 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { redirectAfterLogin } from '@/lib/auth/utils'
+import { redirectAfterLogin, sanitizeRedirectUrl } from '@/lib/auth/utils'
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
+  const callbackUrl = requestUrl.searchParams.get('callbackUrl')
   const origin = requestUrl.origin
 
   if (code) {
@@ -42,14 +43,19 @@ export async function GET(request: Request) {
           }
         }
 
-        // Get fresh profile data to determine redirect
+        // If callbackUrl is provided, use it (after sanitization)
+        if (callbackUrl) {
+          const safeUrl = sanitizeRedirectUrl(callbackUrl)
+          return NextResponse.redirect(`${origin}${safeUrl}`)
+        }
+
+        // Otherwise, redirect based on role
         const { data: freshProfile } = await supabase
           .from('profiles')
           .select('role')
           .eq('id', data.user.id)
           .single()
 
-        // Redirect based on role
         const role = freshProfile?.role || 'user'
         const destination = redirectAfterLogin(role)
 

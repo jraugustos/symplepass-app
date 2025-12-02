@@ -10,13 +10,26 @@ export const metadata: Metadata = {
   description: 'Crie sua conta Symplepass e comece a participar de eventos esportivos',
 }
 
-export default async function RegisterPage() {
+interface RegisterPageProps {
+  searchParams: {
+    callbackUrl?: string
+  }
+}
+
+export default async function RegisterPage({ searchParams }: RegisterPageProps) {
   // Check if user is already authenticated
   const supabase = await createClient()
   const { data: { session } } = await supabase.auth.getSession()
 
   if (session) {
-    redirect('/conta')
+    // Respect the callbackUrl if provided, otherwise go to /conta
+    const callbackUrl = searchParams.callbackUrl || '/conta'
+
+    // Basic validation to prevent open redirect
+    const isValidCallback = callbackUrl.startsWith('/') && !callbackUrl.startsWith('//')
+    const redirectTo = isValidCallback ? callbackUrl : '/conta'
+
+    redirect(redirectTo)
   }
 
   return (
@@ -63,7 +76,7 @@ export default async function RegisterPage() {
             <p className="text-sm text-gray-600">
               Já tem uma conta?{' '}
               <Link
-                href="/login"
+                href={searchParams.callbackUrl ? `/login?callbackUrl=${encodeURIComponent(searchParams.callbackUrl)}` : '/login'}
                 className="font-semibold text-orange-600 hover:text-orange-700 transition-colors"
               >
                 Fazer login

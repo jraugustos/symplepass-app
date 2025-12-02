@@ -3,6 +3,7 @@
 import { MapPin, Calendar, Activity, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { formatEventDate, extractLocationString, formatCurrency } from '@/lib/utils'
+import { getSportLabel } from '@/lib/constants/sports'
 import type { Event } from '@/types/database.types'
 import { EVENT_PAGE_CONTENT_CLASS } from './layout-constants'
 
@@ -16,18 +17,6 @@ interface EventHeroProps {
 export default function EventHero({ event, minPrice, onCtaClick, header }: EventHeroProps) {
   const location = extractLocationString(event.location)
   const date = formatEventDate(event.start_date)
-
-  const sportLabels: Record<string, string> = {
-    corrida: 'Corrida',
-    ciclismo: 'Ciclismo',
-    triatlo: 'Triatlo',
-    natacao: 'Natação',
-    caminhada: 'Caminhada',
-    crossfit: 'CrossFit',
-    beach_sports: 'Beach Sports',
-    trail_running: 'Trail Running',
-    outro: 'Outro',
-  }
 
   const isFreeEvent = event.event_type === 'free' || event.event_type === 'solidarity'
   const eventTypeLabel = event.event_type === 'solidarity' ? 'Solidário' : event.event_type === 'free' ? 'Gratuito' : null
@@ -64,7 +53,7 @@ export default function EventHero({ event, minPrice, onCtaClick, header }: Event
 
               <div className="inline-flex items-center gap-2 sm:text-sm text-xs text-white/90 font-geist bg-white/10 border-white/20 border rounded-full pt-1.5 pr-3 pb-1.5 pl-3">
                 <Activity className="h-4 w-4" />
-                <span>{sportLabels[event.sport_type] || event.sport_type}</span>
+                <span>{getSportLabel(event.sport_type) || event.sport_type}</span>
               </div>
 
               {eventTypeLabel && (

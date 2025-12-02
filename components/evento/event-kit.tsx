@@ -1,6 +1,6 @@
 'use client'
 
-import { ChevronLeft, ChevronRight, Package, MapPin, CreditCard } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Package, MapPin } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
 import { useKitCarousel } from '@/lib/hooks/use-kit-carousel'
 import { useIntersectionObserver } from '@/lib/hooks/use-intersection-observer'
@@ -159,16 +159,17 @@ export default function EventKit({ kitItems, kitPickupInfo }: EventKitProps) {
                   </p>
                 </div>
 
-                <div className="flex gap-2">
-                  <button className="flex-1 rounded-lg border border-neutral-200 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors flex items-center justify-center gap-2">
-                    <MapPin className="h-4 w-4" />
-                    Ver rota
-                  </button>
-                  <button className="flex-1 rounded-lg border border-neutral-200 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors flex items-center justify-center gap-2">
-                    <CreditCard className="h-4 w-4" />
-                    O que levar
-                  </button>
-                </div>
+                {kitPickupInfo.google_maps_url && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => window.open(kitPickupInfo.google_maps_url, '_blank')}
+                      className="flex-1 rounded-lg border border-neutral-200 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <MapPin className="h-4 w-4" />
+                      Ver rota
+                    </button>
+                  </div>
+                )}
 
                 {kitPickupInfo.notes && (
                   <p className="text-xs text-neutral-500">{kitPickupInfo.notes}</p>

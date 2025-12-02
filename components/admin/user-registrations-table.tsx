@@ -3,6 +3,7 @@
 import { Badge } from '@/components/ui/badge'
 import { RegistrationWithDetails, PaymentStatus, RegistrationStatus } from '@/types'
 import { formatDate, formatCurrency } from '@/lib/utils'
+import { getSportLabel } from '@/lib/constants/sports'
 
 interface UserRegistrationsTableProps {
   registrations: RegistrationWithDetails[]
@@ -108,7 +109,7 @@ export function UserRegistrationsTable({ registrations }: UserRegistrationsTable
                     {registration.events?.title || 'N/A'}
                   </p>
                   <p className="text-sm text-neutral-500">
-                    {registration.events?.sport_type || ''}
+                    {registration.events?.sport_type ? getSportLabel(registration.events.sport_type) || registration.events.sport_type : ''}
                   </p>
                 </td>
                 <td className="px-4 py-4 text-sm text-neutral-600">

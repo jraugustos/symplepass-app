@@ -5,6 +5,7 @@ import { EventCard } from '@/components/ui/card'
 import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useCarousel } from '@/lib/hooks/use-carousel'
 import type { Event } from '@/types/database.types'
+import { getSportLabel } from '@/lib/constants/sports'
 
 interface FeaturedEventsProps {
   events: Event[]
@@ -129,10 +130,11 @@ export function FeaturedEvents({ events }: FeaturedEventsProps) {
                   image={event.banner_url || 'https://images.unsplash.com/photo-1452626038306-9aae5e071dd3?w=800'}
                   title={event.title}
                   location={getLocation(event)}
-                  category={event.sport_type}
+                  category={getSportLabel(event.sport_type) || event.sport_type}
                   date={formatEventDate(event.start_date)}
                   description={event.description}
-                  tags={[event.sport_type]}
+                  tags={[getSportLabel(event.sport_type) || event.sport_type]}
+                  isComingSoon={event.status === 'published_no_registration' && !event.allow_page_access}
                   onRegister={() => {
                     window.location.href = `/eventos/${event.slug}`
                   }}

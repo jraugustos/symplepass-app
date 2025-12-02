@@ -56,7 +56,9 @@ export async function middleware(request: NextRequest) {
     }
 
     const redirectUrl = new URL('/login', request.url)
-    redirectUrl.searchParams.set('callbackUrl', pathname)
+    // Preserve full path including query params for proper redirect after login
+    const fullPath = pathname + request.nextUrl.search
+    redirectUrl.searchParams.set('callbackUrl', fullPath)
     const redirectResponse = NextResponse.redirect(redirectUrl)
     copySessionCookies(response, redirectResponse)
     return redirectResponse

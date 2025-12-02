@@ -35,11 +35,13 @@ export async function updateEventAction(eventId: string, data: EventFormDataAdmi
       solidarity_message: data.solidarity_message,
       status: data.status as any,
       is_featured: data.is_featured,
+      has_organizer: data.has_organizer,
       allows_pair_registration: data.allows_pair_registration,
       shirt_sizes: data.shirt_sizes,
       shirt_sizes_config: data.shirt_sizes_config,
       show_course_info: data.show_course_info,
       show_championship_format: data.show_championship_format,
+      allow_page_access: data.allow_page_access,
     },
     result.user.id,
     result.profile.role

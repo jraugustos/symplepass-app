@@ -70,7 +70,9 @@ export default function LoginForm() {
     setError('')
 
     try {
-      const result = await signInWithGoogle()
+      // Pass callbackUrl to Google OAuth
+      const callbackUrl = getCallbackUrl(searchParams)
+      const result = await signInWithGoogle(callbackUrl !== '/conta' ? callbackUrl : undefined)
 
       if (result.error) {
         setError(result.error)

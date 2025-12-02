@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { ArrowRight, Calendar, MapPin } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { Event } from '@/types/database.types'
+import { getSportLabel } from '@/lib/constants/sports'
 
 interface UpcomingEventsProps {
   events: Event[]
@@ -59,6 +60,7 @@ export function UpcomingEvents({ events }: UpcomingEventsProps) {
         <div className="space-y-3">
           {events.map((event, index) => {
             const delay = 0.4 + index * 0.05
+            const isComingSoon = event.status === 'published_no_registration' && !event.allow_page_access
             return (
               <div
                 key={event.id}
@@ -88,7 +90,7 @@ export function UpcomingEvents({ events }: UpcomingEventsProps) {
                       <span className="text-neutral-300">•</span>
                       <div className="flex items-center gap-1.5">
                         <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs font-medium">
-                          {event.sport_type}
+                          {getSportLabel(event.sport_type) || event.sport_type}
                         </span>
                       </div>
                     </div>
@@ -97,13 +99,14 @@ export function UpcomingEvents({ events }: UpcomingEventsProps) {
                   {/* CTA Column */}
                   <div className="lg:col-span-3 flex justify-end">
                     <Button
-                      variant="primary"
-                      onClick={() => {
+                      variant={isComingSoon ? 'secondary' : 'primary'}
+                      onClick={isComingSoon ? undefined : () => {
                         window.location.href = `/eventos/${event.slug}`
                       }}
+                      disabled={isComingSoon}
                       className="w-full sm:w-auto"
                     >
-                      Ver detalhes
+                      {isComingSoon ? 'Em breve' : 'Ver detalhes'}
                     </Button>
                   </div>
                 </div>

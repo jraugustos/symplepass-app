@@ -111,6 +111,7 @@ export interface Event {
   regulation_pdf_url: string | null
   regulation_updated_at: string | null
   kit_pickup_info: any // JSONB field
+  allow_page_access: boolean // When false with published_no_registration status, buttons show "Em breve"
   created_at: string
   updated_at: string
   // Computed fields from event_categories (available when querying from events_with_prices view)
@@ -145,6 +146,7 @@ export interface Registration {
   stripe_session_id: string | null
   stripe_payment_intent_id: string | null
   qr_code: string | null
+  ticket_code: string | null
   shirt_size: ShirtSize | null
   partner_name: string | null
   is_partner_registration: boolean

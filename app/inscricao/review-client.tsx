@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { ShieldCheck, ArrowRight, Users } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -117,6 +118,15 @@ export function ReviewClient({
   )
 
   const isFormValid = isUserDataValid && termsAccepted && isPartnerDataValid
+
+  // Get current search params for login redirect
+  const searchParams = useSearchParams()
+
+  // Handle login redirect with current URL preserved
+  const handleLogin = useCallback(() => {
+    const currentUrl = `/inscricao?${searchParams.toString()}`
+    window.location.href = `/login?callbackUrl=${encodeURIComponent(currentUrl)}`
+  }, [searchParams])
 
   const isFreeEvent = event.event_type === 'free' || event.event_type === 'solidarity'
   const buttonLabel = isSubmitting
@@ -264,6 +274,7 @@ export function ReviewClient({
           isAuthenticated={isAuthenticated}
           userName={user?.full_name || ''}
           userEmail={user?.email ?? undefined}
+          onLogin={handleLogin}
         />
         <div className="border-b border-white/20" />
         <div className="container relative z-10 mx-auto px-5 sm:px-6 lg:px-8 py-16 text-center">
@@ -613,7 +624,7 @@ export function ReviewClient({
             )}
 
             {/* Terms checkbox section */}
-            <section className="mt-8 space-y-2">
+            <section className="mt-8">
               <div className="flex items-start gap-3">
                 <input
                   id="terms"
@@ -637,15 +648,29 @@ export function ReviewClient({
                   </svg>
                 </label>
                 <label htmlFor="terms" className="text-sm text-neutral-600 font-inter cursor-pointer">
-                  Li e concordo com os termos e condições do evento
+                  Li e concordo com o{' '}
+                  <a
+                    href="/uso-de-imagem"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-orange-600 underline underline-offset-2 hover:text-orange-700"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Uso de imagem
+                  </a>
+                  {' '}do evento e{' '}
+                  <a
+                    href="/termos"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-orange-600 underline underline-offset-2 hover:text-orange-700"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Termos de uso
+                  </a>
+                  {' '}da plataforma.
                 </label>
               </div>
-              <a
-                href="/regulamento"
-                className="text-sm underline underline-offset-2 text-neutral-600 hover:text-neutral-900 font-inter inline-block ml-8"
-              >
-                Ver regulamento completo
-              </a>
             </section>
 
             {error && (

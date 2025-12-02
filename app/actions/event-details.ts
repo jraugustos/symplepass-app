@@ -51,8 +51,9 @@ export async function updateKitPickupInfoAction(eventId: string, data: any) {
     if (result.error) throw new Error(result.error)
     revalidatePath(`/admin/eventos/${eventId}/editar`)
     // Revalidate the public event page using the slug from the result
-    if (result.data?.slug) {
-        revalidatePath(`/eventos/${result.data.slug}`)
+    const eventData = result.data as { slug?: string } | null
+    if (eventData?.slug) {
+        revalidatePath(`/eventos/${eventData.slug}`)
     }
 }
 

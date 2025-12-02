@@ -376,16 +376,23 @@ export async function getRegistrationByIdWithDetails(
 export async function updateRegistrationQRCode(
   registrationId: string,
   qrCodeDataUrl: string,
+  ticketCode?: string,
   supabaseClient?: SupabaseServerClient
 ): Promise<RegistrationResult<Registration>> {
   try {
     const supabase = getClient(supabaseClient)
 
+    const updateData: { qr_code: string; ticket_code?: string } = {
+      qr_code: qrCodeDataUrl,
+    }
+
+    if (ticketCode) {
+      updateData.ticket_code = ticketCode
+    }
+
     const { data, error } = await supabase
       .from('registrations')
-      .update({
-        qr_code: qrCodeDataUrl,
-      })
+      .update(updateData)
       .eq('id', registrationId)
       .select('*')
       .single()

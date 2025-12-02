@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { EventCard } from '@/components/ui/card'
 import type { Event } from '@/types/database.types'
-import { formatDateShort, formatCurrency } from '@/lib/utils'
+import { getSportLabel } from '@/lib/constants/sports'
 
 interface EventsGridProps {
   events: Event[]
@@ -33,28 +33,14 @@ export function EventsGrid({ events, variant = 'grid' }: EventsGridProps) {
             ? `${location.city}, ${location.state}`
             : location?.city || location?.state || 'Local a definir'
 
-        const sportTypeLabels: Record<string, string> = {
-          corrida: 'Corrida',
-          ciclismo: 'Ciclismo',
-          triatlo: 'Triatlo',
-          natacao: 'Natação',
-          caminhada: 'Caminhada',
-          crossfit: 'CrossFit',
-          beach_sports: 'Beach Sports',
-          trail_running: 'Trail Running',
-          beach_tenis: 'Beach Tennis',
-          futevolei: 'Futevôlei',
-          volei_praia: 'Vôlei de Praia',
-          stand_up_paddle: 'Stand Up Paddle',
-          outro: 'Outro',
-        }
-
         // Determine badge for event - only show "Destaque" badge, hide event type badges (solidário/gratuito) to limit to 2 tags
         let eventBadge: { text: string; variant: 'warning' | 'success' | 'info' } | undefined
 
         if (event.is_featured) {
           eventBadge = { text: 'Destaque', variant: 'warning' }
         }
+
+        const isComingSoon = event.status === 'published_no_registration' && !event.allow_page_access
 
         return (
           <div
@@ -67,11 +53,12 @@ export function EventsGrid({ events, variant = 'grid' }: EventsGridProps) {
               image={event.banner_url || '/placeholder-event.jpg'}
               title={event.title}
               location={locationString}
-              category={sportTypeLabels[event.sport_type] || event.sport_type}
+              category={getSportLabel(event.sport_type) || event.sport_type}
               date={new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(event.start_date)).replace('.', '')}
               price={event.min_price}
               description={event.description}
               badge={eventBadge}
+              isComingSoon={isComingSoon}
               onRegister={() => router.push(`/eventos/${event.slug}`)}
             />
           </div>

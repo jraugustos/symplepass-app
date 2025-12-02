@@ -221,6 +221,7 @@ export interface KitPickupInfo {
   hours: string
   location: string
   notes: string
+  google_maps_url?: string
 }
 
 export interface CourseElevation {
@@ -462,6 +463,7 @@ export interface EventFormDataAdmin {
     state: string
     venue?: string
     address?: string
+    google_maps_url?: string
   }
   start_date: string
   end_date?: string | null
@@ -480,6 +482,7 @@ export interface EventFormDataAdmin {
   has_organizer: boolean
   show_course_info: boolean
   show_championship_format: boolean
+  allow_page_access: boolean
 }
 
 export interface CategoryFormData {

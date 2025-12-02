@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import type {
     EventKitItem,
     EventCourseInfo,
@@ -257,9 +257,10 @@ export async function reorderRegulations(items: { id: string; display_order: num
 
 // Kit Pickup Info (stored in events table)
 export async function updateKitPickupInfo(eventId: string, pickupInfo: any) {
-    const supabase = createClient()
-    const { data, error } = await supabase
-        .from('events')
+    // Use admin client to bypass RLS for updating kit_pickup_info
+    const supabase = createAdminClient()
+    const { data, error } = await (supabase
+        .from('events') as any)
         .update({ kit_pickup_info: pickupInfo })
         .eq('id', eventId)
         .select()
@@ -270,9 +271,10 @@ export async function updateKitPickupInfo(eventId: string, pickupInfo: any) {
 
 // Regulation PDF
 export async function updateRegulationPDF(eventId: string, pdfUrl: string) {
-    const supabase = createClient()
-    const { data, error } = await supabase
-        .from('events')
+    // Use admin client to bypass RLS for updating regulation_pdf_url
+    const supabase = createAdminClient()
+    const { data, error } = await (supabase
+        .from('events') as any)
         .update({
             regulation_pdf_url: pdfUrl,
             regulation_updated_at: new Date().toISOString(),

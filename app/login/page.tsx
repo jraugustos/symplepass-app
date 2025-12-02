@@ -76,7 +76,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             <p className="text-sm text-gray-600">
               Ainda não tem uma conta?{' '}
               <Link
-                href="/cadastro"
+                href={searchParams.callbackUrl ? `/cadastro?callbackUrl=${encodeURIComponent(searchParams.callbackUrl)}` : '/cadastro'}
                 className="font-semibold text-orange-600 hover:text-orange-700 transition-colors"
               >
                 Criar conta

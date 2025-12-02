@@ -60,6 +60,7 @@ export function KitItemsForm({
         hours: pickupInfo?.hours || '',
         location: pickupInfo?.location || '',
         notes: pickupInfo?.notes || '',
+        google_maps_url: pickupInfo?.google_maps_url || '',
     })
 
     // Sync pickupFormData when pickupInfo prop changes (e.g., after save and revalidation)
@@ -69,6 +70,7 @@ export function KitItemsForm({
             hours: pickupInfo?.hours || '',
             location: pickupInfo?.location || '',
             notes: pickupInfo?.notes || '',
+            google_maps_url: pickupInfo?.google_maps_url || '',
         })
     }, [pickupInfo])
 
@@ -256,6 +258,21 @@ export function KitItemsForm({
                             }
                             placeholder="Ex: Ginásio do Ibirapuera — Portão 7"
                         />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-neutral-700 mb-1">
+                            Link Google Maps
+                        </label>
+                        <Input
+                            value={pickupFormData.google_maps_url}
+                            onChange={(e) =>
+                                setPickupFormData({ ...pickupFormData, google_maps_url: e.target.value })
+                            }
+                            placeholder="Ex: https://maps.google.com/..."
+                        />
+                        <p className="text-xs text-neutral-500 mt-1">
+                            Cole o link do Google Maps para o local de retirada do kit
+                        </p>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-neutral-700 mb-1">

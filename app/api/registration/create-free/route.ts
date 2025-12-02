@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { validateEmail, validateCPF } from '@/lib/utils'
 import { createRegistration } from '@/lib/data/registrations'
 import { updateRegistrationQRCode } from '@/lib/data/registrations'
@@ -230,9 +230,15 @@ export async function POST(request: Request) {
         )
 
         if (!registrationResult.data || registrationResult.error) {
-            console.error('Erro ao criar registro de inscrição:', registrationResult.error)
+            console.error('Erro ao criar registro de inscrição:', {
+                error: registrationResult.error,
+                userId: targetUserId,
+                eventId: event.id,
+                categoryId: category.id,
+                isPairRegistration
+            })
             return NextResponse.json(
-                { error: 'Não foi possível criar sua inscrição. Tente novamente.' },
+                { error: registrationResult.error || 'Não foi possível criar sua inscrição. Tente novamente.' },
                 { status: 500 }
             )
         }
@@ -242,8 +248,10 @@ export async function POST(request: Request) {
 
         if (!isAlreadyConfirmed) {
             // Update registration to confirmed status immediately
-            const { error: updateError } = await supabase
-                .from('registrations')
+            // Use admin client to bypass RLS (user may not be the auth.uid() if created via checkout)
+            const adminSupabase = createAdminClient()
+            const { error: updateError } = await (adminSupabase
+                .from('registrations') as any)
                 .update({
                     status: 'confirmed',
                     payment_status: 'paid',

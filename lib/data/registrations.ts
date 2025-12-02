@@ -234,6 +234,7 @@ export async function getRegistrationByPaymentIntent(
 
 /**
  * Updates registration payment and status fields (e.g. after webhook confirmation).
+ * Uses admin client to bypass RLS since webhooks don't have user context.
  * @returns Updated registration or error description
  */
 export async function updateRegistrationPaymentStatus(
@@ -244,10 +245,11 @@ export async function updateRegistrationPaymentStatus(
   supabaseClient?: SupabaseServerClient
 ): Promise<RegistrationResult<Registration>> {
   try {
-    const supabase = getClient(supabaseClient)
+    // Use admin client to bypass RLS - webhooks don't have user authentication context
+    const supabase = supabaseClient ?? createAdminClient()
 
-    const { data, error } = await supabase
-      .from('registrations')
+    const { data, error } = await (supabase
+      .from('registrations') as any)
       .update({
         status,
         payment_status: paymentStatus,

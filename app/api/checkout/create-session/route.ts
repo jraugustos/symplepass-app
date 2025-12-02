@@ -249,9 +249,15 @@ export async function POST(request: Request) {
     )
 
     if (!registrationResult.data || registrationResult.error) {
-      console.error('Erro ao criar registro de inscrição:', registrationResult.error)
+      console.error('Erro ao criar registro de inscrição:', {
+        error: registrationResult.error,
+        userId: targetUserId,
+        eventId: event.id,
+        categoryId: category.id,
+        isPairRegistration
+      })
       return NextResponse.json(
-        { error: 'Não foi possível criar sua inscrição. Tente novamente.' },
+        { error: registrationResult.error || 'Não foi possível criar sua inscrição. Tente novamente.' },
         { status: 500 }
       )
     }

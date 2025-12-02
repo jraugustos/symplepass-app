@@ -269,9 +269,10 @@ export async function resetPasswordForEmail(
     }
 
     const supabase = await createClient()
+    const env = getEnv()
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/recuperar-senha/atualizar`,
+      redirectTo: `${env.app.baseUrl}/recuperar-senha/atualizar`,
     })
 
     if (error) {
@@ -472,9 +473,10 @@ export async function deleteUserAccount(
 export async function signInWithGoogle(callbackUrl?: string): Promise<ActionResponse<{ url: string }>> {
   try {
     const supabase = await createClient()
+    const env = getEnv()
 
     // Build redirect URL with optional callbackUrl as query param
-    const redirectTo = new URL('/auth/callback', process.env.NEXT_PUBLIC_SITE_URL)
+    const redirectTo = new URL('/auth/callback', env.app.baseUrl)
     if (callbackUrl) {
       redirectTo.searchParams.set('callbackUrl', callbackUrl)
     }

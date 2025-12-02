@@ -29,7 +29,7 @@ export async function sendPasswordResetEmail(
     const html = generatePasswordResetEmailHtml(data)
 
     const response = await resend.emails.send({
-      from: 'Symplepass <noreply@symplepass.com>',
+      from: 'Symplepass <noreply@hello.symplepass.com.br>',
       to: data.userEmail,
       subject: 'Redefinir sua senha - Symplepass',
       html,

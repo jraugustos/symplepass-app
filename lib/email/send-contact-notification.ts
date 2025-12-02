@@ -43,7 +43,7 @@ export async function sendContactNotification(
       : `[Contato] Nova mensagem de ${data.name}`
 
     const response = await resend.emails.send({
-      from: 'Symplepass <noreply@symplepass.com>',
+      from: 'Symplepass <noreply@hello.symplepass.com.br>',
       to: ADMIN_EMAIL,
       replyTo: data.email,
       subject,

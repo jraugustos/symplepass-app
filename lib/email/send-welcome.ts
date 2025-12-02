@@ -24,7 +24,7 @@ export async function sendWelcomeEmail(data: WelcomeEmailData): Promise<SendWelc
     const html = generateWelcomeEmailHtml(data)
 
     const response = await resend.emails.send({
-      from: 'Symplepass <noreply@symplepass.com>',
+      from: 'Symplepass <noreply@hello.symplepass.com.br>',
       to: data.userEmail,
       subject: `Bem-vindo ao Symplepass, ${data.userName}!`,
       html,

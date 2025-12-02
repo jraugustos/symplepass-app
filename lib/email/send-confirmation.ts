@@ -19,7 +19,7 @@ export async function sendConfirmationEmail(data: EmailConfirmationData) {
     const html = generateConfirmationEmailHtml(data)
 
     const response = await resend.emails.send({
-      from: 'Symplepass <noreply@symplepass.com>',
+      from: 'Symplepass <noreply@hello.symplepass.com.br>',
       to: data.userEmail,
       subject: `Inscrição confirmada - ${data.eventTitle}`,
       html,

@@ -36,7 +36,7 @@ export async function sendEventReminderEmail(
           : `${data.daysUntilEvent} dias`
 
     const response = await resend.emails.send({
-      from: 'Symplepass <noreply@symplepass.com>',
+      from: 'Symplepass <noreply@hello.symplepass.com.br>',
       to: data.userEmail,
       subject: `⏰ ${urgencyText} - ${data.eventTitle}`,
       html,

@@ -6,7 +6,7 @@ type SupabaseServerClient = SupabaseClient<Database>
 export interface RegistrationValidationResult {
   valid: boolean
   error?: string
-  errorCode?: 'EVENT_NOT_FOUND' | 'CATEGORY_NOT_FOUND' | 'REGISTRATION_CLOSED' | 'REGISTRATION_NOT_STARTED' | 'REGISTRATION_NOT_ALLOWED' | 'EVENT_FULL' | 'CATEGORY_FULL' | 'PAIR_NOT_ALLOWED' | 'ALREADY_REGISTERED'
+  errorCode?: 'EVENT_NOT_FOUND' | 'CATEGORY_NOT_FOUND' | 'REGISTRATION_CLOSED' | 'REGISTRATION_NOT_STARTED' | 'REGISTRATION_NOT_ALLOWED' | 'EVENT_FULL' | 'CATEGORY_FULL' | 'PAIR_NOT_ALLOWED' | 'INDIVIDUAL_NOT_ALLOWED' | 'ALREADY_REGISTERED'
 }
 
 export interface EventValidationData {
@@ -51,7 +51,7 @@ export async function validateRegistration(
   // 1. Fetch event with validation fields
   const { data: eventData, error: eventError } = await supabase
     .from('events')
-    .select('id, title, slug, max_participants, registration_start, registration_end, allows_pair_registration, status')
+    .select('id, title, slug, max_participants, registration_start, registration_end, allows_individual_registration, allows_pair_registration, status')
     .eq('id', eventId)
     .in('status', ['published', 'published_no_registration'])
     .single()
@@ -64,7 +64,7 @@ export async function validateRegistration(
     }
   }
 
-  const event = eventData as Pick<Event, 'id' | 'title' | 'slug' | 'max_participants' | 'registration_start' | 'registration_end' | 'allows_pair_registration' | 'status'>
+  const event = eventData as Pick<Event, 'id' | 'title' | 'slug' | 'max_participants' | 'registration_start' | 'registration_end' | 'allows_individual_registration' | 'allows_pair_registration' | 'status'>
 
   // 1.5. Check if event allows registrations
   if (event.status === 'published_no_registration') {
@@ -156,6 +156,15 @@ export async function validateRegistration(
       valid: false,
       error: 'Este evento não permite inscrição em dupla.',
       errorCode: 'PAIR_NOT_ALLOWED'
+    }
+  }
+
+  // 6b. Check individual registration allowance
+  if (!isPairRegistration && event.allows_individual_registration === false) {
+    return {
+      valid: false,
+      error: 'Este evento não permite inscrição individual. Apenas inscrições em dupla são aceitas.',
+      errorCode: 'INDIVIDUAL_NOT_ALLOWED'
     }
   }
 

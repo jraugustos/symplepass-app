@@ -6,7 +6,7 @@ import { EVENT_PAGE_CONTENT_CLASS } from './layout-constants'
 import { getSportLabel } from '@/lib/constants/sports'
 
 interface EventAboutProps {
-  event: Pick<Event, 'description' | 'location' | 'start_date' | 'sport_type' | 'event_format' | 'banner_url' | 'event_type' | 'solidarity_message' | 'allows_pair_registration'>
+  event: Pick<Event, 'description' | 'location' | 'start_date' | 'sport_type' | 'event_format' | 'banner_url' | 'event_type' | 'solidarity_message' | 'allows_individual_registration' | 'allows_pair_registration'>
   minPrice: number | null
 }
 
@@ -111,7 +111,9 @@ export default function EventAbout({ event, minPrice }: EventAboutProps) {
                   <p className="text-sm text-neutral-500 font-geist">Tipo de Inscrição</p>
                 </div>
                 <div className="flex flex-wrap gap-2 mt-2">
-                  <Badge variant="info" size="sm">Individual</Badge>
+                  {event.allows_individual_registration !== false && (
+                    <Badge variant="info" size="sm">Individual</Badge>
+                  )}
                   {event.allows_pair_registration && (
                     <Badge variant="info" size="sm">Dupla</Badge>
                   )}

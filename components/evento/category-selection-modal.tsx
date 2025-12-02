@@ -29,7 +29,15 @@ export default function CategorySelectionModal({
   const [partnerGender, setPartnerGender] = useState<ShirtGender | null>(null)
   const [partnerSize, setPartnerSize] = useState<ShirtSize>('')
   const [partnerName, setPartnerName] = useState('')
-  const [registrationType, setRegistrationType] = useState<'individual' | 'dupla'>('individual')
+  // Determine default registration type based on event settings
+  const getDefaultRegistrationType = (): 'individual' | 'dupla' => {
+    const allowsIndividual = event.allows_individual_registration !== false
+    const allowsPair = event.allows_pair_registration === true
+    // If only pair is allowed, default to dupla
+    if (!allowsIndividual && allowsPair) return 'dupla'
+    return 'individual'
+  }
+  const [registrationType, setRegistrationType] = useState<'individual' | 'dupla'>(getDefaultRegistrationType())
 
   // Parse shirt sizes config from event
   const shirtSizesConfig: ShirtSizesByGender | null =
@@ -143,9 +151,11 @@ export default function CategorySelectionModal({
   if (!isOpen || !category) return null
 
   const hasShirtSizes = genderOptions.length > 0 && availableSizes && availableSizes.length > 0
-  const allowsPairRegistration = event.allows_pair_registration
+  const allowsIndividualRegistration = event.allows_individual_registration !== false
+  const allowsPairRegistration = event.allows_pair_registration === true
+  const showRegistrationTypeSelector = allowsIndividualRegistration && allowsPairRegistration
   const isFreeEvent = event.event_type === 'free' || event.event_type === 'solidarity'
-  const requiresPartnerInfo = allowsPairRegistration && registrationType === 'dupla'
+  const requiresPartnerInfo = registrationType === 'dupla'
   const hasPartnerShirtSelection = requiresPartnerInfo && genderOptions.length > 0 && partnerAvailableSizes.length > 0
 
   const handleConfirm = () => {
@@ -232,8 +242,8 @@ export default function CategorySelectionModal({
               </div>
             )}
 
-            {/* Registration type selector (individual / dupla) */}
-            {allowsPairRegistration && (
+            {/* Registration type selector (individual / dupla) - only show if both options are available */}
+            {showRegistrationTypeSelector && (
               <div>
                 <label className="block text-sm font-medium text-neutral-900 mb-2 font-geist">
                   Tipo de inscrição
@@ -260,6 +270,17 @@ export default function CategorySelectionModal({
                     </button>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Info message when only one type is allowed */}
+            {!showRegistrationTypeSelector && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                <p className="text-sm font-medium text-blue-900 font-geist">
+                  {registrationType === 'dupla'
+                    ? '👥 Este evento aceita apenas inscrições em dupla'
+                    : '👤 Este evento aceita apenas inscrições individuais'}
+                </p>
               </div>
             )}
 

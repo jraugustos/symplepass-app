@@ -36,6 +36,7 @@ export async function updateEventAction(eventId: string, data: EventFormDataAdmi
       status: data.status as any,
       is_featured: data.is_featured,
       has_organizer: data.has_organizer,
+      allows_individual_registration: data.allows_individual_registration,
       allows_pair_registration: data.allows_pair_registration,
       shirt_sizes: data.shirt_sizes,
       shirt_sizes_config: data.shirt_sizes_config,

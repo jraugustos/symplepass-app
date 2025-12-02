@@ -69,6 +69,7 @@ const publishSchema = z
     status: z.enum(["draft", "published", "published_no_registration", "cancelled", "completed"]),
     event_type: z.enum(["paid", "free", "solidarity"]),
     solidarity_message: z.string().nullable().optional(),
+    allows_individual_registration: z.boolean(),
     allows_pair_registration: z.boolean(),
     shirt_sizes: z.array(z.string()).optional(),
     shirt_sizes_config: z.any().nullable().optional(),
@@ -141,6 +142,7 @@ const draftSchema = z.object({
   status: z.enum(["draft", "published", "cancelled", "completed"]),
   event_type: z.enum(["paid", "free", "solidarity"]).optional(),
   solidarity_message: z.string().nullable().optional(),
+  allows_individual_registration: z.boolean().optional(),
   allows_pair_registration: z.boolean().optional(),
   shirt_sizes: z.array(z.string()).optional(),
   shirt_sizes_config: z.any().nullable().optional(),
@@ -194,11 +196,7 @@ export function EventForm({
   const [editingCategory, setEditingCategory] = useState<
     EventCategory | undefined
   >();
-  const [registrationTypes, setRegistrationTypes] = useState<{ individual: boolean; pair: boolean }>({
-    individual: true,
-    pair: event?.allows_pair_registration || false
-  });
-  const [draggedCategoryIndex, setDraggedCategoryIndex] = useState<number | null>(null);
+    const [draggedCategoryIndex, setDraggedCategoryIndex] = useState<number | null>(null);
   const [localCategories, setLocalCategories] = useState<EventCategory[]>(categories);
 
   // Keep localCategories in sync with prop
@@ -265,6 +263,7 @@ export function EventForm({
         status: event.status as EventStatus,
         event_type: (event.event_type as EventType) || "paid",
         solidarity_message: event.solidarity_message,
+        allows_individual_registration: event.allows_individual_registration !== false,
         allows_pair_registration: event.allows_pair_registration || false,
         shirt_sizes: event.shirt_sizes || ["P", "M", "G", "GG", "XG"],
         shirt_sizes_config: event.shirt_sizes_config || null,
@@ -293,6 +292,7 @@ export function EventForm({
         status: "draft" as EventStatus,
         event_type: "paid" as EventType,
         solidarity_message: null,
+        allows_individual_registration: true,
         allows_pair_registration: false,
         shirt_sizes: ["P", "M", "G", "GG", "XG"],
         shirt_sizes_config: null,
@@ -337,11 +337,7 @@ export function EventForm({
     }
   }, [success]);
 
-  // Sincroniza o estado de registrationTypes com o campo allows_pair_registration
-  useEffect(() => {
-    setValue("allows_pair_registration", registrationTypes.pair);
-  }, [registrationTypes, setValue]);
-
+  
   // Note: shirt_sizes field is kept for backward compatibility
   // but shirt_sizes_config is now the primary source for gender-based sizes
 
@@ -753,8 +749,7 @@ export function EventForm({
                 <input
                   type="checkbox"
                   id="registration_individual"
-                  checked={registrationTypes.individual}
-                  onChange={(e) => setRegistrationTypes(prev => ({ ...prev, individual: e.target.checked }))}
+                  {...register("allows_individual_registration")}
                   className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-neutral-300 rounded"
                 />
                 <span className="text-sm text-neutral-700">Individual</span>
@@ -763,8 +758,7 @@ export function EventForm({
                 <input
                   type="checkbox"
                   id="registration_pair"
-                  checked={registrationTypes.pair}
-                  onChange={(e) => setRegistrationTypes(prev => ({ ...prev, pair: e.target.checked }))}
+                  {...register("allows_pair_registration")}
                   className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-neutral-300 rounded"
                 />
                 <span className="text-sm text-neutral-700">Em dupla</span>

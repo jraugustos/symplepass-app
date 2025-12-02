@@ -98,6 +98,7 @@ export interface Event {
   event_format: EventFormat
   event_type: EventType
   solidarity_message: string | null
+  allows_individual_registration: boolean
   allows_pair_registration: boolean
   shirt_sizes: string[]
   shirt_sizes_config?: any // JSONB field containing gender-based shirt sizes

@@ -154,6 +154,7 @@ export async function createEvent(eventData: {
   registration_start?: string | null;
   registration_end?: string | null;
   solidarity_message?: string | null;
+  allows_individual_registration?: boolean;
   allows_pair_registration?: boolean;
   shirt_sizes?: string[];
   shirt_sizes_config?: any;

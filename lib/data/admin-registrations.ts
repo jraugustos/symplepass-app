@@ -173,19 +173,32 @@ export async function exportRegistrationsToCSV(eventId: string) {
       return []
     }
 
-    // Format data for CSV
-    const exportData = registrations?.map((reg: any) => ({
-      nome: reg.profiles?.full_name || 'N/A',
-      email: reg.profiles?.email || 'N/A',
-      cpf: reg.profiles?.cpf || 'N/A',
-      telefone: reg.profiles?.phone || 'N/A',
-      categoria: reg.event_categories?.name || 'N/A',
-      status_pagamento: reg.payment_status || 'N/A',
-      status_inscricao: reg.status || 'N/A',
-      valor: formatCurrency(reg.amount_paid || 0),
-      data_inscricao: formatDate(reg.created_at),
-      tamanho_camisa: reg.shirt_size || 'N/A',
-    }))
+    // Format data for CSV including partner data from registration_data
+    const exportData = registrations?.map((reg: any) => {
+      const partnerData = reg.registration_data?.partner
+      const userData = reg.registration_data?.user
+
+      return {
+        codigo_inscricao: reg.ticket_code?.split('-').pop() || 'N/A',
+        nome: reg.profiles?.full_name || 'N/A',
+        email: reg.profiles?.email || 'N/A',
+        cpf: reg.profiles?.cpf || 'N/A',
+        telefone: reg.profiles?.phone || 'N/A',
+        categoria: reg.event_categories?.name || 'N/A',
+        status_pagamento: reg.payment_status || 'N/A',
+        status_inscricao: reg.status || 'N/A',
+        valor: formatCurrency(reg.amount_paid || 0),
+        data_inscricao: formatDate(reg.created_at),
+        tamanho_camisa: userData?.shirtSize || reg.shirt_size || 'N/A',
+        genero_camisa: userData?.shirtGender || 'N/A',
+        nome_parceiro: partnerData?.name || reg.partner_name || '',
+        email_parceiro: partnerData?.email || '',
+        cpf_parceiro: partnerData?.cpf || '',
+        telefone_parceiro: partnerData?.phone || '',
+        tamanho_camisa_parceiro: partnerData?.shirtSize || '',
+        genero_camisa_parceiro: partnerData?.shirtGender || '',
+      }
+    })
 
     return exportData || []
   } catch (error) {

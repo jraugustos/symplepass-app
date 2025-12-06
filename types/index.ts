@@ -504,6 +504,7 @@ export interface RegistrationFilters {
 }
 
 export interface RegistrationExportData {
+  codigo_inscricao: string
   nome: string
   email: string
   cpf: string
@@ -514,7 +515,13 @@ export interface RegistrationExportData {
   valor: string
   data_inscricao: string
   tamanho_camisa: string
+  genero_camisa: string
   nome_parceiro: string
+  email_parceiro: string
+  cpf_parceiro: string
+  telefone_parceiro: string
+  tamanho_camisa_parceiro: string
+  genero_camisa_parceiro: string
 }
 
 export interface EventStatsData {

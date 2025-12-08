@@ -169,37 +169,54 @@ export async function getEventDetailBySlug(slug: string): Promise<EventDetailDat
   try {
     const supabase = createClient()
 
-    // First, fetch the event with all its related data (except organizer)
-    const { data, error } = await supabase
+    // First, fetch the event
+    const { data: eventData, error: eventError } = await supabase
       .from('events')
-      .select(`
-        *,
-        categories:event_categories(*),
-        kit_items:event_kit_items(*),
-        course_info:event_course_info(*),
-        faqs:event_faqs(*),
-        regulations:event_regulations(*)
-      `)
+      .select('*')
       .eq('slug', slug)
       .in('status', ['published', 'published_no_registration'])
-      .order('display_order', { foreignTable: 'event_categories', ascending: true })
-      .order('display_order', { foreignTable: 'event_kit_items', ascending: true })
-      .order('display_order', { foreignTable: 'event_faqs', ascending: true })
-      .order('display_order', { foreignTable: 'event_regulations', ascending: true })
       .single()
 
-    if (error) {
-      console.error('Error fetching event detail by slug:', error)
+    if (eventError || !eventData) {
+      console.error('Error fetching event by slug:', eventError)
       return null
     }
 
-    // Second, fetch the organizer profile if the event has an organizer_id
+    // Fetch related data separately to avoid FK dependency issues
+    const [categoriesRes, kitItemsRes, courseInfoRes, faqsRes, regulationsRes] = await Promise.all([
+      supabase
+        .from('event_categories')
+        .select('*')
+        .eq('event_id', eventData.id)
+        .order('display_order', { ascending: true }),
+      supabase
+        .from('event_kit_items')
+        .select('*')
+        .eq('event_id', eventData.id)
+        .order('display_order', { ascending: true }),
+      supabase
+        .from('event_course_info')
+        .select('*')
+        .eq('event_id', eventData.id),
+      supabase
+        .from('event_faqs')
+        .select('*')
+        .eq('event_id', eventData.id)
+        .order('display_order', { ascending: true }),
+      supabase
+        .from('event_regulations')
+        .select('*')
+        .eq('event_id', eventData.id)
+        .order('display_order', { ascending: true }),
+    ])
+
+    // Fetch the organizer profile if the event has an organizer_id
     let organizer = null
-    if (data.organizer_id) {
+    if (eventData.organizer_id) {
       const { data: organizerData, error: organizerError } = await supabase
         .from('event_organizers')
         .select('id, profile_id, company_name, cnpj, description, logo_url, website, contact_email')
-        .eq('profile_id', data.organizer_id)
+        .eq('profile_id', eventData.organizer_id)
         .single()
 
       if (!organizerError && organizerData) {
@@ -207,10 +224,9 @@ export async function getEventDetailBySlug(slug: string): Promise<EventDetailDat
       }
     }
 
-    // Transform the data to match EventDetailData interface
-    // Handle one-to-one relations (course_info) that Supabase returns as arrays
-    const courseInfo = Array.isArray(data.course_info) && data.course_info.length > 0
-      ? data.course_info[0]
+    // Handle one-to-one relations (course_info)
+    const courseInfo = courseInfoRes.data && courseInfoRes.data.length > 0
+      ? courseInfoRes.data[0]
       : null
 
     // Normalize support_points to ensure it's always a string array
@@ -225,12 +241,12 @@ export async function getEventDetailBySlug(slug: string): Promise<EventDetailDat
     }
 
     const eventDetail: EventDetailData = {
-      ...data,
-      categories: data.categories || [],
-      kit_items: data.kit_items || [],
+      ...eventData,
+      categories: categoriesRes.data || [],
+      kit_items: kitItemsRes.data || [],
       course_info: courseInfo,
-      faqs: data.faqs || [],
-      regulations: data.regulations || [],
+      faqs: faqsRes.data || [],
+      regulations: regulationsRes.data || [],
       organizer: organizer,
     }
 

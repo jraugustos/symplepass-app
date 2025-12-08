@@ -25,10 +25,12 @@ export interface AdminEventFilters {
 /**
  * Get all events for admin with filters and pagination
  * Includes drafts and all statuses
+ * Uses admin client to bypass RLS for full visibility
  */
 export async function getAllEventsForAdmin(filters: AdminEventFilters = {}) {
   try {
-    const supabase = await createClient();
+    // Use admin client to bypass RLS and see all events
+    const supabase = createAdminClient();
     const {
       status,
       sport_type,
@@ -42,7 +44,7 @@ export async function getAllEventsForAdmin(filters: AdminEventFilters = {}) {
 
     let query = supabase
       .from("events")
-      .select("*, profiles!events_organizer_id_fkey(id, full_name, email)", {
+      .select("*", {
         count: "exact",
       })
       .order("created_at", { ascending: false });
@@ -98,10 +100,11 @@ export async function getAllEventsForAdmin(filters: AdminEventFilters = {}) {
 
 /**
  * Get event by ID with all relations for admin editing
+ * Uses admin client to bypass RLS
  */
 export async function getEventByIdForAdmin(eventId: string) {
   try {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     const { data: event, error } = await supabase
       .from("events")

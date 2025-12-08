@@ -106,28 +106,70 @@ export async function getEventByIdForAdmin(eventId: string) {
   try {
     const supabase = createAdminClient();
 
-    const { data: event, error } = await supabase
+    // Fetch event first
+    const { data: eventData, error: eventError } = await supabase
       .from("events")
-      .select(
-        `
-        *,
-        event_categories(*),
-        event_kit_items(*),
-        event_course_info(*),
-        event_faqs(*),
-        event_regulations(*),
-        profiles!events_organizer_id_fkey(id, full_name, email)
-      `,
-      )
+      .select("*")
       .eq("id", eventId)
       .single();
 
-    if (error) {
-      console.error("Error fetching event by ID:", error);
+    if (eventError || !eventData) {
+      console.error("Error fetching event by ID:", eventError);
       return null;
     }
 
-    return event;
+    // Cast to Event type for proper typing
+    const event = eventData as Event;
+
+    // Fetch related data separately to avoid FK dependency issues
+    const [categoriesRes, kitItemsRes, courseInfoRes, faqsRes, regulationsRes] =
+      await Promise.all([
+        supabase
+          .from("event_categories")
+          .select("*")
+          .eq("event_id", eventId)
+          .order("display_order", { ascending: true }),
+        supabase
+          .from("event_kit_items")
+          .select("*")
+          .eq("event_id", eventId)
+          .order("display_order", { ascending: true }),
+        supabase.from("event_course_info").select("*").eq("event_id", eventId),
+        supabase
+          .from("event_faqs")
+          .select("*")
+          .eq("event_id", eventId)
+          .order("display_order", { ascending: true }),
+        supabase
+          .from("event_regulations")
+          .select("*")
+          .eq("event_id", eventId)
+          .order("display_order", { ascending: true }),
+      ]);
+
+    // Fetch organizer profile if exists
+    let organizerProfile = null;
+    if (event.organizer_id) {
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("id, full_name, email")
+        .eq("id", event.organizer_id)
+        .single();
+
+      if (profileData) {
+        organizerProfile = profileData;
+      }
+    }
+
+    return {
+      ...event,
+      event_categories: categoriesRes.data || [],
+      event_kit_items: kitItemsRes.data || [],
+      event_course_info: courseInfoRes.data || [],
+      event_faqs: faqsRes.data || [],
+      event_regulations: regulationsRes.data || [],
+      profiles: organizerProfile,
+    };
   } catch (error) {
     console.error("Error in getEventByIdForAdmin:", error);
     return null;

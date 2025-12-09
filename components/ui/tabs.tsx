@@ -180,6 +180,7 @@ export const TabsTrigger = React.forwardRef<HTMLButtonElement, TabsTriggerProps>
     return (
       <button
         ref={ref}
+        type="button"
         id={tabId}
         role="tab"
         aria-selected={isActive}

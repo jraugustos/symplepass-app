@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Download, Search, Trash2, ExternalLink } from 'lucide-react'
+import { Download, Search, Trash2, ExternalLink, Pencil } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,6 +17,7 @@ interface RegistrationsTableProps {
   onFilterChange: (filters: RegistrationFilters) => void
   onExport: () => Promise<void>
   onDelete?: (registrationId: string) => Promise<void>
+  onEdit?: (registration: any) => void
 }
 
 export function RegistrationsTable({
@@ -25,6 +26,7 @@ export function RegistrationsTable({
   onFilterChange,
   onExport,
   onDelete,
+  onEdit,
 }: RegistrationsTableProps) {
   const [filters, setFilters] = useState<RegistrationFilters>({})
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -255,17 +257,29 @@ export function RegistrationsTable({
                     {formatDate(registration.created_at)}
                   </td>
                   <td className="px-4 py-4 text-right">
-                    {onDelete && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDelete(registration.id, registration.profiles?.full_name || 'Participante')}
-                        disabled={deletingId === registration.id}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
+                    <div className="flex items-center justify-end gap-1">
+                      {onEdit && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onEdit(registration)}
+                          className="text-neutral-600 hover:text-neutral-700 hover:bg-neutral-50"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {onDelete && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(registration.id, registration.profiles?.full_name || 'Participante')}
+                          disabled={deletingId === registration.id}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               )
@@ -365,18 +379,31 @@ export function RegistrationsTable({
                 {formatDate(registration.created_at)}
               </p>
             </div>
-            {onDelete && (
-              <div className="mt-3 pt-3 border-t border-neutral-100 flex justify-end">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleDelete(registration.id, registration.profiles?.full_name || 'Participante')}
-                  disabled={deletingId === registration.id}
-                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                >
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  Excluir
-                </Button>
+            {(onEdit || onDelete) && (
+              <div className="mt-3 pt-3 border-t border-neutral-100 flex justify-end gap-2">
+                {onEdit && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onEdit(registration)}
+                    className="text-neutral-600 hover:text-neutral-700 hover:bg-neutral-50"
+                  >
+                    <Pencil className="h-4 w-4 mr-1" />
+                    Editar
+                  </Button>
+                )}
+                {onDelete && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDelete(registration.id, registration.profiles?.full_name || 'Participante')}
+                    disabled={deletingId === registration.id}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Excluir
+                  </Button>
+                )}
               </div>
             )}
             </div>

@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 type AuditAction =
   | 'role_change'
   | 'registration_delete'
+  | 'registration_update'
   | 'export_registrations'
   | 'export_reports'
   | 'coupon_create'

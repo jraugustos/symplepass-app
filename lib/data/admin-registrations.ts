@@ -4,7 +4,23 @@ import {
   PaymentStatus,
   RegistrationStatus,
 } from '@/types/database.types'
+import { ShirtGender } from '@/types'
 import { formatCurrency, formatDate } from '@/lib/utils'
+
+/**
+ * Data for updating a registration (admin action)
+ */
+export interface UpdateRegistrationData {
+  category_id?: string
+  partner_data?: {
+    name: string
+    email?: string
+    cpf?: string
+    phone?: string
+    shirtSize?: string
+    shirtGender?: ShirtGender
+  } | null
+}
 
 /**
  * Filters for registrations list
@@ -295,5 +311,113 @@ export async function deleteRegistration(registrationId: string) {
   } catch (error) {
     console.error('Error in deleteRegistration:', error)
     return { success: false, error: 'Falha ao excluir inscrição' }
+  }
+}
+
+/**
+ * Update a registration (admin action)
+ * Allows updating category and partner data
+ * Uses admin client to bypass RLS policies
+ */
+export async function updateRegistration(
+  registrationId: string,
+  data: UpdateRegistrationData
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = createAdminClient()
+
+    // First, get the current registration to merge data
+    const { data: fetchedRegistration, error: fetchError } = await supabase
+      .from('registrations')
+      .select('id, event_id, category_id, registration_data')
+      .eq('id', registrationId)
+      .single()
+
+    if (fetchError || !fetchedRegistration) {
+      console.error('Error fetching registration:', fetchError)
+      return { success: false, error: 'Inscrição não encontrada' }
+    }
+
+    // Type assertion for the fetched registration
+    const currentRegistration = fetchedRegistration as {
+      id: string
+      event_id: string
+      category_id: string
+      registration_data: Record<string, unknown> | null
+    }
+
+    // Prepare update object
+    const updateData: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    }
+
+    // Handle category change
+    if (data.category_id && data.category_id !== currentRegistration.category_id) {
+      // Verify category belongs to the same event
+      const { data: fetchedCategory, error: categoryError } = await supabase
+        .from('event_categories')
+        .select('id, event_id')
+        .eq('id', data.category_id)
+        .single()
+
+      if (categoryError || !fetchedCategory) {
+        return { success: false, error: 'Categoria não encontrada' }
+      }
+
+      const category = fetchedCategory as { id: string; event_id: string }
+
+      if (category.event_id !== currentRegistration.event_id) {
+        return { success: false, error: 'Categoria não pertence a este evento' }
+      }
+
+      updateData.category_id = data.category_id
+    }
+
+    // Handle partner data change
+    if (data.partner_data !== undefined) {
+      const currentRegistrationData = currentRegistration.registration_data || {}
+
+      if (data.partner_data === null) {
+        // Remove partner data
+        updateData.partner_name = null
+        updateData.is_partner_registration = false
+        updateData.registration_data = {
+          ...currentRegistrationData,
+          partner: null,
+        }
+      } else {
+        // Update partner data
+        updateData.partner_name = data.partner_data.name
+        updateData.is_partner_registration = true
+        updateData.registration_data = {
+          ...currentRegistrationData,
+          partner: {
+            name: data.partner_data.name,
+            email: data.partner_data.email || '',
+            cpf: data.partner_data.cpf || '',
+            phone: data.partner_data.phone || '',
+            shirtSize: data.partner_data.shirtSize || '',
+            shirtGender: data.partner_data.shirtGender || null,
+          },
+        }
+      }
+    }
+
+    // Perform the update
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: updateError } = await (supabase
+      .from('registrations') as any)
+      .update(updateData)
+      .eq('id', registrationId)
+
+    if (updateError) {
+      console.error('Error updating registration:', updateError)
+      return { success: false, error: updateError.message }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error in updateRegistration:', error)
+    return { success: false, error: 'Falha ao atualizar inscrição' }
   }
 }

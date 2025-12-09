@@ -154,6 +154,8 @@ export default async function InscricoesEventoPage({
           eventId={params.id}
           eventSlug={event.slug}
           searchParams={searchParams}
+          allowsPairRegistration={event.allows_pair_registration ?? false}
+          shirtSizesConfig={event.shirt_sizes_config}
         />
       </div>
     </div>

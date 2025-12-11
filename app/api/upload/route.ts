@@ -3,7 +3,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import type { StorageBucket } from '@/lib/storage/upload-types'
 
 // Buckets that require event ownership validation
-const EVENT_BUCKETS = ['event-banners', 'event-media', 'event-documents', 'event-routes', 'kit-items']
+const EVENT_BUCKETS = ['event-banners', 'event-media', 'event-documents', 'event-routes', 'kit-items', 'event-photos', 'event-photos-watermarked']
 
 // Bucket configurations for validation
 const BUCKET_CONFIG: Record<string, { maxSize: number; allowedTypes: string[] }> = {
@@ -34,6 +34,14 @@ const BUCKET_CONFIG: Record<string, { maxSize: number; allowedTypes: string[] }>
   'organizer-assets': {
     maxSize: 5 * 1024 * 1024,
     allowedTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'],
+  },
+  'event-photos': {
+    maxSize: 50 * 1024 * 1024, // 50MB - high-resolution originals
+    allowedTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
+  },
+  'event-photos-watermarked': {
+    maxSize: 10 * 1024 * 1024, // 10MB - compressed with watermark
+    allowedTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
   },
 }
 
@@ -204,11 +212,17 @@ export async function POST(request: NextRequest) {
 
 // Helper functions
 function sanitizeFilename(filename: string): string {
+  // Preserve directory separators (/) while sanitizing the rest
   return filename
-    .toLowerCase()
-    .replace(/[^a-z0-9.-]/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
+    .split('/')
+    .map(part =>
+      part
+        .toLowerCase()
+        .replace(/[^a-z0-9.-]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '')
+    )
+    .join('/')
 }
 
 function generateUniqueFilename(originalName: string): string {

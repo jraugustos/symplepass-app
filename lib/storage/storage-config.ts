@@ -109,6 +109,36 @@ export const STORAGE_BUCKETS: Record<string, BucketConfig> = {
       allowedExtensions: ['.jpg', '.jpeg', '.png', '.webp', '.svg'],
     },
   },
+  EVENT_PHOTOS: {
+    name: 'event-photos',
+    public: false, // PRIVATE - download only after payment
+    fileType: 'image',
+    constraints: {
+      maxSize: 50 * 1024 * 1024, // 50MB - high-resolution photos
+      allowedTypes: [
+        'image/jpeg',
+        'image/jpg',
+        'image/png',
+        'image/webp',
+      ],
+      allowedExtensions: ['.jpg', '.jpeg', '.png', '.webp'],
+    },
+  },
+  EVENT_PHOTOS_WATERMARKED: {
+    name: 'event-photos-watermarked',
+    public: true, // PUBLIC - preview with watermark
+    fileType: 'image',
+    constraints: {
+      maxSize: 10 * 1024 * 1024, // 10MB - compressed photos
+      allowedTypes: [
+        'image/jpeg',
+        'image/jpg',
+        'image/png',
+        'image/webp',
+      ],
+      allowedExtensions: ['.jpg', '.jpeg', '.png', '.webp'],
+    },
+  },
 };
 
 // Helper to get bucket config by name

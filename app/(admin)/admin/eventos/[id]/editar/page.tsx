@@ -1,6 +1,6 @@
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, Image } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth/actions'
 import { getEventByIdForAdmin } from '@/lib/data/admin-events'
 import { getCategoriesByEventId } from '@/lib/data/admin-categories'
@@ -120,9 +120,22 @@ export default async function EditarEventoPage({ params }: { params: { id: strin
       </nav>
 
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-neutral-900">Editar Evento: {event.title}</h1>
-        <p className="text-neutral-600 mt-1">Gerencie as informações e categorias do evento</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-neutral-900">Editar Evento: {event.title}</h1>
+          <p className="text-neutral-600 mt-1">Gerencie as informações e categorias do evento</p>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="flex gap-3">
+          <Link
+            href={`/admin/eventos/${eventId}/fotos`}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors"
+          >
+            <Image className="h-4 w-4" />
+            Gerenciar Fotos
+          </Link>
+        </div>
       </div>
 
       {/* Main Form */}

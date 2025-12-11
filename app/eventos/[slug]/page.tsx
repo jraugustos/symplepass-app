@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { Metadata } from 'next'
 import { getEventDetailBySlug, getEventMinPriceFromCategories } from '@/lib/data/events'
 import { truncateText } from '@/lib/utils'
@@ -45,6 +45,11 @@ export default async function EventPage({ params }: EventPageProps) {
 
   if (!eventDetail) {
     notFound()
+  }
+
+  // Completed events redirect to mural de fotos page
+  if (eventDetail.status === 'completed') {
+    redirect(`/mural-fotos/${params.slug}`)
   }
 
   const minPrice = getEventMinPriceFromCategories(eventDetail.categories)

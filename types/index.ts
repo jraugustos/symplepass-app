@@ -37,6 +37,7 @@ export type ThemeOption = 'light' | 'dark' | 'system'
 export type TabId =
   | 'visao-geral'
   | 'eventos'
+  | 'fotos'
   | 'dados'
   | 'preferencias'
   | 'pagamentos'
@@ -90,6 +91,7 @@ export interface UserPanelStats {
 export interface UserPanelData {
   profile: Profile
   registrations: RegistrationWithDetails[]
+  photoOrders: import('@/lib/data/photo-orders').PhotoOrderWithDetails[]
   paymentHistory: PaymentHistoryItem[]
   preferences: UserPreferences
   sessions: UserSession[]
@@ -197,6 +199,24 @@ export interface EmailConfirmationData {
   partnerData?: PartnerData
   eventType?: EventType
   solidarityMessage?: string
+}
+
+export interface EmailPhotoOrderConfirmationData {
+  userEmail: string
+  userName: string
+  eventTitle: string
+  eventDate: string
+  eventLocation: string
+  orderId: string
+  packageName: string | null
+  photoCount: number
+  totalAmount: number
+  downloadUrl: string
+  photos: Array<{
+    id: string
+    file_name: string
+    thumbnailUrl: string
+  }>
 }
 
 export interface ICSEventData {
@@ -763,4 +783,147 @@ export interface OrganizerProfileData {
   contact_email: string | null
   created_at: string
   updated_at: string
+}
+
+// ===== Photo Management Types =====
+
+export interface PhotoPackageFormData {
+  name: string
+  quantity: number
+  price: number
+}
+
+export interface CreatePhotoFormData {
+  original_path: string
+  watermarked_path: string
+  thumbnail_path: string
+  file_name: string
+  file_size: number
+  width: number | null
+  height: number | null
+}
+
+// ===== Photo Checkout Types =====
+
+export interface PhotoCheckoutRequest {
+  eventId: string
+  photoIds: string[]
+  totalAmount: number
+  packageId?: string | null
+}
+
+export interface PhotoCheckoutResponse {
+  sessionId: string
+  url: string
+  orderId: string
+}
+
+export interface PhotoCheckoutPageData {
+  event: {
+    id: string
+    title: string
+    slug: string
+    banner_url: string | null
+    start_date: string
+    location: {
+      city: string
+      state: string
+    }
+  }
+  selectedPhotos: Array<{
+    id: string
+    file_name: string
+    thumbnail_path: string
+    thumbnailUrl: string
+  }>
+  packages: Array<{
+    id: string
+    name: string
+    quantity: number
+    price: number
+  }>
+  bestPackage: {
+    id: string
+    name: string
+    quantity: number
+    price: number
+  } | null
+  totalPrice: number
+  user: {
+    id: string
+    email: string
+    full_name: string | null
+  }
+}
+
+// ===== Photo Download Types =====
+
+export interface PhotoDownloadPageData {
+  order: {
+    id: string
+    total_amount: number
+    payment_status: string
+    created_at: string
+    package?: {
+      id: string
+      name: string
+      quantity: number
+      price: number
+    } | null
+  }
+  event: {
+    id: string
+    title: string
+    slug: string
+    start_date: string
+    location: { city: string; state: string } | null
+  }
+  photos: Array<{
+    id: string
+    file_name: string
+    original_path: string
+    thumbnail_path: string
+    thumbnailUrl: string
+  }>
+  user: {
+    id: string
+    email: string
+    full_name: string | null
+  }
+}
+
+export interface PhotoDownloadRequest {
+  orderId: string
+  photoId?: string
+  photoIds?: string
+}
+
+export interface PhotoDownloadResponse {
+  url?: string
+  fileName?: string
+  photos?: Array<{
+    id: string
+    url: string
+    fileName: string
+  }>
+}
+
+// ===== Mural de Fotos Types =====
+
+export interface EventWithPhotoCount extends Event {
+  photo_count: number
+  preview_thumbnails?: string[]
+}
+
+export interface PaginatedEventsWithPhotosResponse {
+  events: EventWithPhotoCount[]
+  total: number
+  page: number
+  pageSize: number
+  hasMore: boolean
+}
+
+export interface MuralFotosStats {
+  totalEvents: number
+  totalPhotos: number
 }

@@ -42,6 +42,11 @@ export default async function ReviewPage({ searchParams }: ReviewPageProps) {
     redirect('/eventos')
   }
 
+  // Completed events cannot accept new registrations - redirect to mural if available
+  if (eventData.status === 'completed') {
+    redirect(`/mural-fotos/${eventSlug}`)
+  }
+
   const category = eventData.categories?.find((item) => item.id === categoryId)
 
   if (!category) {

@@ -64,7 +64,7 @@ export class UploadService {
       }
 
       // Validate folder is provided for event-related buckets
-      const eventBuckets = ['event-banners', 'event-media', 'event-documents', 'event-routes', 'kit-items'];
+      const eventBuckets = ['event-banners', 'event-media', 'event-documents', 'event-routes', 'kit-items', 'event-photos', 'event-photos-watermarked'];
       if (eventBuckets.includes(options.bucket) && !options.folder) {
         throw this.createError('VALIDATION_ERROR', 'Salve o evento primeiro para habilitar o upload.');
       }
@@ -179,11 +179,16 @@ export class UploadService {
 
   /**
    * Get file URL
+   * @param bucket - The storage bucket
+   * @param path - The file path
+   * @param isPublic - Whether to get public URL (true) or signed URL (false)
+   * @param expiresIn - Expiration time in seconds for signed URLs (default: 3600 = 1 hour)
    */
   async getFileUrl(
     bucket: StorageBucket,
     path: string,
-    isPublic: boolean = true
+    isPublic: boolean = true,
+    expiresIn: number = 3600
   ): Promise<string> {
     const supabase = this.getClient();
 
@@ -198,7 +203,7 @@ export class UploadService {
     // For private files, generate a signed URL
     const { data, error } = await supabase.storage
       .from(bucket)
-      .createSignedUrl(path, 3600); // 1 hour expiry
+      .createSignedUrl(path, expiresIn);
 
     if (error || !data) {
       throw this.createError('URL_ERROR', 'Falha ao gerar URL do arquivo');

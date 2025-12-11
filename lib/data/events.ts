@@ -174,7 +174,7 @@ export async function getEventDetailBySlug(slug: string): Promise<EventDetailDat
       .from('events')
       .select('*')
       .eq('slug', slug)
-      .in('status', ['published', 'published_no_registration'])
+      .in('status', ['published', 'published_no_registration', 'completed'])
       .single()
 
     if (eventError || !eventData) {
@@ -599,5 +599,160 @@ export async function getFilterOptions(): Promise<{
   } catch (error) {
     console.error('Unexpected error fetching filter options:', error)
     return { cities: [], states: [], sportTypes: [] }
+  }
+}
+
+// ===== Mural de Fotos Functions =====
+
+import type { EventWithPhotoCount, PaginatedEventsWithPhotosResponse, MuralFotosStats } from '@/types'
+
+/**
+ * Fetches completed events that have photos uploaded
+ * Returns events with photo count, ordered by end_date descending
+ * Uses cumulative pagination (page N includes all events from page 1 to N)
+ * @param page - Page number (1-indexed)
+ * @param pageSize - Number of events per page (default: 12)
+ * @returns Promise with paginated events and metadata
+ */
+export async function getCompletedEventsWithPhotos(
+  page: number = 1,
+  pageSize: number = 12
+): Promise<PaginatedEventsWithPhotosResponse> {
+  try {
+    const supabase = createClient()
+
+    // Cumulative pagination: fetch from 0 to page * pageSize - 1
+    const from = 0
+    const to = page * pageSize - 1
+
+    // First, get the IDs of events that have at least one photo
+    // Using !inner join ensures only events with photos are returned
+    const { data: eventsData, error: eventsError, count } = await supabase
+      .from('events')
+      .select(`
+        *,
+        event_photos!inner (id)
+      `, { count: 'exact' })
+      .eq('status', 'completed')
+      .order('end_date', { ascending: false })
+      .range(from, to)
+
+    if (eventsError) {
+      console.error('Error fetching completed events with photos:', eventsError)
+      return { events: [], total: 0, page, pageSize, hasMore: false }
+    }
+
+    // Transform events to include photo_count
+    const eventsWithPhotos = (eventsData || []).map((event: any) => ({
+      ...event,
+      photo_count: event.event_photos?.length || 0,
+      event_photos: undefined, // Remove the nested photos array
+    })) as EventWithPhotoCount[]
+
+    const total = count || 0
+    const hasMore = from + eventsWithPhotos.length < total
+
+    return {
+      events: eventsWithPhotos,
+      total,
+      page,
+      pageSize,
+      hasMore,
+    }
+  } catch (error) {
+    console.error('Unexpected error fetching completed events with photos:', error)
+    return { events: [], total: 0, page, pageSize, hasMore: false }
+  }
+}
+
+/**
+ * Fetches preview thumbnails for an event
+ * Returns up to 4 thumbnail URLs for display in event cards
+ * @param eventId - The event ID
+ * @returns Promise<string[]> Array of thumbnail URLs
+ */
+export async function getEventPhotoPreview(eventId: string): Promise<string[]> {
+  try {
+    const supabase = createClient()
+
+    const { data, error } = await supabase
+      .from('event_photos')
+      .select('thumbnail_path')
+      .eq('event_id', eventId)
+      .order('display_order', { ascending: true })
+      .limit(4)
+
+    if (error) {
+      console.error('Error fetching event photo preview:', error)
+      return []
+    }
+
+    // Get public URLs for thumbnails
+    const thumbnails = (data || [])
+      .map((photo) => {
+        if (photo.thumbnail_path) {
+          // If it's already a full URL, return it
+          if (photo.thumbnail_path.startsWith('http')) {
+            return photo.thumbnail_path
+          }
+          // Otherwise, get public URL from Supabase Storage (watermarked bucket)
+          const { data: urlData } = supabase.storage
+            .from('event-photos-watermarked')
+            .getPublicUrl(photo.thumbnail_path)
+          return urlData?.publicUrl || ''
+        }
+        return ''
+      })
+      .filter(Boolean)
+
+    return thumbnails
+  } catch (error) {
+    console.error('Unexpected error fetching event photo preview:', error)
+    return []
+  }
+}
+
+/**
+ * Fetches stats for the Mural de Fotos page
+ * Returns total events with photos and total photo count
+ * @returns Promise<MuralFotosStats>
+ */
+export async function getMuralFotosStats(): Promise<MuralFotosStats> {
+  try {
+    const supabase = createClient()
+
+    // Get total photos count
+    const { count: totalPhotos, error: photosError } = await supabase
+      .from('event_photos')
+      .select('id', { count: 'exact', head: true })
+
+    if (photosError) {
+      console.error('Error fetching total photos:', photosError)
+    }
+
+    // Get unique events with photos
+    const { data: eventsData, error: eventsError } = await supabase
+      .from('events')
+      .select(`
+        id,
+        event_photos (id)
+      `)
+      .eq('status', 'completed')
+
+    if (eventsError) {
+      console.error('Error fetching events for stats:', eventsError)
+    }
+
+    const eventsWithPhotos = (eventsData || []).filter(
+      (event: any) => event.event_photos && event.event_photos.length > 0
+    )
+
+    return {
+      totalEvents: eventsWithPhotos.length,
+      totalPhotos: totalPhotos || 0,
+    }
+  } catch (error) {
+    console.error('Unexpected error fetching mural stats:', error)
+    return { totalEvents: 0, totalPhotos: 0 }
   }
 }

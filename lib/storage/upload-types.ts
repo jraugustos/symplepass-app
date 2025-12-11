@@ -11,7 +11,9 @@ export type StorageBucket =
   | 'kit-items'
   | 'user-avatars'
   | 'organizer-assets'
-  | 'event-banners';
+  | 'event-banners'
+  | 'event-photos'
+  | 'event-photos-watermarked';
 
 export interface FileConstraints {
   maxSize: number; // in bytes

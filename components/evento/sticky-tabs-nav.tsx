@@ -23,6 +23,7 @@ export const DEFAULT_EVENT_TABS: Tab[] = [
   { id: 'percurso', label: 'Percurso' },
   { id: 'regulamento', label: 'Regulamento' },
   { id: 'faq', label: 'FAQ' },
+  { id: 'fotos', label: 'Fotos' },
   { id: 'organizador', label: 'Organizador' },
 ]
 

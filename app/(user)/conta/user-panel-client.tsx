@@ -6,6 +6,7 @@ import {
   OverviewTab,
   PaymentsTab,
   PersonalDataTab,
+  PhotoOrdersTab,
   PreferencesTab,
   ProfileHeader,
   SettingsTab,
@@ -19,6 +20,7 @@ import type {
   UserPanelData,
   UserPreferences,
 } from '@/types'
+import type { PhotoOrderWithDetails } from '@/lib/data/photo-orders'
 import { updateUserProfile, updateUserPassword, deleteUserAccount } from '@/lib/auth/actions'
 
 const PAYMENT_PAGE_SIZE = 10
@@ -34,6 +36,7 @@ export function UserPanelClient({ initialData }: UserPanelClientProps) {
   const [preferences, setPreferences] = useState<UserPreferences>(initialData.preferences)
   const [sessions, setSessions] = useState(initialData.sessions)
   const [paymentHistory] = useState<PaymentHistoryItem[]>(initialData.paymentHistory)
+  const [photoOrders] = useState<PhotoOrderWithDetails[]>(initialData.photoOrders)
   const [stats] = useState(initialData.stats)
   const [paymentPage, setPaymentPage] = useState(1)
   const [isPending, startTransition] = useTransition()
@@ -44,6 +47,7 @@ export function UserPanelClient({ initialData }: UserPanelClientProps) {
     const validTabs: TabId[] = [
       'visao-geral',
       'eventos',
+      'fotos',
       'dados',
       'preferencias',
       'pagamentos',
@@ -219,6 +223,8 @@ export function UserPanelClient({ initialData }: UserPanelClientProps) {
           )}
 
           {activeTab === 'eventos' && <EventsTab registrations={registrations} />}
+
+          {activeTab === 'fotos' && <PhotoOrdersTab photoOrders={photoOrders} />}
 
           {activeTab === 'dados' && (
             <PersonalDataTab profile={profile} onUpdate={handleProfileUpdate} />

@@ -2,6 +2,7 @@
 
 import { useRef } from 'react'
 import {
+  Camera,
   CreditCard,
   FlagTriangleRight,
   Heart,
@@ -19,12 +20,13 @@ type UserPanelTabsProps = {
 }
 
 const TAB_CONFIG: { id: TabId; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { id: 'visao-geral', label: 'Visão Geral', icon: LayoutDashboard },
+  { id: 'visao-geral', label: 'Visao Geral', icon: LayoutDashboard },
   { id: 'eventos', label: 'Eventos', icon: FlagTriangleRight },
+  { id: 'fotos', label: 'Fotos', icon: Camera },
   { id: 'dados', label: 'Dados Pessoais', icon: User },
-  { id: 'preferencias', label: 'Preferências', icon: Heart },
+  { id: 'preferencias', label: 'Preferencias', icon: Heart },
   { id: 'pagamentos', label: 'Pagamentos', icon: CreditCard },
-  { id: 'config', label: 'Configurações', icon: Settings },
+  { id: 'config', label: 'Configuracoes', icon: Settings },
 ]
 
 export function UserPanelTabs({ activeTab, onTabChange, className }: UserPanelTabsProps) {

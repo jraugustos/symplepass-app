@@ -68,6 +68,10 @@ export type RegistrationStatus = 'pending' | 'confirmed' | 'cancelled'
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded'
 export type ShirtSize = string
 
+// Photo order types
+export type PhotoOrderStatus = 'pending' | 'confirmed' | 'cancelled'
+export type PhotoPaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded'
+
 export interface User {
   id: string
   email: string
@@ -249,6 +253,74 @@ export interface EventDetailData extends Event {
   organizer: EventOrganizer | null
 }
 
+// ============================================================
+// EVENT PHOTOS INTERFACES
+// ============================================================
+
+export interface EventPhoto {
+  id: string
+  event_id: string
+  original_path: string
+  watermarked_path: string
+  thumbnail_path: string
+  file_name: string
+  file_size: number
+  width: number | null
+  height: number | null
+  display_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface PhotoPackage {
+  id: string
+  event_id: string
+  name: string
+  quantity: number
+  price: number
+  display_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface PhotoOrder {
+  id: string
+  event_id: string
+  user_id: string
+  status: PhotoOrderStatus
+  payment_status: PhotoPaymentStatus
+  total_amount: number
+  package_id: string | null
+  stripe_session_id: string | null
+  stripe_payment_intent_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface PhotoOrderItem {
+  id: string
+  order_id: string
+  photo_id: string
+  created_at: string
+}
+
+// Helper types for photo queries with relations
+export interface PhotoOrderWithDetails extends PhotoOrder {
+  event: Event
+  user: User
+  package: PhotoPackage | null
+  items: PhotoOrderItemWithPhoto[]
+}
+
+export interface PhotoOrderItemWithPhoto extends PhotoOrderItem {
+  photo: EventPhoto
+}
+
+export interface EventWithPhotos extends Event {
+  photos: EventPhoto[]
+  photo_packages: PhotoPackage[]
+}
+
 // Database schema type
 export interface Database {
   public: {
@@ -297,6 +369,26 @@ export interface Database {
         Row: Registration
         Insert: Omit<Registration, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Omit<Registration, 'id' | 'created_at' | 'updated_at'>>
+      }
+      event_photos: {
+        Row: EventPhoto
+        Insert: Omit<EventPhoto, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<EventPhoto, 'id' | 'created_at' | 'updated_at'>>
+      }
+      photo_packages: {
+        Row: PhotoPackage
+        Insert: Omit<PhotoPackage, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<PhotoPackage, 'id' | 'created_at' | 'updated_at'>>
+      }
+      photo_orders: {
+        Row: PhotoOrder
+        Insert: Omit<PhotoOrder, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<PhotoOrder, 'id' | 'created_at' | 'updated_at'>>
+      }
+      photo_order_items: {
+        Row: PhotoOrderItem
+        Insert: Omit<PhotoOrderItem, 'id' | 'created_at'>
+        Update: Partial<Omit<PhotoOrderItem, 'id' | 'created_at'>>
       }
     }
   }

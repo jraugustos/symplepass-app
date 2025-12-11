@@ -6,11 +6,13 @@ type AuditAction =
   | 'registration_update'
   | 'export_registrations'
   | 'export_reports'
+  | 'export_photo_orders'
   | 'coupon_create'
   | 'coupon_update'
   | 'coupon_delete'
+  | 'photo_download'
 
-type TargetType = 'user' | 'registration' | 'report' | 'coupon' | 'other'
+type TargetType = 'user' | 'registration' | 'report' | 'coupon' | 'photo_order' | 'other'
 
 interface AuditLogOptions {
   action: AuditAction

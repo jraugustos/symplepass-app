@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LayoutDashboard, Calendar, Users, BarChart3, Ticket, Settings, Building2 } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, BarChart3, Ticket, Settings, Building2, Camera } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -33,6 +33,11 @@ export function Sidebar({ className }: SidebarProps) {
             href: "/admin/cupons",
             label: "Cupons",
             icon: Ticket,
+        },
+        {
+            href: "/admin/pedidos-fotos",
+            label: "Pedidos Fotos",
+            icon: Camera,
         },
     ];
 

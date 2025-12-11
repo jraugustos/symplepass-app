@@ -2,6 +2,7 @@ import { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth/actions'
 import { getUserRegistrations } from '@/lib/data/registrations'
+import { getUserPhotoOrders } from '@/lib/data/photo-orders'
 import { getUserPreferences, getUserSessions } from '@/lib/data/user-preferences'
 import { getUserPaymentHistory } from '@/lib/data/payments'
 import type { Profile, UserPanelData, UserPanelStats } from '@/types'
@@ -20,14 +21,16 @@ export default async function ContaPage() {
 
   const { user, profile } = userData
 
-  const [registrationsResult, preferencesResult, paymentResult, sessionsResult] = await Promise.all([
+  const [registrationsResult, photoOrdersResult, preferencesResult, paymentResult, sessionsResult] = await Promise.all([
     getUserRegistrations(user.id),
+    getUserPhotoOrders(user.id),
     getUserPreferences(user.id),
     getUserPaymentHistory(user.id, 40),
     getUserSessions(user.id),
   ])
 
   const registrations = registrationsResult.data ?? []
+  const photoOrders = photoOrdersResult.data ?? []
   const preferences = preferencesResult.data ?? {
     id: user.id,
     user_id: user.id,
@@ -76,6 +79,7 @@ export default async function ContaPage() {
   const panelData: UserPanelData = {
     profile: resolvedProfile,
     registrations,
+    photoOrders,
     paymentHistory,
     preferences,
     sessions,

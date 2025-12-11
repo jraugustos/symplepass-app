@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import {
   EventHero,
   StickyTabsNav,
@@ -11,6 +11,7 @@ import {
   EventRegulations,
   EventFAQ,
   EventOrganizer,
+  EventPhotos,
   CategorySelectionModal,
   StickyCtaBar,
   DEFAULT_EVENT_TABS,
@@ -21,6 +22,7 @@ import { Footer } from '@/components/layout/footer'
 import { signOut } from '@/lib/auth/actions'
 import type { EventDetailData, EventCategory, UserRole } from '@/types/database.types'
 import type { KitPickupInfo } from '@/types'
+import type { EventPhotosData } from '@/lib/data/event-photos'
 
 interface EventPageClientProps {
   event: EventDetailData
@@ -31,6 +33,7 @@ interface EventPageClientProps {
   userName?: string
   userEmail?: string
   userRole?: UserRole
+  photosData?: EventPhotosData
 }
 
 export default function EventPageClient({
@@ -42,9 +45,29 @@ export default function EventPageClient({
   userName,
   userEmail,
   userRole = 'user',
+  photosData = { photos: [], packages: [] },
 }: EventPageClientProps) {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<EventCategory | null>(null)
+
+  // Filter tabs based on event status and available content
+  const visibleTabs = useMemo(() => {
+    return DEFAULT_EVENT_TABS.filter((tab) => {
+      if (tab.id === 'fotos') {
+        return event.status === 'completed' && photosData.photos.length > 0
+      }
+      if (tab.id === 'percurso') {
+        return event.course_info && (
+          (event.course_info.specification_type === 'course' && event.show_course_info) ||
+          (event.course_info.specification_type === 'championship_format' && event.show_championship_format)
+        )
+      }
+      if (tab.id === 'organizador') {
+        return event.has_organizer && event.organizer
+      }
+      return true
+    })
+  }, [event, photosData.photos.length])
 
   const handleCategorySelect = (category: EventCategory) => {
     setSelectedCategory(category)
@@ -112,7 +135,7 @@ export default function EventPageClient({
         </div>
 
         {/* Sticky Navigation - Outside gradient */}
-        <StickyTabsNav tabs={DEFAULT_EVENT_TABS} variant="light" />
+        <StickyTabsNav tabs={visibleTabs} variant="light" />
 
         {/* Main Content */}
         <main>
@@ -155,6 +178,16 @@ export default function EventPageClient({
             <EventSectionWrapper id="faq" showTitle={false}>
               <EventFAQ faqs={event.faqs} />
             </EventSectionWrapper>
+
+            {event.status === 'completed' && (
+              <EventSectionWrapper id="fotos" showTitle={false}>
+                <EventPhotos
+                  eventId={event.id}
+                  photos={photosData.photos}
+                  packages={photosData.packages}
+                />
+              </EventSectionWrapper>
+            )}
 
             {event.has_organizer && event.organizer && (
               <EventSectionWrapper id="organizador" showTitle={false}>

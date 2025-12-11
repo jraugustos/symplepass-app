@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
+import { Image, ExternalLink } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { KitItemsForm } from './kit-items-form'
 import { CourseInfoForm } from './course-info-form'
@@ -17,7 +19,7 @@ import type {
     RegulationFormData,
 } from '@/types'
 
-type TabId = 'kit' | 'course' | 'regulations' | 'faq'
+type TabId = 'kit' | 'course' | 'regulations' | 'faq' | 'photos'
 
 interface EventDetailsTabsProps {
     eventId: string
@@ -75,6 +77,7 @@ export function EventDetailsTabs({
         { id: 'course' as TabId, label: 'Especificações' },
         { id: 'regulations' as TabId, label: 'Regulamento' },
         { id: 'faq' as TabId, label: 'FAQ' },
+        { id: 'photos' as TabId, label: 'Fotos' },
     ]
 
     return (
@@ -144,6 +147,25 @@ export function EventDetailsTabs({
                         onDelete={onFAQDelete}
                         onReorder={onFAQsReorder}
                     />
+                )}
+
+                {activeTab === 'photos' && (
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className="font-medium">Fotos do Evento</h4>
+                            <p className="text-sm text-neutral-500 mt-1">
+                                Gerencie fotos, pacotes de preços e pedidos em uma página dedicada.
+                            </p>
+                        </div>
+                        <Link
+                            href={`/admin/eventos/${eventId}/fotos`}
+                            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors"
+                        >
+                            <Image className="h-4 w-4" />
+                            Gerenciar Fotos
+                            <ExternalLink className="h-3 w-3 ml-1" />
+                        </Link>
+                    </div>
                 )}
             </div>
         </Card>

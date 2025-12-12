@@ -78,12 +78,24 @@ export async function updateSession(request: NextRequest): Promise<MiddlewareSes
     console.error('[Middleware] Error getting session:', error)
   }
 
-  // Refresh session if needed
+  // Only refresh session if token is close to expiring (within 5 minutes)
+  // This prevents excessive token refreshes that can cause race conditions
   if (session) {
-    const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession()
-    if (!refreshError && refreshedSession) {
-      // Session was refreshed successfully
-      return { response, supabase, session: refreshedSession }
+    const expiresAt = session.expires_at
+    const now = Math.floor(Date.now() / 1000)
+    const fiveMinutes = 5 * 60
+
+    // Only refresh if token expires in less than 5 minutes
+    if (expiresAt && (expiresAt - now) < fiveMinutes) {
+      const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession()
+      if (!refreshError && refreshedSession) {
+        // Session was refreshed successfully
+        return { response, supabase, session: refreshedSession }
+      }
+      // If refresh failed but we still have a valid session, continue with it
+      if (!refreshError) {
+        console.warn('[Middleware] Session refresh returned no session, using existing')
+      }
     }
   }
 

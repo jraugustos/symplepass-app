@@ -102,7 +102,6 @@ export function NavigationHeader({
   const navigationLinks = [
     { href: '/eventos', label: 'Eventos' },
     { href: '/mural-fotos', label: 'Mural de Fotos' },
-    { href: '/modalidades', label: 'Modalidades' },
     { href: '/sobre', label: 'Sobre nós' },
     { href: '/clube-beneficios', label: 'Clube de benefícios' },
     { href: '/contato', label: 'Contato' },

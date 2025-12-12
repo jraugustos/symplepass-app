@@ -1,6 +1,10 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { getEventPhotosData, getBestPackageForQuantity } from '@/lib/data/event-photos'
+import {
+  getEventPhotosData,
+  getBestPackageForQuantity,
+  calculatePriceForQuantity,
+} from '@/lib/data/event-photos'
 import { PhotoCheckoutClient } from './checkout-client'
 
 interface PageProps {
@@ -56,8 +60,8 @@ export default async function PhotoCheckoutPage({ searchParams }: PageProps) {
     redirect('/')
   }
 
-  // Fetch photos and packages using shared data layer
-  const { photos: allPhotos, packages } = await getEventPhotosData(eventId)
+  // Fetch photos, packages, and pricing tiers using shared data layer
+  const { photos: allPhotos, packages, pricingTiers } = await getEventPhotosData(eventId)
 
   // Filter to only selected photos and map to expected shape
   const selectedPhotoIds = new Set(photoIds)
@@ -75,11 +79,19 @@ export default async function PhotoCheckoutPage({ searchParams }: PageProps) {
     redirect(`/eventos/${event.slug}#fotos`)
   }
 
-  // Calculate best package and total price
-  const { package: bestPackage, totalPrice } = getBestPackageForQuantity(
+  // Calculate pricing using new progressive tiers (or fallback to legacy packages)
+  const hasPricingTiers = pricingTiers.length > 0
+  const pricingResult = calculatePriceForQuantity(pricingTiers, photoIds.length)
+
+  // Legacy: Calculate best package (for backward compatibility)
+  const { package: bestPackage, totalPrice: legacyTotalPrice } = getBestPackageForQuantity(
     packages,
     photoIds.length
   )
+
+  // Use new pricing if tiers are available
+  const totalPrice = hasPricingTiers ? pricingResult.totalPrice : legacyTotalPrice
+  const appliedTier = hasPricingTiers ? pricingResult.tier : null
 
   return (
     <PhotoCheckoutClient
@@ -108,6 +120,16 @@ export default async function PhotoCheckoutPage({ searchParams }: PageProps) {
             }
           : null
       }
+      appliedTier={
+        appliedTier
+          ? {
+              id: appliedTier.id,
+              min_quantity: appliedTier.min_quantity,
+              price_per_photo: Number(appliedTier.price_per_photo),
+            }
+          : null
+      }
+      pricePerPhoto={hasPricingTiers ? pricingResult.pricePerPhoto : null}
       totalPrice={totalPrice}
       user={{
         id: user.id,

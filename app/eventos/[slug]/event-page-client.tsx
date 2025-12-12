@@ -45,7 +45,7 @@ export default function EventPageClient({
   userName,
   userEmail,
   userRole = 'user',
-  photosData = { photos: [], packages: [] },
+  photosData = { photos: [], packages: [], pricingTiers: [] },
 }: EventPageClientProps) {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<EventCategory | null>(null)
@@ -185,6 +185,7 @@ export default function EventPageClient({
                   eventId={event.id}
                   photos={photosData.photos}
                   packages={photosData.packages}
+                  pricingTiers={photosData.pricingTiers}
                 />
               </EventSectionWrapper>
             )}

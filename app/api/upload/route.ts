@@ -9,11 +9,11 @@ const EVENT_BUCKETS = ['event-banners', 'event-media', 'event-documents', 'event
 const BUCKET_CONFIG: Record<string, { maxSize: number; allowedTypes: string[] }> = {
   'event-banners': {
     maxSize: 10 * 1024 * 1024, // 10MB
-    allowedTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'],
+    allowedTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'],
   },
   'event-media': {
     maxSize: 10 * 1024 * 1024,
-    allowedTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'],
+    allowedTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'],
   },
   'event-documents': {
     maxSize: 50 * 1024 * 1024, // 50MB
@@ -49,13 +49,24 @@ export async function POST(request: NextRequest) {
   try {
     // Get user session using server client
     const supabase = createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
 
+    // First try to get user directly (more reliable than getSession for API routes)
+    let { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    // If user fetch failed, try to refresh the session
     if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Não autorizado. Por favor, faça login novamente.' },
-        { status: 401 }
-      )
+      console.log('[API Upload] Initial auth failed, attempting session refresh...')
+      const { data: { session }, error: refreshError } = await supabase.auth.refreshSession()
+
+      if (refreshError || !session) {
+        console.error('[API Upload] Auth failed:', authError?.message || refreshError?.message)
+        return NextResponse.json(
+          { error: 'Não autorizado. Por favor, faça login novamente.' },
+          { status: 401 }
+        )
+      }
+
+      user = session.user
     }
 
     // Parse form data
@@ -64,6 +75,15 @@ export async function POST(request: NextRequest) {
     const bucket = formData.get('bucket') as StorageBucket | null
     const folder = formData.get('folder') as string | null
     const fileName = formData.get('fileName') as string | null
+
+    console.log('[API Upload] Request:', {
+      bucket,
+      folder,
+      fileName,
+      fileType: file?.type,
+      fileSize: file?.size,
+      userId: user.id,
+    })
 
     if (!file || !bucket) {
       return NextResponse.json(
@@ -125,6 +145,7 @@ export async function POST(request: NextRequest) {
       // For event buckets, check if user is admin or owns the event
       if (profile.role !== 'admin') {
         // Check if user owns the event (folder should be event_id or slug)
+        console.log('[API Upload] Checking event ownership for folder:', folder)
         const { data: event, error: eventError } = await supabase
           .from('events')
           .select('id, organizer_id')
@@ -132,11 +153,14 @@ export async function POST(request: NextRequest) {
           .single()
 
         if (eventError || !event) {
+          console.error('[API Upload] Event not found:', eventError?.message)
           return NextResponse.json(
             { error: 'Evento não encontrado.' },
             { status: 404 }
           )
         }
+
+        console.log('[API Upload] Event found:', event.id, 'organizer:', event.organizer_id, 'current user:', user.id)
 
         if (event.organizer_id !== user.id) {
           return NextResponse.json(
@@ -144,6 +168,8 @@ export async function POST(request: NextRequest) {
             { status: 403 }
           )
         }
+      } else {
+        console.log('[API Upload] User is admin, skipping ownership check')
       }
     } else if (bucket === 'user-avatars') {
       // User avatars: folder must be user's own ID

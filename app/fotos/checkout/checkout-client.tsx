@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import Image from 'next/image'
-import { ShieldCheck, ArrowRight, Camera, Package, ImageIcon, Mail, Download, Clock } from 'lucide-react'
+import { ShieldCheck, ArrowRight, Camera, Layers, ImageIcon, Mail, Download, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { NavigationHeader } from '@/components/molecules/navigation-header'
 import { formatCurrency, cn } from '@/lib/utils'
@@ -32,12 +32,19 @@ interface PhotoCheckoutClientProps {
     quantity: number
     price: number
   }>
+  /** @deprecated Use appliedTier instead */
   bestPackage: {
     id: string
     name: string
     quantity: number
     price: number
   } | null
+  appliedTier?: {
+    id: string
+    min_quantity: number
+    price_per_photo: number
+  } | null
+  pricePerPhoto?: number | null
   totalPrice: number
   user: {
     id: string
@@ -51,6 +58,8 @@ export function PhotoCheckoutClient({
   selectedPhotos,
   packages,
   bestPackage,
+  appliedTier,
+  pricePerPhoto,
   totalPrice,
   user,
 }: PhotoCheckoutClientProps) {
@@ -89,6 +98,9 @@ export function PhotoCheckoutClient({
           photoIds: selectedPhotos.map((p) => p.id),
           totalAmount: totalPrice,
           packageId: bestPackage?.id || null,
+          // New fields for progressive pricing
+          appliedTierId: appliedTier?.id || null,
+          pricePerPhotoApplied: pricePerPhoto || null,
         }),
       })
 
@@ -202,8 +214,31 @@ export function PhotoCheckoutClient({
             </div>
           </section>
 
-          {/* Package section */}
-          {bestPackage && (
+          {/* Pricing tier section (new progressive pricing) */}
+          {appliedTier && (
+            <section>
+              <h2 className="text-xl sm:text-2xl tracking-tight font-geist font-semibold text-neutral-900 mb-4">
+                Faixa de preço aplicada
+              </h2>
+              <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4 sm:p-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
+                    <Layers className="w-5 h-5 text-orange-600" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-orange-900 font-geist">
+                      {appliedTier.min_quantity}+ fotos
+                    </p>
+                    <p className="text-sm text-orange-700">
+                      {formatCurrency(appliedTier.price_per_photo)} por foto
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+          {/* Legacy: Package section (deprecated, for backward compatibility) */}
+          {!appliedTier && bestPackage && (
             <section>
               <h2 className="text-xl sm:text-2xl tracking-tight font-geist font-semibold text-neutral-900 mb-4">
                 Pacote aplicado
@@ -211,7 +246,7 @@ export function PhotoCheckoutClient({
               <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4 sm:p-5">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
-                    <Package className="w-5 h-5 text-orange-600" />
+                    <Layers className="w-5 h-5 text-orange-600" />
                   </div>
                   <div>
                     <p className="font-semibold text-orange-900 font-geist">

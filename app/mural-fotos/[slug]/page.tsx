@@ -131,6 +131,7 @@ export default async function MuralEventPage({ params }: MuralEventPageProps) {
             eventId={event.id}
             photos={photosData.photos}
             packages={photosData.packages}
+            pricingTiers={photosData.pricingTiers}
           />
         </section>
       </main>

@@ -1,9 +1,15 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import type { PhotoPackage } from '@/types/database.types'
+import type { PhotoPackage, PhotoPricingTier } from '@/types/database.types'
+import type { PricingCalculationResult, FormattedPricingTier } from '@/types'
 import type { EventPhotoWithUrls } from '@/lib/photos/photo-utils'
-import { getBestPackageForQuantity } from '@/lib/photos/photo-utils'
+import {
+  getBestPackageForQuantity,
+  calculatePriceForQuantity,
+  formatTiersForDisplay,
+  calculateSavings,
+} from '@/lib/photos/photo-utils'
 
 const CART_STORAGE_KEY = 'photo-cart'
 const MAX_CART_SIZE = 50
@@ -21,10 +27,19 @@ interface UsePhotoCartResult {
   togglePhoto: (photoId: string) => void
   clearCart: () => void
   isSelected: (photoId: string) => boolean
+  /** @deprecated Use appliedTier instead */
   bestPackage: PhotoPackage | null
   totalPrice: number
   pricePerPhoto: number
   getSelectedPhotos: (photos: EventPhotoWithUrls[]) => EventPhotoWithUrls[]
+  /** The currently applied pricing tier based on quantity */
+  appliedTier: PhotoPricingTier | null
+  /** All pricing tiers formatted for display */
+  formattedTiers: FormattedPricingTier[]
+  /** Savings compared to base price, if any */
+  savings: { amount: number; percentage: number } | null
+  /** Full pricing calculation result */
+  pricingResult: PricingCalculationResult
 }
 
 function getStorageKey(eventId: string): string {
@@ -58,9 +73,17 @@ function saveCartToStorage(eventId: string, selectedIds: string[]): void {
   }
 }
 
+/**
+ * Hook for managing the photo cart with progressive pricing tiers
+ *
+ * @param eventId - The event ID for cart isolation
+ * @param packages - Legacy photo packages (deprecated, for backward compatibility)
+ * @param pricingTiers - New pricing tiers for progressive pricing
+ */
 export function usePhotoCart(
   eventId: string,
-  packages: PhotoPackage[]
+  packages: PhotoPackage[],
+  pricingTiers: PhotoPricingTier[] = []
 ): UsePhotoCartResult {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [isInitialized, setIsInitialized] = useState(false)
@@ -123,15 +146,35 @@ export function usePhotoCart(
     [selectedIds]
   )
 
-  // Calculate best package and pricing
-  const { bestPackage, totalPrice, pricePerPhoto } = useMemo(() => {
+  // NEW: Calculate pricing using progressive tiers
+  const pricingResult = useMemo(() => {
+    return calculatePriceForQuantity(pricingTiers, selectedIds.length)
+  }, [pricingTiers, selectedIds.length])
+
+  // Format tiers for display
+  const formattedTiers = useMemo(() => {
+    return formatTiersForDisplay(pricingTiers)
+  }, [pricingTiers])
+
+  // Calculate savings
+  const savings = useMemo(() => {
+    return calculateSavings(pricingTiers, selectedIds.length)
+  }, [pricingTiers, selectedIds.length])
+
+  // DEPRECATED: Calculate best package and pricing (for backward compatibility)
+  const { bestPackage, legacyTotalPrice, legacyPricePerPhoto } = useMemo(() => {
     const result = getBestPackageForQuantity(packages, selectedIds.length)
     return {
       bestPackage: result.package,
-      totalPrice: result.totalPrice,
-      pricePerPhoto: result.pricePerPhoto,
+      legacyTotalPrice: result.totalPrice,
+      legacyPricePerPhoto: result.pricePerPhoto,
     }
   }, [packages, selectedIds.length])
+
+  // Use new pricing if tiers are available, otherwise fall back to legacy packages
+  const hasPricingTiers = pricingTiers.length > 0
+  const totalPrice = hasPricingTiers ? pricingResult.totalPrice : legacyTotalPrice
+  const pricePerPhoto = hasPricingTiers ? pricingResult.pricePerPhoto : legacyPricePerPhoto
 
   return {
     selectedIds,
@@ -145,5 +188,10 @@ export function usePhotoCart(
     totalPrice,
     pricePerPhoto,
     getSelectedPhotos,
+    // New properties for progressive pricing
+    appliedTier: pricingResult.tier,
+    formattedTiers,
+    savings,
+    pricingResult,
   }
 }

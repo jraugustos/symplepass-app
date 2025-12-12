@@ -272,12 +272,34 @@ export interface EventPhoto {
   updated_at: string
 }
 
+/**
+ * @deprecated Use PhotoPricingTier instead. Kept for backward compatibility.
+ */
 export interface PhotoPackage {
   id: string
   event_id: string
   name: string
   quantity: number
   price: number
+  display_order: number
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * Progressive pricing tier for photo purchases.
+ * Replaces fixed packages with price-per-photo based on quantity.
+ *
+ * Example tiers:
+ * - min_quantity: 1, price_per_photo: 10.00 (1-2 photos = R$10/each)
+ * - min_quantity: 3, price_per_photo: 7.00 (3-9 photos = R$7/each)
+ * - min_quantity: 10, price_per_photo: 5.00 (10+ photos = R$5/each)
+ */
+export interface PhotoPricingTier {
+  id: string
+  event_id: string
+  min_quantity: number
+  price_per_photo: number
   display_order: number
   created_at: string
   updated_at: string
@@ -290,7 +312,12 @@ export interface PhotoOrder {
   status: PhotoOrderStatus
   payment_status: PhotoPaymentStatus
   total_amount: number
+  /** @deprecated Use applied_tier_id instead */
   package_id: string | null
+  /** Reference to the pricing tier applied at checkout */
+  applied_tier_id: string | null
+  /** Price per photo at checkout time (for audit) */
+  price_per_photo_applied: number | null
   stripe_session_id: string | null
   stripe_payment_intent_id: string | null
   created_at: string
@@ -308,7 +335,10 @@ export interface PhotoOrderItem {
 export interface PhotoOrderWithDetails extends PhotoOrder {
   event: Event
   user: User
+  /** @deprecated Use appliedTier instead */
   package: PhotoPackage | null
+  /** The pricing tier that was applied to this order */
+  appliedTier: PhotoPricingTier | null
   items: PhotoOrderItemWithPhoto[]
 }
 
@@ -318,7 +348,10 @@ export interface PhotoOrderItemWithPhoto extends PhotoOrderItem {
 
 export interface EventWithPhotos extends Event {
   photos: EventPhoto[]
+  /** @deprecated Use pricing_tiers instead */
   photo_packages: PhotoPackage[]
+  /** Progressive pricing tiers for this event */
+  pricing_tiers: PhotoPricingTier[]
 }
 
 // Database schema type
@@ -379,6 +412,11 @@ export interface Database {
         Row: PhotoPackage
         Insert: Omit<PhotoPackage, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Omit<PhotoPackage, 'id' | 'created_at' | 'updated_at'>>
+      }
+      photo_pricing_tiers: {
+        Row: PhotoPricingTier
+        Insert: Omit<PhotoPricingTier, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<PhotoPricingTier, 'id' | 'created_at' | 'updated_at'>>
       }
       photo_orders: {
         Row: PhotoOrder

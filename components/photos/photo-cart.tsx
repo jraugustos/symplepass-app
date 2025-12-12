@@ -1,36 +1,34 @@
 'use client'
 
 import { useState } from 'react'
-import { ShoppingCart, X, Trash2, ChevronUp, ChevronDown, Package } from 'lucide-react'
+import { ShoppingCart, X, Trash2, ChevronUp, ChevronDown, Layers, TrendingDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
-import type { PhotoPackage } from '@/types/database.types'
+import { cn, formatCurrency } from '@/lib/utils'
+import type { PhotoPackage, PhotoPricingTier } from '@/types/database.types'
 import type { EventPhotoWithUrls } from '@/lib/photos/photo-utils'
 
 interface PhotoCartProps {
   eventId: string
   selectedPhotos: EventPhotoWithUrls[]
+  /** @deprecated Use appliedTier instead */
   bestPackage: PhotoPackage | null
+  appliedTier?: PhotoPricingTier | null
   totalPrice: number
   pricePerPhoto: number
+  savings?: { amount: number; percentage: number } | null
   onRemovePhoto: (photoId: string) => void
   onClearCart: () => void
   onCheckout: () => void
-}
-
-function formatPrice(price: number): string {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  }).format(price)
 }
 
 export default function PhotoCart({
   eventId,
   selectedPhotos,
   bestPackage,
+  appliedTier,
   totalPrice,
   pricePerPhoto,
+  savings,
   onRemovePhoto,
   onClearCart,
   onCheckout,
@@ -76,7 +74,7 @@ export default function PhotoCart({
                 {photoCount} {photoCount === 1 ? 'foto selecionada' : 'fotos selecionadas'}
               </p>
               <p className="text-sm text-orange-600 font-semibold">
-                {formatPrice(totalPrice)}
+                {formatCurrency(totalPrice)}
               </p>
             </div>
           </div>
@@ -92,15 +90,36 @@ export default function PhotoCart({
         {/* Expanded content */}
         {isExpanded && (
           <div className="border-t border-neutral-100">
-            {/* Package info */}
-            {bestPackage && (
+            {/* Pricing tier info (new progressive pricing) */}
+            {appliedTier && (
+              <div className="px-4 py-3 bg-orange-50 border-b border-orange-100">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Layers className="w-4 h-4 text-orange-500" />
+                    <span className="text-orange-700">
+                      <span className="font-medium">{appliedTier.min_quantity}+ fotos</span>
+                      {' - '}
+                      {formatCurrency(pricePerPhoto)}/foto
+                    </span>
+                  </div>
+                  {savings && (
+                    <div className="flex items-center gap-1 text-xs text-green-600 font-medium">
+                      <TrendingDown className="w-3 h-3" />
+                      -{savings.percentage}%
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            {/* Legacy: Package info (deprecated, for backward compatibility) */}
+            {!appliedTier && bestPackage && (
               <div className="px-4 py-3 bg-orange-50 border-b border-orange-100">
                 <div className="flex items-center gap-2 text-sm">
-                  <Package className="w-4 h-4 text-orange-500" />
+                  <Layers className="w-4 h-4 text-orange-500" />
                   <span className="text-orange-700">
                     <span className="font-medium">{bestPackage.name}</span>
                     {' - '}
-                    {formatPrice(pricePerPhoto)}/foto
+                    {formatCurrency(pricePerPhoto)}/foto
                   </span>
                 </div>
               </div>
@@ -139,10 +158,21 @@ export default function PhotoCart({
 
             {/* Actions */}
             <div className="p-4 border-t border-neutral-100 space-y-3">
+              {savings && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-green-600 flex items-center gap-1">
+                    <TrendingDown className="w-3 h-3" />
+                    Economia
+                  </span>
+                  <span className="text-green-600 font-medium">
+                    -{formatCurrency(savings.amount)}
+                  </span>
+                </div>
+              )}
               <div className="flex items-center justify-between text-sm">
-                <span className="text-neutral-600">Total</span>
+                <span className="text-neutral-600">Total ({photoCount} {photoCount === 1 ? 'foto' : 'fotos'})</span>
                 <span className="text-lg font-bold text-neutral-900">
-                  {formatPrice(totalPrice)}
+                  {formatCurrency(totalPrice)}
                 </span>
               </div>
 

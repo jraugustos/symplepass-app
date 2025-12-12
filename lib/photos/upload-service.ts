@@ -6,6 +6,7 @@
 
 import { uploadService } from '@/lib/storage/upload-service';
 import { validateFileForBucket, getFileExtension } from '@/lib/storage/file-validators';
+import { createClient } from '@/lib/supabase/client';
 import {
   processEventPhoto,
   validateImageForProcessing,
@@ -61,6 +62,39 @@ const PHOTO_BUCKETS = {
  * Handles processing and upload of event photos to Supabase Storage
  */
 export class PhotoUploadService {
+  private lastTokenRefresh: number = 0;
+  private readonly TOKEN_REFRESH_INTERVAL = 4 * 60 * 1000; // 4 minutes
+
+  /**
+   * Refresh the auth token if needed to prevent session expiration during long uploads
+   * This is especially important when uploading many photos sequentially
+   * Note: This is non-blocking - failures won't stop the upload process
+   */
+  private async refreshTokenIfNeeded(): Promise<void> {
+    const now = Date.now();
+    // Only refresh after the interval has passed (not on the first call)
+    if (this.lastTokenRefresh > 0 && (now - this.lastTokenRefresh) < this.TOKEN_REFRESH_INTERVAL) {
+      return; // Not time to refresh yet
+    }
+
+    // Mark that we attempted refresh (even if it fails, wait before trying again)
+    this.lastTokenRefresh = now;
+
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.refreshSession();
+      if (error) {
+        console.warn('[PhotoUploadService] Token refresh failed:', error.message);
+        // Don't throw - let uploads continue with existing session
+      } else {
+        console.log('[PhotoUploadService] Token refreshed successfully');
+      }
+    } catch (err) {
+      console.warn('[PhotoUploadService] Token refresh error:', err);
+      // Don't throw - let uploads continue with existing session
+    }
+  }
+
   /**
    * Upload a single event photo with automatic processing
    * Creates three versions: original, watermarked, and thumbnail
@@ -197,19 +231,53 @@ export class PhotoUploadService {
     const successful: PhotoUploadResult[] = [];
     const failed: PhotoUploadError[] = [];
 
+    // Initialize token refresh timer at start of batch upload
+    // This ensures first refresh happens after TOKEN_REFRESH_INTERVAL, not immediately
+    if (this.lastTokenRefresh === 0) {
+      this.lastTokenRefresh = Date.now();
+    }
+
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
 
       try {
+        // Refresh token periodically to prevent session expiration during long uploads
+        // This is called every iteration but only actually refreshes after TOKEN_REFRESH_INTERVAL
+        await this.refreshTokenIfNeeded();
+
         onProgress?.(i + 1, files.length, file.name);
 
         const result = await this.uploadEventPhoto(file, eventId, options);
         successful.push(result);
       } catch (error) {
         console.error(`[PhotoUploadService] Failed to upload ${file.name}:`, error);
+
+        // Check if the error is auth-related and try to recover
+        const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+        if (errorMessage.includes('Não autorizado') || errorMessage.includes('login')) {
+          // Try to refresh the token and retry once
+          try {
+            console.log('[PhotoUploadService] Auth error detected, attempting token refresh...');
+            const supabase = createClient();
+            const { error: refreshError } = await supabase.auth.refreshSession();
+
+            if (!refreshError) {
+              console.log('[PhotoUploadService] Token refreshed, retrying upload...');
+              // Retry the upload
+              const result = await this.uploadEventPhoto(file, eventId, options);
+              successful.push(result);
+              continue; // Skip adding to failed
+            } else {
+              console.error('[PhotoUploadService] Token refresh failed:', refreshError.message);
+            }
+          } catch (retryError) {
+            console.error(`[PhotoUploadService] Retry also failed for ${file.name}:`, retryError);
+          }
+        }
+
         failed.push({
           fileName: file.name,
-          error: error instanceof Error ? error.message : 'Erro desconhecido',
+          error: errorMessage,
         });
       }
     }

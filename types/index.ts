@@ -787,10 +787,51 @@ export interface OrganizerProfileData {
 
 // ===== Photo Management Types =====
 
+/**
+ * @deprecated Use PhotoPricingTierFormData instead
+ */
 export interface PhotoPackageFormData {
   name: string
   quantity: number
   price: number
+}
+
+/**
+ * Form data for creating/editing a pricing tier
+ */
+export interface PhotoPricingTierFormData {
+  min_quantity: number
+  price_per_photo: number
+}
+
+/**
+ * Result from the progressive pricing calculation
+ */
+export interface PricingCalculationResult {
+  /** The pricing tier that was applied */
+  tier: import('./database.types').PhotoPricingTier | null
+  /** Price per photo from the applied tier */
+  pricePerPhoto: number
+  /** Total price (quantity × pricePerPhoto) */
+  totalPrice: number
+  /** Number of photos in the calculation */
+  quantity: number
+}
+
+/**
+ * Formatted tier for display in UI
+ */
+export interface FormattedPricingTier {
+  /** Display label like "1-2 fotos" or "10+ fotos" */
+  label: string
+  /** Price per photo in this tier */
+  pricePerPhoto: number
+  /** Minimum quantity to activate tier */
+  minQty: number
+  /** Maximum quantity for this tier (null if no upper limit) */
+  maxQty: number | null
+  /** Original tier ID */
+  id: string
 }
 
 export interface CreatePhotoFormData {

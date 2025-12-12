@@ -3,26 +3,37 @@
 import { useState } from 'react'
 import { PhotosUpload } from './photos-upload'
 import { PhotoPackagesForm } from './photo-packages-form'
+import { PhotoPricingTiersForm } from './photo-pricing-tiers-form'
 import { PhotoOrdersPageClient } from './photo-orders-page-client'
-import type { EventPhoto, PhotoPackage } from '@/types/database.types'
+import type { EventPhoto, PhotoPackage, PhotoPricingTier } from '@/types/database.types'
 import type { AdminPhotoOrderWithDetails, CreatePhotoData, PhotoOrderFilters } from '@/lib/data/admin-photos'
-import type { PhotoPackageFormData } from '@/types'
+import type { PhotoPackageFormData, PhotoPricingTierFormData } from '@/types'
 
-type TabId = 'photos' | 'packages' | 'orders'
+type TabId = 'photos' | 'pricing' | 'orders'
 
 interface EventPhotosManagementProps {
   eventId: string
   photos: EventPhoto[]
+  /** @deprecated Use pricingTiers instead */
   packages: PhotoPackage[]
+  pricingTiers: PhotoPricingTier[]
   orders: AdminPhotoOrderWithDetails[]
   totalOrders: number
   onPhotoCreate: (data: Omit<CreatePhotoData, 'event_id'>) => Promise<any>
   onPhotoDelete: (photoId: string) => Promise<void>
   onPhotosReorder: (items: { id: string; display_order: number }[]) => Promise<void>
+  /** @deprecated Use onPricingTierCreate instead */
   onPackageCreate: (data: PhotoPackageFormData) => Promise<any>
+  /** @deprecated Use onPricingTierUpdate instead */
   onPackageUpdate: (packageId: string, data: PhotoPackageFormData) => Promise<any>
+  /** @deprecated Use onPricingTierDelete instead */
   onPackageDelete: (packageId: string) => Promise<void>
+  /** @deprecated Use onPricingTiersReorder instead */
   onPackagesReorder: (items: { id: string; display_order: number }[]) => Promise<void>
+  onPricingTierCreate: (data: PhotoPricingTierFormData) => Promise<any>
+  onPricingTierUpdate: (tierId: string, data: PhotoPricingTierFormData) => Promise<any>
+  onPricingTierDelete: (tierId: string) => Promise<void>
+  onPricingTiersReorder: (items: { id: string; display_order: number }[]) => Promise<void>
   onFilterOrders: (filters: PhotoOrderFilters) => Promise<{ orders: AdminPhotoOrderWithDetails[]; total: number }>
   onExportOrders: (filters: Omit<PhotoOrderFilters, 'page' | 'pageSize'>) => Promise<string>
 }
@@ -31,6 +42,7 @@ export function EventPhotosManagement({
   eventId,
   photos,
   packages,
+  pricingTiers,
   orders,
   totalOrders,
   onPhotoCreate,
@@ -40,6 +52,10 @@ export function EventPhotosManagement({
   onPackageUpdate,
   onPackageDelete,
   onPackagesReorder,
+  onPricingTierCreate,
+  onPricingTierUpdate,
+  onPricingTierDelete,
+  onPricingTiersReorder,
   onFilterOrders,
   onExportOrders,
 }: EventPhotosManagementProps) {
@@ -47,7 +63,7 @@ export function EventPhotosManagement({
 
   const tabs = [
     { id: 'photos' as TabId, label: 'Fotos do Evento', count: photos.length },
-    { id: 'packages' as TabId, label: 'Pacotes de Preços', count: packages.length },
+    { id: 'pricing' as TabId, label: 'Faixas de Preço', count: pricingTiers.length },
     { id: 'orders' as TabId, label: 'Pedidos', count: totalOrders },
   ]
 
@@ -91,14 +107,14 @@ export function EventPhotosManagement({
           />
         )}
 
-        {activeTab === 'packages' && (
-          <PhotoPackagesForm
+        {activeTab === 'pricing' && (
+          <PhotoPricingTiersForm
             eventId={eventId}
-            packages={packages}
-            onCreate={onPackageCreate}
-            onUpdate={onPackageUpdate}
-            onDelete={onPackageDelete}
-            onReorder={onPackagesReorder}
+            tiers={pricingTiers}
+            onCreate={onPricingTierCreate}
+            onUpdate={onPricingTierUpdate}
+            onDelete={onPricingTierDelete}
+            onReorder={onPricingTiersReorder}
           />
         )}
 

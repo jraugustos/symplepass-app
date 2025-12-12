@@ -1,21 +1,23 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { Camera, ImageIcon, ImagePlus } from 'lucide-react'
+import { Camera, ImageIcon, TrendingDown, Check } from 'lucide-react'
 import { PhotoGrid, PhotoLightbox, PhotoCart } from '@/components/photos'
 import { usePhotoCart } from '@/lib/hooks/use-photo-cart'
 import { EVENT_PAGE_CONTENT_CLASS } from './layout-constants'
-import { cn } from '@/lib/utils'
-import type { PhotoPackage } from '@/types/database.types'
+import { cn, formatCurrency } from '@/lib/utils'
+import type { PhotoPackage, PhotoPricingTier } from '@/types/database.types'
 import type { EventPhotoWithUrls } from '@/lib/photos/photo-utils'
 
 interface EventPhotosProps {
   eventId: string
   photos: EventPhotoWithUrls[]
+  /** @deprecated Use pricingTiers instead */
   packages: PhotoPackage[]
+  pricingTiers: PhotoPricingTier[]
 }
 
-export default function EventPhotos({ eventId, photos, packages }: EventPhotosProps) {
+export default function EventPhotos({ eventId, photos, packages, pricingTiers }: EventPhotosProps) {
   const [lightboxPhoto, setLightboxPhoto] = useState<EventPhotoWithUrls | null>(null)
   const [isLightboxOpen, setIsLightboxOpen] = useState(false)
 
@@ -30,7 +32,10 @@ export default function EventPhotos({ eventId, photos, packages }: EventPhotosPr
     totalPrice,
     pricePerPhoto,
     getSelectedPhotos,
-  } = usePhotoCart(eventId, packages)
+    appliedTier,
+    formattedTiers,
+    savings,
+  } = usePhotoCart(eventId, packages, pricingTiers)
 
   const handlePhotoClick = useCallback((photo: EventPhotoWithUrls) => {
     setLightboxPhoto(photo)
@@ -115,61 +120,68 @@ export default function EventPhotos({ eventId, photos, packages }: EventPhotosPr
           )}
         </div>
 
-        {/* Package cards */}
-        {packages.length > 0 && (
+        {/* Pricing tiers cards */}
+        {formattedTiers.length > 0 && (
           <div className="mb-8">
-            <p className="text-sm font-medium text-neutral-700 mb-3">Pacotes disponíveis:</p>
+            <p className="text-sm font-medium text-neutral-700 mb-3">Faixas de preço:</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {packages.map((pkg) => {
-                const pricePerPhoto = Number(pkg.price) / Number(pkg.quantity)
-                const isCurrentPackage = bestPackage?.id === pkg.id
+              {formattedTiers.map((tier, index) => {
+                const isCurrentTier = appliedTier?.id === tier.id
+                const isBaseTier = tier.minQty === 1
+                const basePricePerPhoto = formattedTiers[0]?.pricePerPhoto || tier.pricePerPhoto
+                const discountPercentage = !isBaseTier && basePricePerPhoto > 0
+                  ? Math.round(((basePricePerPhoto - tier.pricePerPhoto) / basePricePerPhoto) * 100)
+                  : null
 
                 return (
                   <div
-                    key={pkg.id}
+                    key={tier.id}
                     className={cn(
                       'relative rounded-xl border p-4 transition-all',
-                      isCurrentPackage
+                      isCurrentTier
                         ? 'border-orange-400 bg-gradient-to-br from-orange-50 to-amber-50 ring-1 ring-orange-400'
-                        : 'border-neutral-200 bg-white hover:border-orange-200 hover:bg-orange-50/30'
+                        : 'border-neutral-200 bg-white'
                     )}
                   >
-                    {isCurrentPackage && (
-                      <div className="absolute -top-2.5 left-3 px-2 py-0.5 bg-orange-500 text-white text-xs font-medium rounded-full">
-                        Selecionado
+                    {isCurrentTier && selectedCount > 0 && (
+                      <div className="absolute -top-2.5 left-3 px-2 py-0.5 bg-orange-500 text-white text-xs font-medium rounded-full flex items-center gap-1">
+                        <Check className="w-3 h-3" />
+                        Sua faixa
                       </div>
                     )}
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <ImagePlus className={cn(
-                            'w-4 h-4',
-                            isCurrentPackage ? 'text-orange-600' : 'text-neutral-400'
-                          )} />
-                          <span className={cn(
-                            'font-semibold',
-                            isCurrentPackage ? 'text-orange-900' : 'text-neutral-900'
-                          )}>
-                            {pkg.name}
-                          </span>
-                        </div>
-                        <p className="text-xs text-neutral-500">
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(pricePerPhoto)}/foto
-                        </p>
+                    {discountPercentage && discountPercentage > 0 && (
+                      <div className="absolute -top-2.5 right-3 px-2 py-0.5 bg-green-500 text-white text-xs font-medium rounded-full flex items-center gap-1">
+                        <TrendingDown className="w-3 h-3" />
+                        {discountPercentage}% off
                       </div>
-                      <div className="text-right">
-                        <p className={cn(
-                          'text-lg font-bold',
-                          isCurrentPackage ? 'text-orange-600' : 'text-neutral-900'
-                        )}>
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(pkg.price))}
-                        </p>
-                      </div>
+                    )}
+                    <div className="flex flex-col">
+                      <span className={cn(
+                        'font-semibold mb-1',
+                        isCurrentTier ? 'text-orange-900' : 'text-neutral-900'
+                      )}>
+                        {tier.label}
+                      </span>
+                      <p className={cn(
+                        'text-2xl font-bold',
+                        isCurrentTier ? 'text-orange-600' : 'text-neutral-900'
+                      )}>
+                        {formatCurrency(tier.pricePerPhoto)}
+                        <span className="text-sm font-normal text-neutral-500">/foto</span>
+                      </p>
                     </div>
                   </div>
                 )
               })}
             </div>
+            {savings && selectedCount > 0 && (
+              <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-sm text-green-700 font-medium flex items-center gap-2">
+                  <TrendingDown className="w-4 h-4" />
+                  Você está economizando {savings.percentage}% ({formatCurrency(savings.amount)})
+                </p>
+              </div>
+            )}
           </div>
         )}
 
@@ -206,8 +218,10 @@ export default function EventPhotos({ eventId, photos, packages }: EventPhotosPr
         eventId={eventId}
         selectedPhotos={selectedPhotos}
         bestPackage={bestPackage}
+        appliedTier={appliedTier}
         totalPrice={totalPrice}
         pricePerPhoto={pricePerPhoto}
+        savings={savings}
         onRemovePhoto={removePhoto}
         onClearCart={clearCart}
         onCheckout={handleCheckout}

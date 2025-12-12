@@ -16,6 +16,13 @@ import {
   type PhotoOrderFilters,
   type AdminPhotoOrderWithDetails,
 } from '@/lib/data/admin-photos'
+import {
+  createPricingTier,
+  updatePricingTier,
+  deletePricingTier,
+  reorderPricingTiers,
+  type CreatePricingTierData,
+} from '@/lib/data/photo-pricing-tiers'
 
 /**
  * Create a new photo record after upload
@@ -242,4 +249,111 @@ export async function exportPhotoOrdersAction(
 
   const queryString = params.toString()
   return `/api/admin/events/${eventId}/photos/orders/export${queryString ? `?${queryString}` : ''}`
+}
+
+// ============================================================
+// PRICING TIER ACTIONS (New Progressive Pricing Model)
+// ============================================================
+
+/**
+ * Create a new pricing tier
+ */
+export async function createPricingTierAction(
+  eventId: string,
+  data: Omit<CreatePricingTierData, 'event_id'>
+) {
+  const result = await getCurrentUser()
+  if (!result || !result.user || !result.profile) {
+    throw new Error('User not authenticated')
+  }
+
+  if (result.profile.role !== 'admin' && result.profile.role !== 'organizer') {
+    throw new Error('Unauthorized')
+  }
+
+  const createResult = await createPricingTier({
+    event_id: eventId,
+    ...data,
+  })
+
+  if (createResult.error) {
+    throw new Error(createResult.error)
+  }
+
+  revalidatePath(`/admin/eventos/${eventId}/fotos`)
+  return createResult.data
+}
+
+/**
+ * Update an existing pricing tier
+ */
+export async function updatePricingTierAction(
+  eventId: string,
+  tierId: string,
+  data: Partial<Omit<CreatePricingTierData, 'event_id'>>
+) {
+  const result = await getCurrentUser()
+  if (!result || !result.user || !result.profile) {
+    throw new Error('User not authenticated')
+  }
+
+  if (result.profile.role !== 'admin' && result.profile.role !== 'organizer') {
+    throw new Error('Unauthorized')
+  }
+
+  const updateResult = await updatePricingTier(tierId, data, eventId)
+
+  if (updateResult.error) {
+    throw new Error(updateResult.error)
+  }
+
+  revalidatePath(`/admin/eventos/${eventId}/fotos`)
+  return updateResult.data
+}
+
+/**
+ * Delete a pricing tier
+ */
+export async function deletePricingTierAction(eventId: string, tierId: string) {
+  const result = await getCurrentUser()
+  if (!result || !result.user || !result.profile) {
+    throw new Error('User not authenticated')
+  }
+
+  if (result.profile.role !== 'admin' && result.profile.role !== 'organizer') {
+    throw new Error('Unauthorized')
+  }
+
+  const deleteResult = await deletePricingTier(tierId)
+
+  if (deleteResult.error) {
+    throw new Error(deleteResult.error)
+  }
+
+  revalidatePath(`/admin/eventos/${eventId}/fotos`)
+}
+
+/**
+ * Reorder pricing tiers
+ */
+export async function reorderPricingTiersAction(
+  eventId: string,
+  items: { id: string; display_order: number }[]
+) {
+  const result = await getCurrentUser()
+  if (!result || !result.user || !result.profile) {
+    throw new Error('User not authenticated')
+  }
+
+  if (result.profile.role !== 'admin' && result.profile.role !== 'organizer') {
+    throw new Error('Unauthorized')
+  }
+
+  const reorderResult = await reorderPricingTiers(items)
+
+  if (reorderResult.error) {
+    throw new Error(reorderResult.error)
+  }
+
+  revalidatePath(`/admin/eventos/${eventId}/fotos`)
 }

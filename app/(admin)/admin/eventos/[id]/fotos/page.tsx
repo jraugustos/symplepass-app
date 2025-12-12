@@ -1,6 +1,6 @@
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronRight, Image, Package, ShoppingCart, DollarSign, ClipboardList } from 'lucide-react'
+import { ChevronRight, Image, Layers, ShoppingCart, DollarSign, ClipboardList } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth/actions'
 import { getEventByIdForAdmin } from '@/lib/data/admin-events'
 import {
@@ -9,6 +9,7 @@ import {
   getPhotoOrdersByEventId,
   getPhotoOrderStats,
 } from '@/lib/data/admin-photos'
+import { getPricingTiersByEventId } from '@/lib/data/photo-pricing-tiers'
 import { EventPhotosManagement } from '@/components/admin/event-photos-management'
 import { Card } from '@/components/ui/card'
 import { formatCurrency } from '@/lib/utils'
@@ -20,6 +21,10 @@ import {
   updatePhotoPackageAction,
   deletePhotoPackageAction,
   reorderPhotoPackagesAction,
+  createPricingTierAction,
+  updatePricingTierAction,
+  deletePricingTierAction,
+  reorderPricingTiersAction,
   filterPhotoOrdersAction,
   exportPhotoOrdersAction,
 } from '@/app/actions/admin-photos'
@@ -52,10 +57,11 @@ export default async function FotosEventoPage({
     notFound()
   }
 
-  // Fetch photos, packages, and orders in parallel
-  const [photos, packages, orders, stats] = await Promise.all([
+  // Fetch photos, packages, pricing tiers, and orders in parallel
+  const [photos, packages, pricingTiers, orders, stats] = await Promise.all([
     getPhotosByEventId(params.id),
     getPhotoPackagesByEventId(params.id),
+    getPricingTiersByEventId(params.id),
     getPhotoOrdersByEventId(params.id),
     getPhotoOrderStats(params.id),
   ])
@@ -68,6 +74,10 @@ export default async function FotosEventoPage({
   const boundUpdatePackage = updatePhotoPackageAction.bind(null, params.id)
   const boundDeletePackage = deletePhotoPackageAction.bind(null, params.id)
   const boundReorderPackages = reorderPhotoPackagesAction.bind(null, params.id)
+  const boundCreatePricingTier = createPricingTierAction.bind(null, params.id)
+  const boundUpdatePricingTier = updatePricingTierAction.bind(null, params.id)
+  const boundDeletePricingTier = deletePricingTierAction.bind(null, params.id)
+  const boundReorderPricingTiers = reorderPricingTiersAction.bind(null, params.id)
   const boundFilterOrders = filterPhotoOrdersAction.bind(null, params.id)
   const boundExportOrders = exportPhotoOrdersAction.bind(null, params.id)
 
@@ -118,12 +128,12 @@ export default async function FotosEventoPage({
           <Card className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-100 rounded-lg">
-                <Package className="h-5 w-5 text-blue-600" />
+                <Layers className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-neutral-600">Pacotes</p>
+                <p className="text-sm text-neutral-600">Faixas de Preço</p>
                 <p className="text-2xl font-bold text-neutral-900">
-                  {packages.length}
+                  {pricingTiers.length}
                 </p>
               </div>
             </div>
@@ -189,6 +199,7 @@ export default async function FotosEventoPage({
           eventId={params.id}
           photos={photos}
           packages={packages}
+          pricingTiers={pricingTiers}
           orders={orders}
           totalOrders={stats?.totalOrders || orders.length}
           onPhotoCreate={boundCreatePhoto}
@@ -198,6 +209,10 @@ export default async function FotosEventoPage({
           onPackageUpdate={boundUpdatePackage}
           onPackageDelete={boundDeletePackage}
           onPackagesReorder={boundReorderPackages}
+          onPricingTierCreate={boundCreatePricingTier}
+          onPricingTierUpdate={boundUpdatePricingTier}
+          onPricingTierDelete={boundDeletePricingTier}
+          onPricingTiersReorder={boundReorderPricingTiers}
           onFilterOrders={boundFilterOrders}
           onExportOrders={boundExportOrders}
         />

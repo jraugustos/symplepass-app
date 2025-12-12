@@ -27,11 +27,18 @@ export interface PhotoOrderWithDetails extends PhotoOrder {
     full_name: string
     email: string
   }
+  /** @deprecated Use appliedTier instead for progressive pricing */
   package?: {
     id: string
     name: string
     quantity: number
     price: number
+  } | null
+  /** Applied pricing tier for progressive pricing */
+  appliedTier?: {
+    id: string
+    min_quantity: number
+    price_per_photo: number
   } | null
   items?: Array<{
     id: string
@@ -47,36 +54,68 @@ export interface PhotoOrderWithDetails extends PhotoOrder {
 }
 
 /**
+ * Options for creating a photo order with progressive pricing
+ */
+export interface CreatePhotoOrderOptions {
+  userId: string
+  eventId: string
+  photoIds: string[]
+  totalAmount: number
+  /** @deprecated Use appliedTierId instead */
+  packageId?: string | null
+  /** ID of the applied pricing tier (progressive pricing) */
+  appliedTierId?: string | null
+  /** Price per photo that was applied */
+  pricePerPhotoApplied?: number | null
+  supabaseClient?: SupabaseServerClient
+}
+
+/**
  * Creates a pending photo order with order items in a single operation.
+ * Supports both legacy package-based pricing and new progressive tier pricing.
  * @returns Created order or error description
  */
 export async function createPhotoOrder(
-  userId: string,
-  eventId: string,
-  photoIds: string[],
-  totalAmount: number,
+  userIdOrOptions: string | CreatePhotoOrderOptions,
+  eventId?: string,
+  photoIds?: string[],
+  totalAmount?: number,
   packageId?: string | null,
   supabaseClient?: SupabaseServerClient
 ): Promise<PhotoOrderResult<PhotoOrder>> {
+  // Support both old signature and new options object
+  let options: CreatePhotoOrderOptions
+  if (typeof userIdOrOptions === 'string') {
+    options = {
+      userId: userIdOrOptions,
+      eventId: eventId!,
+      photoIds: photoIds!,
+      totalAmount: totalAmount!,
+      packageId,
+      supabaseClient,
+    }
+  } else {
+    options = userIdOrOptions
+  }
   try {
-    const supabase = getClient(supabaseClient)
+    const supabase = getClient(options.supabaseClient)
 
     // Validate that all photos belong to the event
     const { data: photos, error: photosError } = await supabase
       .from('event_photos')
       .select('id, event_id')
-      .in('id', photoIds)
+      .in('id', options.photoIds)
 
     if (photosError) {
       console.error('Error validating photos:', photosError)
       return { data: null, error: 'Erro ao validar fotos selecionadas.' }
     }
 
-    if (!photos || photos.length !== photoIds.length) {
+    if (!photos || photos.length !== options.photoIds.length) {
       return { data: null, error: 'Uma ou mais fotos selecionadas não foram encontradas.' }
     }
 
-    const invalidPhotos = photos.filter((p) => p.event_id !== eventId)
+    const invalidPhotos = photos.filter((p) => p.event_id !== options.eventId)
     if (invalidPhotos.length > 0) {
       return { data: null, error: 'Uma ou mais fotos não pertencem a este evento.' }
     }
@@ -85,8 +124,8 @@ export async function createPhotoOrder(
     const { data: existingOrder, error: existingError } = await supabase
       .from('photo_orders')
       .select('id, status')
-      .eq('user_id', userId)
-      .eq('event_id', eventId)
+      .eq('user_id', options.userId)
+      .eq('event_id', options.eventId)
       .eq('status', 'pending')
       .maybeSingle()
 
@@ -101,16 +140,18 @@ export async function createPhotoOrder(
       await supabase.from('photo_orders').delete().eq('id', existingOrder.id)
     }
 
-    // Create new order
+    // Create new order with progressive pricing fields
     const { data: order, error: orderError } = await supabase
       .from('photo_orders')
       .insert({
-        user_id: userId,
-        event_id: eventId,
+        user_id: options.userId,
+        event_id: options.eventId,
         status: 'pending',
         payment_status: 'pending',
-        total_amount: totalAmount,
-        package_id: packageId || null,
+        total_amount: options.totalAmount,
+        package_id: options.packageId || null,
+        applied_tier_id: options.appliedTierId || null,
+        price_per_photo_applied: options.pricePerPhotoApplied || null,
       })
       .select('*')
       .single()
@@ -121,7 +162,7 @@ export async function createPhotoOrder(
     }
 
     // Create order items
-    const orderItems = photoIds.map((photoId) => ({
+    const orderItems = options.photoIds.map((photoId) => ({
       order_id: order.id,
       photo_id: photoId,
     }))
@@ -290,6 +331,7 @@ export async function getPhotoOrderByIdWithDetails(
         event:events(id, title, slug, banner_url, start_date, location),
         user:profiles(id, full_name, email),
         package:photo_packages(id, name, quantity, price),
+        appliedTier:photo_pricing_tiers(id, min_quantity, price_per_photo),
         items:photo_order_items(
           id,
           photo_id,
@@ -330,6 +372,7 @@ export async function getPhotoOrderByStripeSessionWithDetails(
         event:events(id, title, slug, banner_url, start_date, location),
         user:profiles(id, full_name, email),
         package:photo_packages(id, name, quantity, price),
+        appliedTier:photo_pricing_tiers(id, min_quantity, price_per_photo),
         items:photo_order_items(
           id,
           photo_id,
@@ -370,6 +413,7 @@ export async function getUserPhotoOrders(
         *,
         event:events(id, title, slug, banner_url, start_date, location),
         package:photo_packages(id, name, quantity, price),
+        appliedTier:photo_pricing_tiers(id, min_quantity, price_per_photo),
         items:photo_order_items(
           id,
           photo_id,

@@ -3,8 +3,8 @@ import { stripe } from '@/lib/stripe/client'
 import { createClient } from '@/lib/supabase/server'
 import { getEnv } from '@/lib/env'
 import { createPhotoOrder, updatePhotoOrderStripeSession } from '@/lib/data/photo-orders'
-import { getBestPackageForQuantity } from '@/lib/photos/photo-utils'
-import type { PhotoCheckoutRequest } from '@/types'
+import { getBestPackageForQuantity, calculatePriceForQuantity } from '@/lib/photos/photo-utils'
+import type { PhotoCheckoutRequest, PhotoPricingTier, PhotoPackage } from '@/types'
 
 export const runtime = 'nodejs'
 
@@ -102,46 +102,78 @@ export async function POST(request: Request) {
       )
     }
 
-    // Fetch packages to validate pricing
-    const { data: packages } = await supabase
-      .from('photo_packages')
-      .select('id, name, quantity, price')
-      .eq('event_id', eventId)
-      .order('display_order', { ascending: true })
+    // Fetch pricing tiers and packages in parallel
+    const [tiersResult, packagesResult] = await Promise.all([
+      supabase
+        .from('photo_pricing_tiers')
+        .select('id, min_quantity, price_per_photo')
+        .eq('event_id', eventId)
+        .order('min_quantity', { ascending: true }),
+      supabase
+        .from('photo_packages')
+        .select('id, name, quantity, price')
+        .eq('event_id', eventId)
+        .order('display_order', { ascending: true }),
+    ])
 
-    const packagesData = packages || []
+    const pricingTiers = (tiersResult.data || []) as PhotoPricingTier[]
+    const packagesData = (packagesResult.data || []) as PhotoPackage[]
+    const hasPricingTiers = pricingTiers.length > 0
 
-    // Recalculate price server-side
-    const { package: serverBestPackage, totalPrice: serverTotalPrice } = getBestPackageForQuantity(
-      packagesData as any,
-      photoIds.length
-    )
+    // Recalculate price server-side using the appropriate pricing model
+    let serverTotalPrice: number
+    let serverAppliedTierId: string | null = null
+    let serverPricePerPhoto: number | null = null
+    let serverPackageId: string | null = null
+
+    if (hasPricingTiers) {
+      // Use progressive pricing tiers
+      const pricingResult = calculatePriceForQuantity(pricingTiers, photoIds.length)
+      serverTotalPrice = pricingResult.totalPrice
+      serverAppliedTierId = pricingResult.tier?.id || null
+      serverPricePerPhoto = pricingResult.pricePerPhoto
+    } else {
+      // Fallback to legacy package-based pricing
+      const { package: serverBestPackage, totalPrice } = getBestPackageForQuantity(
+        packagesData as any,
+        photoIds.length
+      )
+      serverTotalPrice = totalPrice
+      serverPackageId = serverBestPackage?.id || null
+    }
 
     // Validate price matches (with tolerance for floating point)
     if (Math.abs(totalAmount - serverTotalPrice) > PRICE_TOLERANCE) {
-      console.error('Price mismatch:', { clientPrice: totalAmount, serverPrice: serverTotalPrice })
+      console.error('Price mismatch:', {
+        clientPrice: totalAmount,
+        serverPrice: serverTotalPrice,
+        hasPricingTiers,
+        photoCount: photoIds.length
+      })
       return NextResponse.json(
         { error: 'Os valores informados não conferem. Recarregue a página e tente novamente.' },
         { status: 400 }
       )
     }
 
-    // Validate packageId if provided
-    if (packageId && serverBestPackage?.id !== packageId) {
+    // Validate packageId if provided (legacy support)
+    if (packageId && serverPackageId && serverPackageId !== packageId) {
       console.warn('Package ID mismatch, using server-calculated package')
     }
 
-    const finalPackageId = serverBestPackage?.id || null
+    const finalPackageId = serverPackageId
 
-    // Create pending order
-    const orderResult = await createPhotoOrder(
-      user.id,
+    // Create pending order with pricing tier info
+    const orderResult = await createPhotoOrder({
+      userId: user.id,
       eventId,
       photoIds,
-      serverTotalPrice,
-      finalPackageId,
-      supabase
-    )
+      totalAmount: serverTotalPrice,
+      packageId: finalPackageId,
+      appliedTierId: serverAppliedTierId,
+      pricePerPhotoApplied: serverPricePerPhoto,
+      supabaseClient: supabase,
+    })
 
     if (!orderResult.data || orderResult.error) {
       console.error('Error creating photo order:', orderResult.error)
@@ -182,6 +214,8 @@ export async function POST(request: Request) {
         userId: user.id,
         photoIds: JSON.stringify(photoIds),
         packageId: finalPackageId || '',
+        appliedTierId: serverAppliedTierId || '',
+        pricePerPhoto: serverPricePerPhoto?.toString() || '',
         type: 'photo_order',
       },
       success_url: `${env.app.baseUrl}/fotos/download/${orderResult.data.id}?session_id={CHECKOUT_SESSION_ID}`,

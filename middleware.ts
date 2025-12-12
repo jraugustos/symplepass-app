@@ -17,6 +17,7 @@ const publicRoutes = [
   '/login',
   '/cadastro',
   '/recuperar-senha',
+  '/mural-fotos',
 ]
 
 const exactPublicRoutes = ['/auth/callback']
@@ -91,6 +92,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|api/webhooks/stripe|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/webhooks/stripe|api/upload|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

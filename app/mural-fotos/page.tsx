@@ -63,6 +63,12 @@ export default async function MuralFotosPage({ searchParams }: MuralFotosPagePro
 
       <main className="flex-1">
         <section className="container mx-auto px-4 py-8">
+          {/* Debug info - remove after testing */}
+          <div className="mb-4 p-4 bg-yellow-100 rounded text-sm">
+            <p><strong>Debug:</strong> {eventsWithPreviews.length} eventos encontrados</p>
+            <p>Total: {total} | Página: {page}</p>
+          </div>
+
           {eventsWithPreviews.length > 0 ? (
             <>
               <PhotoEventsGrid events={eventsWithPreviews} />

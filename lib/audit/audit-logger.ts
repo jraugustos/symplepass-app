@@ -11,6 +11,7 @@ type AuditAction =
   | 'coupon_update'
   | 'coupon_delete'
   | 'photo_download'
+  | 'delete_photo_order'
 
 type TargetType = 'user' | 'registration' | 'report' | 'coupon' | 'photo_order' | 'other'
 

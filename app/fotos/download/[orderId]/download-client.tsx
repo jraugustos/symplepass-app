@@ -88,7 +88,15 @@ export function PhotoDownloadClient({ data }: PhotoDownloadClientProps) {
 
       const result: PhotoDownloadResponse = await response.json()
 
-      if (!result.photos || result.photos.length === 0) {
+      // Handle both single photo response and batch response
+      // API returns { url, fileName } for single photo, { photos: [...] } for multiple
+      const photosToDownload = result.photos
+        ? result.photos
+        : result.url
+          ? [{ id: data.photos[0]?.id || 'photo', url: result.url, fileName: result.fileName || 'foto.jpg' }]
+          : []
+
+      if (photosToDownload.length === 0) {
         throw new Error('Nenhuma foto disponível para download')
       }
 
@@ -97,9 +105,9 @@ export function PhotoDownloadClient({ data }: PhotoDownloadClientProps) {
       const zip = new JSZip()
 
       // Download each photo and add to ZIP
-      for (let i = 0; i < result.photos.length; i++) {
-        const photo = result.photos[i]
-        setBatchProgress({ current: i + 1, total: result.photos.length })
+      for (let i = 0; i < photosToDownload.length; i++) {
+        const photo = photosToDownload[i]
+        setBatchProgress({ current: i + 1, total: photosToDownload.length })
 
         try {
           const photoResponse = await fetch(photo.url)

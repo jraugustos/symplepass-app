@@ -19,6 +19,7 @@ interface EventPhotosManagementProps {
   pricingTiers: PhotoPricingTier[]
   orders: AdminPhotoOrderWithDetails[]
   totalOrders: number
+  isAdmin?: boolean
   onPhotoCreate: (data: Omit<CreatePhotoData, 'event_id'>) => Promise<any>
   onPhotoDelete: (photoId: string) => Promise<void>
   onPhotosReorder: (items: { id: string; display_order: number }[]) => Promise<void>
@@ -36,6 +37,7 @@ interface EventPhotosManagementProps {
   onPricingTiersReorder: (items: { id: string; display_order: number }[]) => Promise<void>
   onFilterOrders: (filters: PhotoOrderFilters) => Promise<{ orders: AdminPhotoOrderWithDetails[]; total: number }>
   onExportOrders: (filters: Omit<PhotoOrderFilters, 'page' | 'pageSize'>) => Promise<string>
+  onDeleteOrder?: (orderId: string) => Promise<void>
 }
 
 export function EventPhotosManagement({
@@ -45,6 +47,7 @@ export function EventPhotosManagement({
   pricingTiers,
   orders,
   totalOrders,
+  isAdmin = false,
   onPhotoCreate,
   onPhotoDelete,
   onPhotosReorder,
@@ -58,6 +61,7 @@ export function EventPhotosManagement({
   onPricingTiersReorder,
   onFilterOrders,
   onExportOrders,
+  onDeleteOrder,
 }: EventPhotosManagementProps) {
   const [activeTab, setActiveTab] = useState<TabId>('photos')
 
@@ -123,8 +127,10 @@ export function EventPhotosManagement({
             eventId={eventId}
             initialOrders={orders}
             initialTotal={totalOrders}
+            isAdmin={isAdmin}
             onFilterOrders={onFilterOrders}
             onExportOrders={onExportOrders}
+            onDeleteOrder={onDeleteOrder}
           />
         )}
       </div>

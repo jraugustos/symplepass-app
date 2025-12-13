@@ -1,6 +1,8 @@
 'use client'
 
+import { useState } from 'react'
 import Image from 'next/image'
+import { Trash2, AlertTriangle, Loader2 } from 'lucide-react'
 import { Modal, ModalHeader, ModalTitle, ModalBody, ModalFooter } from '@/components/ui/modal'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -11,13 +13,40 @@ interface PhotoOrderDetailsModalProps {
   order: AdminPhotoOrderWithDetails | null
   open: boolean
   onClose: () => void
+  onDelete?: (orderId: string) => Promise<void>
+  isAdmin?: boolean
 }
 
 export function PhotoOrderDetailsModal({
   order,
   open,
   onClose,
+  onDelete,
+  isAdmin = false,
 }: PhotoOrderDetailsModalProps) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const handleDelete = async () => {
+    if (!order || !onDelete) return
+
+    setIsDeleting(true)
+    try {
+      await onDelete(order.id)
+      setShowDeleteConfirm(false)
+      onClose()
+    } catch (error) {
+      console.error('Error deleting order:', error)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const handleCloseModal = () => {
+    setShowDeleteConfirm(false)
+    onClose()
+  }
+
   const getPaymentStatusVariant = (status: string) => {
     switch (status) {
       case 'paid':
@@ -54,7 +83,7 @@ export function PhotoOrderDetailsModal({
     if (!order) {
       return (
         <>
-          <ModalHeader onClose={onClose}>
+          <ModalHeader onClose={handleCloseModal}>
             <ModalTitle>Detalhes do Pedido</ModalTitle>
           </ModalHeader>
           <ModalBody>
@@ -63,7 +92,7 @@ export function PhotoOrderDetailsModal({
             </div>
           </ModalBody>
           <ModalFooter>
-            <Button variant="secondary" onClick={onClose}>
+            <Button variant="secondary" onClick={handleCloseModal}>
               Fechar
             </Button>
           </ModalFooter>
@@ -80,9 +109,71 @@ export function PhotoOrderDetailsModal({
       return `${supabaseUrl}/storage/v1/object/public/event-photos-watermarked/${thumbnailPath}`
     }
 
+    // Delete confirmation view
+    if (showDeleteConfirm) {
+      return (
+        <>
+          <ModalHeader onClose={handleCloseModal}>
+            <ModalTitle>Excluir Pedido</ModalTitle>
+          </ModalHeader>
+          <ModalBody>
+            <div className="flex flex-col items-center text-center py-4">
+              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-4">
+                <AlertTriangle className="h-6 w-6 text-red-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-neutral-900 mb-2">
+                Tem certeza que deseja excluir?
+              </h3>
+              <p className="text-sm text-neutral-600 mb-4">
+                O pedido <span className="font-mono font-medium">{shortCode}</span> será excluído permanentemente.
+                Esta ação não pode ser desfeita.
+              </p>
+              <div className="p-4 bg-neutral-50 rounded-lg w-full text-left">
+                <p className="text-sm text-neutral-600">
+                  <span className="font-medium">Cliente:</span> {order.profiles?.full_name || 'N/A'}
+                </p>
+                <p className="text-sm text-neutral-600">
+                  <span className="font-medium">Valor:</span> {formatCurrency(order.total_amount)}
+                </p>
+                <p className="text-sm text-neutral-600">
+                  <span className="font-medium">Fotos:</span> {photos.length} foto(s)
+                </p>
+              </div>
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <Button
+              variant="secondary"
+              onClick={() => setShowDeleteConfirm(false)}
+              disabled={isDeleting}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Excluindo...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Excluir Pedido
+                </>
+              )}
+            </Button>
+          </ModalFooter>
+        </>
+      )
+    }
+
     return (
       <>
-        <ModalHeader onClose={onClose}>
+        <ModalHeader onClose={handleCloseModal}>
           <ModalTitle>Detalhes do Pedido</ModalTitle>
         </ModalHeader>
 
@@ -171,7 +262,17 @@ export function PhotoOrderDetailsModal({
         </ModalBody>
 
         <ModalFooter>
-          <Button variant="secondary" onClick={onClose}>
+          {isAdmin && onDelete && (
+            <Button
+              variant="destructive"
+              onClick={() => setShowDeleteConfirm(true)}
+              className="mr-auto"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Excluir
+            </Button>
+          )}
+          <Button variant="secondary" onClick={handleCloseModal}>
             Fechar
           </Button>
         </ModalFooter>
@@ -180,7 +281,7 @@ export function PhotoOrderDetailsModal({
   }
 
   return (
-    <Modal open={open} onOpenChange={onClose} size="lg">
+    <Modal open={open} onOpenChange={handleCloseModal} size="lg">
       {renderContent()}
     </Modal>
   )

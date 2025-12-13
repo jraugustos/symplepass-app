@@ -218,6 +218,7 @@ export async function updatePhotoOrderStripeSession(
 
 /**
  * Retrieves a photo order by its Stripe session ID.
+ * Uses admin client by default to bypass RLS - necessary for webhook context.
  * @returns Order linked to session or null if not found
  */
 export async function getPhotoOrderByStripeSession(
@@ -225,7 +226,8 @@ export async function getPhotoOrderByStripeSession(
   supabaseClient?: SupabaseServerClient
 ): Promise<PhotoOrderResult<PhotoOrder>> {
   try {
-    const supabase = getClient(supabaseClient)
+    // Use admin client to bypass RLS - webhooks don't have user authentication context
+    const supabase = supabaseClient ?? createAdminClient()
 
     const { data, error } = await supabase
       .from('photo_orders')
@@ -355,14 +357,17 @@ export async function getPhotoOrderByIdWithDetails(
 }
 
 /**
- * Get photo order by Stripe session with all details
+ * Get photo order by Stripe session with all details.
+ * Uses admin client by default to bypass RLS - necessary for webhook context
+ * where there's no authenticated user.
  */
 export async function getPhotoOrderByStripeSessionWithDetails(
   stripeSessionId: string,
   supabaseClient?: SupabaseServerClient
 ): Promise<PhotoOrderResult<PhotoOrderWithDetails>> {
   try {
-    const supabase = getClient(supabaseClient)
+    // Use admin client to bypass RLS - webhooks don't have user authentication context
+    const supabase = supabaseClient ?? createAdminClient()
 
     const { data, error } = await supabase
       .from('photo_orders')
@@ -460,5 +465,45 @@ export async function getPhotoOrderItems(
   } catch (error) {
     console.error('Unexpected error fetching photo order items:', error)
     return { data: null, error: 'Não foi possível buscar os itens do pedido.' }
+  }
+}
+
+/**
+ * Deletes a photo order and its associated items.
+ * Uses admin client to bypass RLS - requires admin authorization check before calling.
+ * @returns Success status or error description
+ */
+export async function deletePhotoOrder(
+  orderId: string
+): Promise<PhotoOrderResult<{ deleted: boolean }>> {
+  try {
+    const supabase = createAdminClient()
+
+    // First delete order items (foreign key constraint)
+    const { error: itemsError } = await supabase
+      .from('photo_order_items')
+      .delete()
+      .eq('order_id', orderId)
+
+    if (itemsError) {
+      console.error('Error deleting photo order items:', itemsError)
+      return { data: null, error: 'Erro ao excluir itens do pedido.' }
+    }
+
+    // Then delete the order
+    const { error: orderError } = await supabase
+      .from('photo_orders')
+      .delete()
+      .eq('id', orderId)
+
+    if (orderError) {
+      console.error('Error deleting photo order:', orderError)
+      return { data: null, error: 'Erro ao excluir pedido.' }
+    }
+
+    return { data: { deleted: true }, error: null }
+  } catch (error) {
+    console.error('Unexpected error deleting photo order:', error)
+    return { data: null, error: 'Não foi possível excluir o pedido.' }
   }
 }

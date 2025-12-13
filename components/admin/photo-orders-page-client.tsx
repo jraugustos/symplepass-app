@@ -10,8 +10,10 @@ interface PhotoOrdersPageClientProps {
   initialOrders: AdminPhotoOrderWithDetails[]
   initialTotal: number
   pageSize?: number
+  isAdmin?: boolean
   onFilterOrders: (filters: PhotoOrderFilters) => Promise<{ orders: AdminPhotoOrderWithDetails[]; total: number }>
   onExportOrders: (filters: Omit<PhotoOrderFilters, 'page' | 'pageSize'>) => Promise<string>
+  onDeleteOrder?: (orderId: string) => Promise<void>
 }
 
 export function PhotoOrdersPageClient({
@@ -19,8 +21,10 @@ export function PhotoOrdersPageClient({
   initialOrders,
   initialTotal,
   pageSize = 20,
+  isAdmin = false,
   onFilterOrders,
   onExportOrders,
+  onDeleteOrder,
 }: PhotoOrdersPageClientProps) {
   const [orders, setOrders] = useState<AdminPhotoOrderWithDetails[]>(initialOrders)
   const [totalOrders, setTotalOrders] = useState(initialTotal)
@@ -72,6 +76,16 @@ export function PhotoOrdersPageClient({
     // Keep selectedOrder until modal animation completes
   }, [])
 
+  const handleDeleteOrder = useCallback(async (orderId: string) => {
+    if (!onDeleteOrder) return
+
+    await onDeleteOrder(orderId)
+
+    // Remove the deleted order from the list
+    setOrders((prev) => prev.filter((o) => o.id !== orderId))
+    setTotalOrders((prev) => prev - 1)
+  }, [onDeleteOrder])
+
   return (
     <div className="space-y-4">
       <div>
@@ -97,6 +111,8 @@ export function PhotoOrdersPageClient({
         order={selectedOrder}
         open={isModalOpen}
         onClose={handleCloseModal}
+        onDelete={onDeleteOrder ? handleDeleteOrder : undefined}
+        isAdmin={isAdmin}
       />
     </div>
   )

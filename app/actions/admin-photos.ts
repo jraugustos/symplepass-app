@@ -23,6 +23,7 @@ import {
   reorderPricingTiers,
   type CreatePricingTierData,
 } from '@/lib/data/photo-pricing-tiers'
+import { deletePhotoOrder } from '@/lib/data/photo-orders'
 
 /**
  * Create a new photo record after upload
@@ -353,6 +354,33 @@ export async function reorderPricingTiersAction(
 
   if (reorderResult.error) {
     throw new Error(reorderResult.error)
+  }
+
+  revalidatePath(`/admin/eventos/${eventId}/fotos`)
+}
+
+// ============================================================
+// PHOTO ORDER ACTIONS
+// ============================================================
+
+/**
+ * Delete a photo order (admin only)
+ */
+export async function deletePhotoOrderAction(eventId: string, orderId: string) {
+  const result = await getCurrentUser()
+  if (!result || !result.user || !result.profile) {
+    throw new Error('User not authenticated')
+  }
+
+  // Only admins can delete orders
+  if (result.profile.role !== 'admin') {
+    throw new Error('Unauthorized - Admin access required')
+  }
+
+  const deleteResult = await deletePhotoOrder(orderId)
+
+  if (deleteResult.error) {
+    throw new Error(deleteResult.error)
   }
 
   revalidatePath(`/admin/eventos/${eventId}/fotos`)

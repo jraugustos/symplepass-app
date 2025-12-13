@@ -27,6 +27,7 @@ import {
   reorderPricingTiersAction,
   filterPhotoOrdersAction,
   exportPhotoOrdersAction,
+  deletePhotoOrderAction,
 } from '@/app/actions/admin-photos'
 import type { PhotoOrderFilters } from '@/lib/data/admin-photos'
 
@@ -80,6 +81,9 @@ export default async function FotosEventoPage({
   const boundReorderPricingTiers = reorderPricingTiersAction.bind(null, params.id)
   const boundFilterOrders = filterPhotoOrdersAction.bind(null, params.id)
   const boundExportOrders = exportPhotoOrdersAction.bind(null, params.id)
+  const boundDeleteOrder = deletePhotoOrderAction.bind(null, params.id)
+
+  const isAdmin = result.profile.role === 'admin'
 
   return (
     <div className="space-y-6">
@@ -202,6 +206,7 @@ export default async function FotosEventoPage({
           pricingTiers={pricingTiers}
           orders={orders}
           totalOrders={stats?.totalOrders || orders.length}
+          isAdmin={isAdmin}
           onPhotoCreate={boundCreatePhoto}
           onPhotoDelete={boundDeletePhoto}
           onPhotosReorder={boundReorderPhotos}
@@ -215,6 +220,7 @@ export default async function FotosEventoPage({
           onPricingTiersReorder={boundReorderPricingTiers}
           onFilterOrders={boundFilterOrders}
           onExportOrders={boundExportOrders}
+          onDeleteOrder={isAdmin ? boundDeleteOrder : undefined}
         />
       </div>
     </div>

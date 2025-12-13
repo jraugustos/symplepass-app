@@ -29,13 +29,17 @@ interface EnvironmentConfig {
  */
 function validateEnv(): EnvironmentConfig {
   const nodeEnv = process.env.NODE_ENV || 'development'
+  const vercelEnv = process.env.VERCEL_ENV
   const isDevelopment = nodeEnv === 'development'
+  const isProductionRuntime = vercelEnv === 'production'
+
+  const cleanEnvValue = (value?: string | null) => (typeof value === 'string' ? value.trim() : '')
 
   // Supabase environment variables
   const supabaseUrl =
-    process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
+    cleanEnvValue(process.env.NEXT_PUBLIC_SUPABASE_URL) || cleanEnvValue(process.env.SUPABASE_URL)
   const supabaseAnonKey =
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
+    cleanEnvValue(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) || cleanEnvValue(process.env.SUPABASE_ANON_KEY)
 
   if (!supabaseUrl || !supabaseAnonKey) {
     const message =
@@ -52,8 +56,14 @@ function validateEnv(): EnvironmentConfig {
   }
 
   // Stripe environment variables
-  const stripeSecretKey = process.env.STRIPE_SECRET_KEY
-  const stripePublicKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+  const rawStripeSecretKey = process.env.STRIPE_SECRET_KEY
+  const rawStripePublicKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+  const stripeSecretKey = cleanEnvValue(rawStripeSecretKey)
+  const stripePublicKey = cleanEnvValue(rawStripePublicKey)
+
+  if (rawStripeSecretKey && rawStripeSecretKey !== stripeSecretKey) {
+    console.warn('⚠️  WARNING: STRIPE_SECRET_KEY contained whitespace and was trimmed.')
+  }
 
   if (!stripeSecretKey || !stripePublicKey) {
     const message =
@@ -69,8 +79,25 @@ function validateEnv(): EnvironmentConfig {
     }
   }
 
+  const isTestKey = stripeSecretKey.startsWith('sk_test_') || stripeSecretKey.startsWith('rk_test_')
+  if (isProductionRuntime && isTestKey) {
+    const message =
+      'Invalid STRIPE_SECRET_KEY for production: expected a live key (sk_live_* or rk_live_*), but a test key was provided.'
+
+    throw new Error(message)
+  }
+
+  if (!(stripeSecretKey.startsWith('sk_') || stripeSecretKey.startsWith('rk_'))) {
+    const message = 'Invalid STRIPE_SECRET_KEY format. Expected key to start with sk_* or rk_*.'
+    if (isDevelopment) {
+      console.warn('⚠️  WARNING:', message)
+    } else {
+      throw new Error(message)
+    }
+  }
+
   // Application URL for redirects
-  let appBaseUrl = process.env.NEXT_PUBLIC_APP_URL
+  let appBaseUrl = cleanEnvValue(process.env.NEXT_PUBLIC_APP_URL)
 
   if (!appBaseUrl) {
     const message =

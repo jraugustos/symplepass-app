@@ -11,9 +11,11 @@ export const runtime = 'nodejs'
 const PRICE_TOLERANCE = 0.01
 
 export async function POST(request: Request) {
+  console.log('[Photo Checkout] Starting checkout session creation...')
   try {
     const body = (await request.json()) as PhotoCheckoutRequest
     const { eventId, photoIds, totalAmount, packageId } = body || {}
+    console.log('[Photo Checkout] Request body:', { eventId, photoCount: photoIds?.length, totalAmount, packageId })
 
     // Validate required fields
     if (!eventId || !photoIds || !Array.isArray(photoIds) || photoIds.length === 0) {
@@ -103,6 +105,7 @@ export async function POST(request: Request) {
     }
 
     // Fetch pricing tiers and packages in parallel
+    console.log('[Photo Checkout] Fetching pricing tiers and packages for event:', eventId)
     const [tiersResult, packagesResult] = await Promise.all([
       supabase
         .from('photo_pricing_tiers')
@@ -115,6 +118,9 @@ export async function POST(request: Request) {
         .eq('event_id', eventId)
         .order('display_order', { ascending: true }),
     ])
+
+    console.log('[Photo Checkout] Tiers result:', tiersResult.error ? tiersResult.error : tiersResult.data?.length)
+    console.log('[Photo Checkout] Packages result:', packagesResult.error ? packagesResult.error : packagesResult.data?.length)
 
     const pricingTiers = (tiersResult.data || []) as PhotoPricingTier[]
     const packagesData = (packagesResult.data || []) as PhotoPackage[]
@@ -164,6 +170,14 @@ export async function POST(request: Request) {
     const finalPackageId = serverPackageId
 
     // Create pending order with pricing tier info
+    console.log('[Photo Checkout] Creating order with:', {
+      userId: user.id,
+      eventId,
+      photoCount: photoIds.length,
+      serverTotalPrice,
+      appliedTierId: serverAppliedTierId,
+      pricePerPhoto: serverPricePerPhoto
+    })
     const orderResult = await createPhotoOrder({
       userId: user.id,
       eventId,
@@ -176,7 +190,7 @@ export async function POST(request: Request) {
     })
 
     if (!orderResult.data || orderResult.error) {
-      console.error('Error creating photo order:', orderResult.error)
+      console.error('[Photo Checkout] Error creating photo order:', orderResult.error)
       return NextResponse.json(
         { error: orderResult.error || 'Não foi possível criar seu pedido. Tente novamente.' },
         { status: 500 }
@@ -239,7 +253,9 @@ export async function POST(request: Request) {
       orderId: orderResult.data.id,
     })
   } catch (error) {
-    console.error('Error creating photo checkout session:', error)
+    console.error('[Photo Checkout] Unexpected error:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    console.error('[Photo Checkout] Error details:', errorMessage)
     return NextResponse.json(
       { error: 'Não foi possível iniciar o checkout. Tente novamente.' },
       { status: 500 }

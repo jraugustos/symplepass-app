@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { redirectAfterLogin, sanitizeRedirectUrl } from '@/lib/auth/utils'
+import { redirectAfterLogin, sanitizeRedirectUrl, isProfileComplete } from '@/lib/auth/utils'
+import type { Profile, UserPreferences } from '@/types'
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
@@ -26,7 +27,7 @@ export async function GET(request: Request) {
           .from('profiles')
           .select('*')
           .eq('id', data.user.id)
-          .single()
+          .single<Profile>()
 
         // If profile doesn't exist, create it (this should be handled by trigger, but as a fallback)
         if (profileError && profileError.code === 'PGRST116') {
@@ -43,21 +44,32 @@ export async function GET(request: Request) {
           }
         }
 
-        // If callbackUrl is provided, use it (after sanitization)
-        if (callbackUrl) {
-          const safeUrl = sanitizeRedirectUrl(callbackUrl)
-          return NextResponse.redirect(`${origin}${safeUrl}`)
-        }
+        // Fetch user preferences to check if profile is complete
+        const { data: preferences } = await supabase
+          .from('user_preferences')
+          .select('*')
+          .eq('user_id', data.user.id)
+          .single<UserPreferences>()
 
-        // Otherwise, redirect based on role
+        // Get fresh profile for completeness check
         const { data: freshProfile } = await supabase
           .from('profiles')
-          .select('role')
+          .select('*')
           .eq('id', data.user.id)
-          .single()
+          .single<Profile>()
 
+        // Determine the final destination
         const role = freshProfile?.role || 'user'
-        const destination = redirectAfterLogin(role)
+        const destination = callbackUrl
+          ? sanitizeRedirectUrl(callbackUrl)
+          : redirectAfterLogin(role)
+
+        // Check if profile is complete (for OAuth users)
+        if (!isProfileComplete(freshProfile, preferences)) {
+          // Redirect to complete profile page with callback URL
+          const completeProfileUrl = `/completar-perfil?callbackUrl=${encodeURIComponent(destination)}`
+          return NextResponse.redirect(`${origin}${completeProfileUrl}`)
+        }
 
         return NextResponse.redirect(`${origin}${destination}`)
       }

@@ -129,6 +129,28 @@ export const deleteAccountSchema = z.object({
 
 export type DeleteAccountData = z.infer<typeof deleteAccountSchema>
 
+/**
+ * Complete profile form validation schema (for OAuth onboarding)
+ */
+export const completeProfileSchema = z.object({
+  full_name: z
+    .string()
+    .trim()
+    .min(3, 'Nome deve ter no mínimo 3 caracteres')
+    .max(120, 'Nome muito longo'),
+  phone: z
+    .string()
+    .regex(
+      /^\(\d{2}\) \d{4,5}-\d{4}$/,
+      'Telefone inválido. Use o formato (XX) XXXXX-XXXX'
+    ),
+  favorite_sports: z
+    .array(z.string())
+    .min(1, 'Selecione pelo menos 1 esporte de interesse'),
+})
+
+export type CompleteProfileData = z.infer<typeof completeProfileSchema>
+
 export const organizerProfileSchema = z.object({
   company_name: z
     .string()

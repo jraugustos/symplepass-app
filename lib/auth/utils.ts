@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import type { UserRole } from '@/types'
+import type { UserRole, Profile, UserPreferences } from '@/types'
 
 /**
  * Maps Supabase Auth errors to user-friendly Portuguese messages
@@ -132,4 +132,25 @@ export function sanitizeRedirectUrl(url: string): string {
     // If URL parsing fails, redirect to conta (safe fallback)
     return '/conta'
   }
+}
+
+/**
+ * Checks if user profile is complete (has required fields for onboarding)
+ * Used to determine if OAuth users need to complete their profile
+ */
+export function isProfileComplete(
+  profile: Profile | null,
+  preferences: UserPreferences | null
+): boolean {
+  if (!profile) return false
+
+  // Check required profile fields
+  const hasBasicInfo = !!(profile.full_name && profile.phone)
+
+  // Check if user has at least 1 favorite sport
+  const hasSportsInterests = !!(
+    preferences?.favorite_sports && preferences.favorite_sports.length > 0
+  )
+
+  return hasBasicInfo && hasSportsInterests
 }

@@ -273,6 +273,12 @@ export interface UpdatePasswordFormData {
   confirmNewPassword: string
 }
 
+export interface CompleteProfileFormData {
+  full_name: string
+  phone: string
+  favorite_sports: string[]
+}
+
 export interface EventFormData {
   title: string
   description: string

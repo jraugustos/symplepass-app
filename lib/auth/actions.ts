@@ -5,6 +5,7 @@ import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js
 import { revalidatePath } from 'next/cache'
 import { headers } from 'next/headers'
 import {
+  completeProfileSchema,
   deleteAccountSchema,
   loginSchema,
   passwordChangeSchema,
@@ -548,5 +549,89 @@ export async function getCurrentUser() {
   } catch (error) {
     console.error('Get current user error:', error)
     return null
+  }
+}
+
+/**
+ * Complete user profile after OAuth signup
+ * Updates profile with phone and user_preferences with favorite sports
+ */
+export async function completeProfile(
+  userId: string,
+  data: {
+    full_name: string
+    phone: string
+    favorite_sports: string[]
+  }
+): Promise<ActionResponse> {
+  try {
+    // Validate inputs
+    const validation = completeProfileSchema.safeParse(data)
+    if (!validation.success) {
+      const firstError = validation.error.errors[0]
+      return { error: firstError.message }
+    }
+
+    const { supabase, user, error } = await getAuthenticatedUser()
+    if (error || !user || user.id !== userId) {
+      return { error: 'Não autorizado' }
+    }
+
+    // Update profile with full_name and phone
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({
+        full_name: validation.data.full_name,
+        phone: validation.data.phone,
+      })
+      .eq('id', userId)
+
+    if (profileError) {
+      console.error('Error updating profile:', profileError)
+      return { error: 'Erro ao atualizar perfil. Tente novamente.' }
+    }
+
+    // Check if user_preferences exists
+    const { data: existingPrefs } = await supabase
+      .from('user_preferences')
+      .select('id')
+      .eq('user_id', userId)
+      .single()
+
+    if (existingPrefs) {
+      // Update existing preferences
+      const { error: prefsError } = await supabase
+        .from('user_preferences')
+        .update({
+          favorite_sports: validation.data.favorite_sports,
+        })
+        .eq('user_id', userId)
+
+      if (prefsError) {
+        console.error('Error updating preferences:', prefsError)
+        return { error: 'Erro ao salvar preferências. Tente novamente.' }
+      }
+    } else {
+      // Insert new preferences
+      const { error: prefsError } = await supabase
+        .from('user_preferences')
+        .insert({
+          user_id: userId,
+          favorite_sports: validation.data.favorite_sports,
+        })
+
+      if (prefsError) {
+        console.error('Error creating preferences:', prefsError)
+        return { error: 'Erro ao salvar preferências. Tente novamente.' }
+      }
+    }
+
+    revalidatePath('/conta')
+    revalidatePath('/completar-perfil')
+
+    return { data: { success: true } }
+  } catch (error) {
+    console.error('Complete profile error:', error)
+    return { error: 'Erro ao completar perfil. Tente novamente.' }
   }
 }

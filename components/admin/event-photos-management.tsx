@@ -1,7 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { Trash2, Loader2, CheckSquare, Square, XSquare } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { PhotosUpload } from './photos-upload'
+import { PhotosBulkUpload } from './photos-bulk-upload'
+import { PhotoJobsStatus } from './photo-jobs-status'
 import { PhotoPackagesForm } from './photo-packages-form'
 import { PhotoPricingTiersForm } from './photo-pricing-tiers-form'
 import { PhotoOrdersPageClient } from './photo-orders-page-client'
@@ -64,12 +68,96 @@ export function EventPhotosManagement({
   onDeleteOrder,
 }: EventPhotosManagementProps) {
   const [activeTab, setActiveTab] = useState<TabId>('photos')
+  const [uploadMode, setUploadMode] = useState<'bulk' | 'individual'>('bulk')
+  const [jobsRefreshTrigger, setJobsRefreshTrigger] = useState(0)
+  const [selectedPhotos, setSelectedPhotos] = useState<Set<string>>(new Set())
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [localPhotos, setLocalPhotos] = useState<EventPhoto[]>(photos)
+
+  // Sync local photos with props
+  useEffect(() => {
+    setLocalPhotos(photos)
+    // Clear selection when photos change (after delete, etc.)
+    setSelectedPhotos(new Set())
+  }, [photos])
 
   const tabs = [
     { id: 'photos' as TabId, label: 'Fotos do Evento', count: photos.length },
     { id: 'pricing' as TabId, label: 'Faixas de Preço', count: pricingTiers.length },
     { id: 'orders' as TabId, label: 'Pedidos', count: totalOrders },
   ]
+
+  const handleJobCreated = () => {
+    // Refresh the jobs list when a new job is created
+    setJobsRefreshTrigger((prev) => prev + 1)
+  }
+
+  // Selection handlers
+  const togglePhotoSelection = (photoId: string) => {
+    setSelectedPhotos((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(photoId)) {
+        newSet.delete(photoId)
+      } else {
+        newSet.add(photoId)
+      }
+      return newSet
+    })
+  }
+
+  const selectAllPhotos = () => {
+    setSelectedPhotos(new Set(localPhotos.map((p) => p.id)))
+  }
+
+  const deselectAllPhotos = () => {
+    setSelectedPhotos(new Set())
+  }
+
+  const handleDeleteSelected = async () => {
+    if (selectedPhotos.size === 0) return
+
+    const count = selectedPhotos.size
+    if (!confirm(`Tem certeza que deseja excluir ${count} foto${count > 1 ? 's' : ''}? Esta ação não pode ser desfeita.`)) {
+      return
+    }
+
+    setIsDeleting(true)
+    try {
+      // Delete photos one by one
+      const photoIds = Array.from(selectedPhotos)
+      for (const photoId of photoIds) {
+        await onPhotoDelete(photoId)
+      }
+      // Clear selection after successful delete
+      setSelectedPhotos(new Set())
+    } catch (err) {
+      console.error('Error deleting photos:', err)
+      alert('Erro ao excluir algumas fotos. Tente novamente.')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const handleDeleteAllPhotos = async () => {
+    if (localPhotos.length === 0) return
+
+    if (!confirm(`Tem certeza que deseja excluir TODAS as ${localPhotos.length} fotos? Esta ação não pode ser desfeita.`)) {
+      return
+    }
+
+    setIsDeleting(true)
+    try {
+      for (const photo of localPhotos) {
+        await onPhotoDelete(photo.id)
+      }
+      setSelectedPhotos(new Set())
+    } catch (err) {
+      console.error('Error deleting all photos:', err)
+      alert('Erro ao excluir algumas fotos. Tente novamente.')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -102,13 +190,164 @@ export function EventPhotosManagement({
       {/* Tab Content */}
       <div className="mt-6">
         {activeTab === 'photos' && (
-          <PhotosUpload
-            eventId={eventId}
-            photos={photos}
-            onPhotoCreate={onPhotoCreate}
-            onPhotoDelete={onPhotoDelete}
-            onPhotosReorder={onPhotosReorder}
-          />
+          <div className="space-y-6">
+            {/* Upload Mode Toggle */}
+            <div className="flex items-center gap-2 p-1 bg-neutral-100 rounded-lg w-fit">
+              <button
+                onClick={() => setUploadMode('bulk')}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                  uploadMode === 'bulk'
+                    ? 'bg-white text-neutral-900 shadow-sm'
+                    : 'text-neutral-600 hover:text-neutral-900'
+                }`}
+              >
+                Upload em Massa (ZIP)
+              </button>
+              <button
+                onClick={() => setUploadMode('individual')}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                  uploadMode === 'individual'
+                    ? 'bg-white text-neutral-900 shadow-sm'
+                    : 'text-neutral-600 hover:text-neutral-900'
+                }`}
+              >
+                Upload Individual
+              </button>
+            </div>
+
+            {/* Bulk Upload Mode */}
+            {uploadMode === 'bulk' && (
+              <div className="space-y-6">
+                <PhotosBulkUpload
+                  eventId={eventId}
+                  onJobCreated={handleJobCreated}
+                />
+                <PhotoJobsStatus
+                  eventId={eventId}
+                  refreshTrigger={jobsRefreshTrigger}
+                />
+              </div>
+            )}
+
+            {/* Individual Upload Mode */}
+            {uploadMode === 'individual' && (
+              <PhotosUpload
+                eventId={eventId}
+                photos={photos}
+                onPhotoCreate={onPhotoCreate}
+                onPhotoDelete={onPhotoDelete}
+                onPhotosReorder={onPhotosReorder}
+              />
+            )}
+
+            {/* Photo Gallery - Always visible when in photos tab */}
+            {localPhotos.length > 0 && uploadMode === 'bulk' && (
+              <div className="border-t border-neutral-200 pt-6">
+                {/* Header with selection controls */}
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                  <h4 className="font-medium">Fotos do Evento ({localPhotos.length})</h4>
+                  <div className="flex items-center gap-2">
+                    {/* Selection buttons */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={selectedPhotos.size === localPhotos.length ? deselectAllPhotos : selectAllPhotos}
+                      disabled={isDeleting}
+                    >
+                      {selectedPhotos.size === localPhotos.length ? (
+                        <>
+                          <XSquare className="h-4 w-4 mr-1" />
+                          Desmarcar
+                        </>
+                      ) : (
+                        <>
+                          <CheckSquare className="h-4 w-4 mr-1" />
+                          Selecionar Todas
+                        </>
+                      )}
+                    </Button>
+                    {/* Delete selected button */}
+                    {selectedPhotos.size > 0 && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleDeleteSelected}
+                        disabled={isDeleting}
+                      >
+                        {isDeleting ? (
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4 mr-1" />
+                        )}
+                        Excluir {selectedPhotos.size}
+                      </Button>
+                    )}
+                    {/* Delete all button */}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleDeleteAllPhotos}
+                      disabled={isDeleting || localPhotos.length === 0}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Excluir Todas
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Selection info */}
+                {selectedPhotos.size > 0 && (
+                  <div className="mb-4 p-2 bg-primary-50 border border-primary-200 rounded-lg text-sm text-primary-700">
+                    {selectedPhotos.size} foto{selectedPhotos.size > 1 ? 's' : ''} selecionada{selectedPhotos.size > 1 ? 's' : ''}
+                  </div>
+                )}
+
+                {/* Photo grid with selection */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                  {localPhotos.map((photo, index) => {
+                    const isSelected = selectedPhotos.has(photo.id)
+                    return (
+                      <div
+                        key={photo.id}
+                        onClick={() => togglePhotoSelection(photo.id)}
+                        className={`relative rounded-lg overflow-hidden border-2 cursor-pointer transition-all ${
+                          isSelected
+                            ? 'border-primary-500 ring-2 ring-primary-200'
+                            : 'border-neutral-200 hover:border-neutral-300'
+                        }`}
+                      >
+                        <div className="aspect-square bg-neutral-100">
+                          <img
+                            src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/event-photos-watermarked/${photo.thumbnail_path}`}
+                            alt={photo.file_name}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                        </div>
+                        {/* Selection checkbox */}
+                        <div className={`absolute top-2 right-2 p-0.5 rounded ${isSelected ? 'bg-primary-500' : 'bg-black/40'}`}>
+                          {isSelected ? (
+                            <CheckSquare className="h-4 w-4 text-white" />
+                          ) : (
+                            <Square className="h-4 w-4 text-white" />
+                          )}
+                        </div>
+                        {/* Order badge */}
+                        <div className="absolute top-2 left-2 bg-black/60 text-white text-xs px-2 py-0.5 rounded">
+                          {index + 1}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <p className="text-xs text-neutral-500 mt-4">
+                  Clique nas fotos para selecioná-las. Use os botões acima para ações em massa.
+                </p>
+              </div>
+            )}
+          </div>
         )}
 
         {activeTab === 'pricing' && (

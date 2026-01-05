@@ -20,6 +20,14 @@ export interface UpdateRegistrationData {
     shirtSize?: string
     shirtGender?: ShirtGender
   } | null
+  team_members_data?: Array<{
+    name: string
+    email?: string
+    cpf?: string
+    phone?: string
+    shirtSize?: string
+    shirtGender?: ShirtGender
+  }> | null
 }
 
 /**
@@ -399,6 +407,32 @@ export async function updateRegistration(
             shirtSize: data.partner_data.shirtSize || '',
             shirtGender: data.partner_data.shirtGender || null,
           },
+        }
+      }
+    }
+
+    // Handle team members data change
+    if (data.team_members_data !== undefined) {
+      const currentRegistrationData = (updateData.registration_data as Record<string, unknown>) || currentRegistration.registration_data || {}
+
+      if (data.team_members_data === null || data.team_members_data.length === 0) {
+        // Remove team members data
+        updateData.registration_data = {
+          ...currentRegistrationData,
+          team_members: null,
+        }
+      } else {
+        // Update team members data
+        updateData.registration_data = {
+          ...currentRegistrationData,
+          team_members: data.team_members_data.map((member) => ({
+            name: member.name,
+            email: member.email || '',
+            cpf: member.cpf || '',
+            phone: member.phone || '',
+            shirtSize: member.shirtSize || '',
+            shirtGender: member.shirtGender || null,
+          })),
         }
       }
     }

@@ -2,17 +2,19 @@
 
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { ShieldCheck, ArrowRight, Users } from 'lucide-react'
+import { ShieldCheck, ArrowRight, Users, Crown } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { NavigationHeader } from '@/components/molecules/navigation-header'
 import { EventSummaryCard, PriceBreakdown as PriceBreakdownCard } from '@/components/inscricao'
-import type { CheckoutSessionResponse, PriceBreakdown as PriceBreakdownData, ReviewPageData, ShirtGender, ShirtSizesByGender } from '@/types'
-import { formatCurrency, validateEmail, formatCPF, formatPhone, validateCPF, cn } from '@/lib/utils'
+import type { CheckoutSessionResponse, PriceBreakdown as PriceBreakdownData, ReviewPageData, ShirtGender, ShirtSizesByGender, ParticipantData, ShirtSize } from '@/types'
+import { formatCurrency, validateEmail, formatCPF, formatPhone, validateCPF, cn, calculateServiceFee, calculateTotal } from '@/lib/utils'
 import { DEFAULT_SHIRT_SIZES_BY_GENDER, GENDER_LABELS } from '@/lib/constants/shirt-sizes'
+import { CLUB_DISCOUNT_PERCENTAGE } from '@/lib/constants/club'
 
 interface ReviewClientProps extends ReviewPageData {
   priceBreakdown: PriceBreakdownData
+  isClubMember?: boolean
 }
 
 export function ReviewClient({
@@ -23,9 +25,11 @@ export function ReviewClient({
   partnerName,
   partnerShirtGender: initialPartnerShirtGender,
   partnerShirtSize: initialPartnerShirtSize,
+  teamMembers: initialTeamMembers,
   user,
   isAuthenticated,
   priceBreakdown,
+  isClubMember = false,
 }: ReviewClientProps) {
   const [name, setName] = useState(user?.full_name ?? '')
   const [email, setEmail] = useState(user?.email ?? '')
@@ -45,6 +49,8 @@ export function ReviewClient({
   const [termsAccepted, setTermsAccepted] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [couponCode, setCouponCode] = useState<string | null>(null)
+  const [couponDiscount, setCouponDiscount] = useState(0)
 
   // Partner data states
   const [partnerEmail, setPartnerEmail] = useState('')
@@ -55,6 +61,67 @@ export function ReviewClient({
     return 'masculino'
   })
   const [partnerShirtSize, setPartnerShirtSize] = useState(initialPartnerShirtSize ?? '')
+
+  // Team members state
+  const [teamMembersData, setTeamMembersData] = useState<Array<{
+    name: string
+    email: string
+    cpf: string
+    phone: string
+    shirtSize: ShirtSize
+    shirtGender: ShirtGender
+  }>>(() => {
+    if (!initialTeamMembers || initialTeamMembers.length === 0) return []
+    return initialTeamMembers.map((member) => ({
+      name: member.name || '',
+      email: member.email || '',
+      cpf: member.cpf || '',
+      phone: member.phone || '',
+      shirtSize: (member.shirtSize || '') as ShirtSize,
+      shirtGender: (member.shirtGender || 'masculino') as ShirtGender,
+    }))
+  })
+
+  const isTeamRegistration = teamMembersData.length > 0
+
+  // Calculate club member discount
+  const categoryPrice = category.price || 0
+  const clubDiscount = useMemo(() => {
+    if (!isClubMember || categoryPrice <= 0) return 0
+    return (categoryPrice * CLUB_DISCOUNT_PERCENTAGE) / 100
+  }, [isClubMember, categoryPrice])
+
+  // Calculate applied discount (non-cumulative: apply the greater of club or coupon)
+  const appliedDiscount = useMemo(() => {
+    if (clubDiscount > 0 && couponDiscount > 0) {
+      // Non-cumulative: use the greater discount
+      return clubDiscount >= couponDiscount
+        ? { type: 'club' as const, amount: clubDiscount }
+        : { type: 'coupon' as const, amount: couponDiscount }
+    } else if (clubDiscount > 0) {
+      return { type: 'club' as const, amount: clubDiscount }
+    } else if (couponDiscount > 0) {
+      return { type: 'coupon' as const, amount: couponDiscount }
+    }
+    return { type: null, amount: 0 }
+  }, [clubDiscount, couponDiscount])
+
+  // Calculate prices with the applied discount
+  const adjustedPriceBreakdown = useMemo(() => {
+    if (appliedDiscount.amount <= 0) return priceBreakdown
+
+    const subtotal = categoryPrice - appliedDiscount.amount
+    const serviceFee = calculateServiceFee(subtotal)
+    const total = calculateTotal(subtotal, serviceFee)
+
+    return {
+      subtotal,
+      clubDiscount: appliedDiscount.type === 'club' ? appliedDiscount.amount : undefined,
+      couponDiscount: appliedDiscount.type === 'coupon' ? appliedDiscount.amount : undefined,
+      serviceFee,
+      total,
+    }
+  }, [priceBreakdown, appliedDiscount, categoryPrice])
 
   // Parse shirt sizes config from event
   const shirtSizesConfig: ShirtSizesByGender | null = event.shirt_sizes_config || null
@@ -117,7 +184,21 @@ export function ReviewClient({
     isPartnerShirtSizeValid
   )
 
-  const isFormValid = isUserDataValid && termsAccepted && isPartnerDataValid
+  // Team member validation
+  const isTeamDataValid = useMemo(() => {
+    if (!isTeamRegistration) return true
+    return teamMembersData.every((member) => {
+      const isNameValid = member.name.trim().length >= 3
+      const isEmailValid = validateEmail(member.email)
+      const isCpfValid = validateCPF(member.cpf)
+      const phoneDigits = member.phone.replace(/\D/g, '')
+      const isPhoneValid = phoneDigits.length === 10 || phoneDigits.length === 11
+      const isSizeValid = member.shirtSize.length > 0
+      return isNameValid && isEmailValid && isCpfValid && isPhoneValid && isSizeValid
+    })
+  }, [isTeamRegistration, teamMembersData])
+
+  const isFormValid = isUserDataValid && termsAccepted && isPartnerDataValid && isTeamDataValid
 
   // Get current search params for login redirect
   const searchParams = useSearchParams()
@@ -164,6 +245,17 @@ export function ReviewClient({
         shirtSize: userShirtSize,
         shirtGender: userShirtGender,
       }
+      // Prepare team members data if team registration
+      const teamMembersPayload: ParticipantData[] | null = isTeamRegistration
+        ? teamMembersData.map((member) => ({
+            name: member.name.trim(),
+            email: member.email.trim(),
+            cpf: member.cpf,
+            phone: member.phone,
+            shirtSize: member.shirtSize,
+            shirtGender: member.shirtGender,
+          }))
+        : null
 
       if (isFreeEvent) {
         // Free or solidarity event - direct registration
@@ -182,6 +274,7 @@ export function ReviewClient({
             userData,
             partnerName: partnerName || null,
             partnerData,
+            teamMembers: teamMembersPayload,
           }),
         })
 
@@ -226,9 +319,13 @@ export function ReviewClient({
             userData,
             partnerName: partnerName || null,
             partnerData,
-            subtotal: priceBreakdown.subtotal,
-            serviceFee: priceBreakdown.serviceFee,
-            total: priceBreakdown.total,
+            teamMembers: teamMembersPayload,
+            subtotal: adjustedPriceBreakdown.subtotal,
+            clubDiscount: appliedDiscount.type === 'club' ? appliedDiscount.amount : undefined,
+            couponCode: appliedDiscount.type === 'coupon' ? couponCode : null,
+            couponDiscount: appliedDiscount.type === 'coupon' ? appliedDiscount.amount : undefined,
+            serviceFee: adjustedPriceBreakdown.serviceFee,
+            total: adjustedPriceBreakdown.total,
           }),
         })
 
@@ -567,6 +664,188 @@ export function ReviewClient({
               </section>
             )}
 
+            {/* Team members data section */}
+            {isTeamRegistration && (
+              <section>
+                <h2 className="text-xl sm:text-2xl tracking-tight font-geist font-semibold text-neutral-900 mb-4 flex items-center gap-2">
+                  <Users className="h-6 w-6 text-purple-600" />
+                  Dados da Equipe ({teamMembersData.length + 1} pessoas)
+                </h2>
+                <div className="space-y-4">
+                  {teamMembersData.map((member, index) => {
+                    const memberAvailableSizes = shirtSizesConfig?.[member.shirtGender]?.length
+                      ? shirtSizesConfig[member.shirtGender]
+                      : DEFAULT_SHIRT_SIZES_BY_GENDER[member.shirtGender]
+
+                    const isMemberNameValid = member.name.trim().length >= 3
+                    const isMemberEmailValid = validateEmail(member.email)
+                    const isMemberCpfValid = validateCPF(member.cpf)
+                    const memberPhoneDigits = member.phone.replace(/\D/g, '')
+                    const isMemberPhoneValid = memberPhoneDigits.length === 10 || memberPhoneDigits.length === 11
+
+                    return (
+                      <div key={index} className="rounded-2xl border border-purple-200 bg-purple-50/50 p-4 sm:p-5 space-y-4">
+                        <h3 className="text-lg font-semibold text-purple-900 font-geist">
+                          Membro {index + 2}
+                        </h3>
+
+                        <div className="space-y-2">
+                          <label className="text-sm font-semibold text-neutral-700 font-geist">Nome completo</label>
+                          <input
+                            type="text"
+                            placeholder="Nome completo"
+                            value={member.name}
+                            onChange={(e) => {
+                              const updated = [...teamMembersData]
+                              updated[index].name = e.target.value
+                              setTeamMembersData(updated)
+                            }}
+                            className={cn(
+                              "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                              !!member.name && !isMemberNameValid ? "border-rose-500 focus-visible:ring-rose-500" : ""
+                            )}
+                          />
+                          {!isMemberNameValid && member.name && (
+                            <p className="text-sm text-rose-500">Informe o nome completo.</p>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-sm font-semibold text-neutral-700 font-geist">E-mail</label>
+                          <input
+                            type="email"
+                            placeholder="email@exemplo.com"
+                            value={member.email}
+                            onChange={(e) => {
+                              const updated = [...teamMembersData]
+                              updated[index].email = e.target.value
+                              setTeamMembersData(updated)
+                            }}
+                            className={cn(
+                              "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                              !!member.email && !isMemberEmailValid ? "border-rose-500 focus-visible:ring-rose-500" : ""
+                            )}
+                          />
+                          {!isMemberEmailValid && member.email && (
+                            <p className="text-sm text-rose-500">Informe um e-mail válido.</p>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-sm font-semibold text-neutral-700 font-geist">CPF</label>
+                          <input
+                            type="text"
+                            placeholder="000.000.000-00"
+                            value={member.cpf}
+                            onChange={(e) => {
+                              const updated = [...teamMembersData]
+                              updated[index].cpf = formatCPF(e.target.value)
+                              setTeamMembersData(updated)
+                            }}
+                            className={cn(
+                              "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                              !!member.cpf && !isMemberCpfValid ? "border-rose-500 focus-visible:ring-rose-500" : ""
+                            )}
+                          />
+                          {!isMemberCpfValid && member.cpf && (
+                            <p className="text-sm text-rose-500">CPF inválido.</p>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-sm font-semibold text-neutral-700 font-geist">Telefone</label>
+                          <input
+                            type="tel"
+                            placeholder="(00) 00000-0000"
+                            value={member.phone}
+                            onChange={(e) => {
+                              const updated = [...teamMembersData]
+                              updated[index].phone = formatPhone(e.target.value)
+                              setTeamMembersData(updated)
+                            }}
+                            className={cn(
+                              "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                              !!member.phone && !isMemberPhoneValid ? "border-rose-500 focus-visible:ring-rose-500" : ""
+                            )}
+                          />
+                          {!isMemberPhoneValid && member.phone && (
+                            <p className="text-sm text-rose-500">Telefone inválido.</p>
+                          )}
+                        </div>
+
+                        <div className="space-y-3">
+                          <label className="text-sm font-semibold text-neutral-700 font-geist">
+                            Tamanho da camiseta
+                          </label>
+
+                          <div>
+                            <p className="text-xs text-neutral-500 font-geist mb-2">Gênero</p>
+                            <div className="grid grid-cols-3 gap-2">
+                              {(Object.keys(GENDER_LABELS) as ShirtGender[])
+                                .filter(gender => {
+                                  if (!shirtSizesConfig) return true
+                                  return shirtSizesConfig[gender] && shirtSizesConfig[gender].length > 0
+                                })
+                                .map((gender) => (
+                                  <button
+                                    key={gender}
+                                    type="button"
+                                    onClick={() => {
+                                      const updated = [...teamMembersData]
+                                      updated[index].shirtGender = gender
+                                      const newSizes = shirtSizesConfig
+                                        ? shirtSizesConfig[gender]
+                                        : DEFAULT_SHIRT_SIZES_BY_GENDER[gender]
+                                      if (newSizes && newSizes.length > 0) {
+                                        updated[index].shirtSize = newSizes[0] as ShirtSize
+                                      }
+                                      setTeamMembersData(updated)
+                                    }}
+                                    className={cn(
+                                      'h-10 rounded-xl border-2 font-semibold text-xs transition-all',
+                                      member.shirtGender === gender
+                                        ? 'border-purple-500 bg-purple-50 text-purple-700'
+                                        : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
+                                    )}
+                                  >
+                                    {GENDER_LABELS[gender]}
+                                  </button>
+                                ))}
+                            </div>
+                          </div>
+
+                          <div>
+                            <p className="text-xs text-neutral-500 font-geist mb-2">Tamanho</p>
+                            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                              {memberAvailableSizes?.map((size) => (
+                                <button
+                                  key={size}
+                                  type="button"
+                                  onClick={() => {
+                                    const updated = [...teamMembersData]
+                                    updated[index].shirtSize = size as ShirtSize
+                                    setTeamMembersData(updated)
+                                  }}
+                                  className={cn(
+                                    'h-12 rounded-xl border-2 font-semibold text-sm transition-all',
+                                    member.shirtSize === size
+                                      ? 'border-purple-500 bg-purple-50 text-purple-700'
+                                      : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
+                                  )}
+                                >
+                                  {size}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+            )}
+
             {/* Solidarity message */}
             {event.event_type === 'solidarity' && event.solidarity_message && (
               <section>
@@ -606,8 +885,40 @@ export function ReviewClient({
                     )}
                   </div>
                 )}
+                {isTeamRegistration && (
+                  <div className="mt-4 pt-4 border-t border-neutral-200">
+                    <p className="text-sm text-neutral-500 font-geist">Equipe ({teamMembersData.length + 1} pessoas)</p>
+                    <ul className="mt-2 space-y-1">
+                      {teamMembersData.map((member, index) => (
+                        <li key={index} className="text-sm text-neutral-700 font-geist">
+                          {member.name || `Membro ${index + 2}`} {member.shirtSize && `- Camiseta ${member.shirtSize}`}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             </section>
+
+            {/* Club member discount banner - only show when club discount is the applied discount */}
+            {isClubMember && appliedDiscount.type === 'club' && !isFreeEvent && (
+              <section>
+                <div className="rounded-2xl border border-orange-200 bg-gradient-to-r from-orange-50 to-orange-100 p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center flex-shrink-0">
+                      <Crown className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-orange-900">Desconto de Membro do Clube</p>
+                      <p className="text-xs text-orange-700">10% de desconto aplicado automaticamente</p>
+                    </div>
+                    <span className="text-lg font-bold text-orange-600">
+                      -{formatCurrency(appliedDiscount.amount)}
+                    </span>
+                  </div>
+                </div>
+              </section>
+            )}
 
             {/* Resumo de valores section */}
             {!isFreeEvent && (
@@ -616,9 +927,11 @@ export function ReviewClient({
                   Resumo de valores
                 </h2>
                 <PriceBreakdownCard
-                  subtotal={priceBreakdown.subtotal}
-                  serviceFee={priceBreakdown.serviceFee}
-                  total={priceBreakdown.total}
+                  subtotal={categoryPrice}
+                  clubDiscount={appliedDiscount.type === 'club' ? appliedDiscount.amount : undefined}
+                  couponDiscount={appliedDiscount.type === 'coupon' ? appliedDiscount.amount : undefined}
+                  serviceFee={adjustedPriceBreakdown.serviceFee}
+                  total={adjustedPriceBreakdown.total}
                 />
               </section>
             )}

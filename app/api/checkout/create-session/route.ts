@@ -5,7 +5,9 @@ import { calculateServiceFee, calculateTotal, validateEmail, validateCPF } from 
 import { getEnv } from '@/lib/env'
 import { createRegistration, updateRegistrationStripeSession } from '@/lib/data/registrations'
 import { validateRegistration } from '@/lib/validations/registration-guards'
-import type { CheckoutSessionRequest, ShirtSize, PartnerData, ShirtGender, ParticipantData } from '@/types'
+import { getClubMemberDiscount } from '@/lib/data/subscriptions'
+import { validateCoupon, applyCoupon } from '@/lib/data/admin-coupons'
+import type { CheckoutSessionRequest, ShirtSize, ShirtGender, ParticipantData } from '@/types'
 
 export const runtime = 'nodejs'
 
@@ -26,7 +28,10 @@ export async function POST(request: Request) {
       userData,
       partnerName,
       partnerData,
+      teamMembers,
       subtotal,
+      clubDiscount,
+      couponCode,
       serviceFee,
       total,
     } = body || {}
@@ -106,6 +111,37 @@ export async function POST(request: Request) {
       }
     }
 
+    // Validate team members data if present
+    if (teamMembers && teamMembers.length > 0) {
+      for (let i = 0; i < teamMembers.length; i++) {
+        const member = teamMembers[i]
+        if (!member.name || !member.email || !member.cpf || !member.phone || !member.shirtSize) {
+          return NextResponse.json({ error: `Dados do membro ${i + 2} incompletos.` }, { status: 400 })
+        }
+
+        if (!validateEmail(member.email)) {
+          return NextResponse.json({ error: `Email do membro ${i + 2} inválido.` }, { status: 400 })
+        }
+
+        if (!validateCPF(member.cpf)) {
+          return NextResponse.json({ error: `CPF do membro ${i + 2} inválido.` }, { status: 400 })
+        }
+
+        const phoneDigits = member.phone.replace(/\D/g, '')
+        if (phoneDigits.length !== 10 && phoneDigits.length !== 11) {
+          return NextResponse.json({ error: `Telefone do membro ${i + 2} inválido.` }, { status: 400 })
+        }
+
+        if (!ALLOWED_SHIRT_SIZES.includes(member.shirtSize as ShirtSize)) {
+          return NextResponse.json({ error: `Tamanho de camiseta do membro ${i + 2} inválido.` }, { status: 400 })
+        }
+
+        if (member.shirtGender && !isValidShirtGender(member.shirtGender)) {
+          return NextResponse.json({ error: `Gênero da camiseta do membro ${i + 2} inválido.` }, { status: 400 })
+        }
+      }
+    }
+
     const supabase = createClient()
     const {
       data: { user },
@@ -154,7 +190,54 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Preço da categoria inválido.' }, { status: 400 })
     }
 
-    const serverSubtotal = categoryPrice
+    // Identify user first for discount validation
+    const targetUserId =
+      user?.id ||
+      (await getOrCreateCheckoutUser({
+        supabase,
+        email: normalizedEmail,
+        fullName: normalizedName,
+      }))
+
+    if (!targetUserId) {
+      return NextResponse.json(
+        { error: 'Não foi possível identificar o usuário autenticado.' },
+        { status: 401 }
+      )
+    }
+
+    // Calculate server-side discounts
+    const clubDiscountData = await getClubMemberDiscount(targetUserId, categoryPrice, supabase)
+
+    // Validate coupon if provided
+    let couponDiscountData: { valid: boolean; discountAmount?: number; coupon?: any } = { valid: false }
+    if (couponCode) {
+      couponDiscountData = await validateCoupon(couponCode, event.id, targetUserId, categoryPrice)
+    }
+
+    // Apply the greater discount (non-cumulative)
+    let appliedDiscount = 0
+    let discountType: 'club' | 'coupon' | null = null
+
+    if (clubDiscountData.isEligible && couponDiscountData.valid) {
+      // Both available: apply the greater discount
+      if (clubDiscountData.discountAmount >= (couponDiscountData.discountAmount || 0)) {
+        appliedDiscount = clubDiscountData.discountAmount
+        discountType = 'club'
+      } else {
+        appliedDiscount = couponDiscountData.discountAmount || 0
+        discountType = 'coupon'
+      }
+    } else if (clubDiscountData.isEligible) {
+      appliedDiscount = clubDiscountData.discountAmount
+      discountType = 'club'
+    } else if (couponDiscountData.valid) {
+      appliedDiscount = couponDiscountData.discountAmount || 0
+      discountType = 'coupon'
+    }
+
+    // Recalculate values with discount
+    const serverSubtotal = categoryPrice - appliedDiscount
     const serverServiceFee = calculateServiceFee(serverSubtotal)
     const serverTotal = calculateTotal(serverSubtotal, serverServiceFee)
 
@@ -194,29 +277,31 @@ export async function POST(request: Request) {
       }
       : null
 
-    const targetUserId =
-      user?.id ||
-      (await getOrCreateCheckoutUser({
-        supabase,
-        email: normalizedEmail,
-        fullName: normalizedName,
+    // Normalize team members data
+    const normalizedTeamMembers = teamMembers && teamMembers.length > 0
+      ? teamMembers.map((member) => ({
+        name: member.name.trim(),
+        email: member.email.trim(),
+        cpf: member.cpf.trim(),
+        phone: member.phone.trim(),
+        shirtSize: member.shirtSize as ShirtSize,
+        shirtGender: isValidShirtGender(member.shirtGender) ? member.shirtGender : undefined,
       }))
+      : null
 
-    if (!targetUserId) {
-      return NextResponse.json(
-        { error: 'Não foi possível identificar o usuário autenticado.' },
-        { status: 401 }
-      )
-    }
-
-    // Validate registration constraints (capacity, window, pair registration)
+    // Validate registration constraints (capacity, window, pair/team registration)
     const isPairRegistration = !!normalizedPartnerData
+    const isTeamRegistration = !!normalizedTeamMembers && normalizedTeamMembers.length > 0
+    const teamSize = isTeamRegistration ? normalizedTeamMembers.length + 1 : undefined
+
     const validationResult = await validateRegistration(
       supabase,
       event.id,
       category.id,
       targetUserId,
-      isPairRegistration
+      isPairRegistration,
+      isTeamRegistration,
+      teamSize
     )
 
     if (!validationResult.valid) {
@@ -245,6 +330,7 @@ export async function POST(request: Request) {
       normalizedPartnerName,
       normalizedPartnerData,
       normalizedUserData,
+      normalizedTeamMembers,
       supabase
     )
 
@@ -310,6 +396,10 @@ export async function POST(request: Request) {
         userId: targetUserId,
         shirtSize,
         partnerData: normalizedPartnerData ? JSON.stringify(normalizedPartnerData) : '',
+        teamData: normalizedTeamMembers ? JSON.stringify(normalizedTeamMembers) : '',
+        discountType: discountType || '',
+        discountAmount: appliedDiscount.toString(),
+        couponId: discountType === 'coupon' && couponDiscountData.coupon ? couponDiscountData.coupon.id : '',
       },
       success_url: `${env.app.baseUrl}/confirmacao?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${env.app.baseUrl}/inscricao?${cancelUrlParams.toString()}`,
@@ -324,6 +414,16 @@ export async function POST(request: Request) {
     }
 
     await updateRegistrationStripeSession(registrationResult.data.id, session.id, supabase)
+
+    // Register coupon usage if coupon was applied
+    if (discountType === 'coupon' && couponDiscountData.coupon) {
+      await applyCoupon(
+        couponDiscountData.coupon.id,
+        targetUserId,
+        registrationResult.data.id,
+        appliedDiscount
+      )
+    }
 
     return NextResponse.json({
       sessionId: session.id,

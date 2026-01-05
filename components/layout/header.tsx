@@ -3,6 +3,7 @@ import { NavigationVariant, UserRole } from '@/types'
 import { redirect } from 'next/navigation'
 import { getCurrentUser, signOut } from '@/lib/auth/actions'
 import { redirectAfterLogin } from '@/lib/auth/utils'
+import { getActiveSubscription } from '@/lib/data/subscriptions'
 
 export interface HeaderProps {
   variant?: NavigationVariant
@@ -18,6 +19,13 @@ export async function Header({ variant = 'dark', sticky = true, className }: Hea
 
   const userName = user?.user_metadata?.full_name || profile?.full_name || user?.email?.split('@')[0]
   const userEmail = user?.email || profile?.email
+
+  // Check if user is a club member
+  let isClubMember = false
+  if (user) {
+    const { data: subscription } = await getActiveSubscription(user.id)
+    isClubMember = subscription?.status === 'active' || subscription?.status === 'trialing'
+  }
 
   // Server action for login
   async function handleLogin() {
@@ -47,6 +55,7 @@ export async function Header({ variant = 'dark', sticky = true, className }: Hea
       userName={userName}
       userEmail={userEmail}
       userRole={userRole}
+      isClubMember={isClubMember}
       onLogin={handleLogin}
       onLogout={handleLogout}
       onProfileClick={handleProfileClick}

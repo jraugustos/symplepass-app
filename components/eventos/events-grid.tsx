@@ -8,9 +8,10 @@ import { getSportLabel } from '@/lib/constants/sports'
 interface EventsGridProps {
   events: Event[]
   variant?: 'grid' | 'list'
+  isClubMember?: boolean
 }
 
-export function EventsGrid({ events, variant = 'grid' }: EventsGridProps) {
+export function EventsGrid({ events, variant = 'grid', isClubMember = false }: EventsGridProps) {
   const router = useRouter()
 
   if (events.length === 0) {
@@ -59,6 +60,7 @@ export function EventsGrid({ events, variant = 'grid' }: EventsGridProps) {
               description={event.description}
               badge={eventBadge}
               isComingSoon={isComingSoon}
+              showClubBadge={isClubMember}
               onRegister={() => router.push(`/eventos/${event.slug}`)}
             />
           </div>

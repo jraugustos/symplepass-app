@@ -1,16 +1,17 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowRight, Calendar, MapPin } from 'lucide-react'
+import { ArrowRight, Calendar, MapPin, Crown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { Event } from '@/types/database.types'
 import { getSportLabel } from '@/lib/constants/sports'
 
 interface UpcomingEventsProps {
   events: Event[]
+  isClubMember?: boolean
 }
 
-export function UpcomingEvents({ events }: UpcomingEventsProps) {
+export function UpcomingEvents({ events, isClubMember = false }: UpcomingEventsProps) {
   // Helper function to format date in short format
   const formatDateShort = (dateString: string) => {
     const date = new Date(dateString)
@@ -79,9 +80,17 @@ export function UpcomingEvents({ events }: UpcomingEventsProps) {
 
                   {/* Event Info Column */}
                   <div className="lg:col-span-7 space-y-2">
-                    <h3 className="text-lg font-semibold text-neutral-900 font-geist">
-                      {event.title}
-                    </h3>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-lg font-semibold text-neutral-900 font-geist">
+                        {event.title}
+                      </h3>
+                      {isClubMember && event.min_price !== undefined && event.min_price > 0 && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-orange-500 to-orange-600 px-2 py-0.5 text-xs font-medium text-white">
+                          <Crown className="w-3 h-3" />
+                          10% off
+                        </span>
+                      )}
+                    </div>
                     <div className="flex flex-wrap items-center gap-3 text-sm text-neutral-600">
                       <div className="flex items-center gap-1.5">
                         <MapPin className="w-4 h-4 text-neutral-400" />

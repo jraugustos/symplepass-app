@@ -71,6 +71,15 @@ const publishSchema = z
     solidarity_message: z.string().nullable().optional(),
     allows_individual_registration: z.boolean(),
     allows_pair_registration: z.boolean(),
+    allows_team_registration: z.boolean(),
+    team_size: z.preprocess(
+      (val) => {
+        if (val === "" || val === null || val === undefined) return null;
+        const num = Number(val);
+        return isNaN(num) ? null : num;
+      },
+      z.number().int().min(2).nullable().optional(),
+    ),
     shirt_sizes: z.array(z.string()).optional(),
     shirt_sizes_config: z.any().nullable().optional(),
     max_participants: z.preprocess(
@@ -102,6 +111,19 @@ const publishSchema = z
     {
       message: "Mensagem solidária é obrigatória para eventos solidários",
       path: ["solidarity_message"],
+    },
+  )
+  .refine(
+    (data) => {
+      // team_size is required and must be >= 2 when allows_team_registration is true
+      if (data.allows_team_registration) {
+        return data.team_size !== null && data.team_size !== undefined && data.team_size >= 2;
+      }
+      return true;
+    },
+    {
+      message: "Tamanho da equipe é obrigatório (mínimo 2 membros)",
+      path: ["team_size"],
     },
   );
 
@@ -144,6 +166,12 @@ const draftSchema = z.object({
   solidarity_message: z.string().nullable().optional(),
   allows_individual_registration: z.boolean().optional(),
   allows_pair_registration: z.boolean().optional(),
+  allows_team_registration: z.boolean().optional(),
+  team_size: z.preprocess(
+    (val) =>
+      val === "" || val === null || val === undefined ? null : Number(val),
+    z.number().int().min(2).nullable().optional(),
+  ),
   shirt_sizes: z.array(z.string()).optional(),
   shirt_sizes_config: z.any().nullable().optional(),
   max_participants: z.preprocess(
@@ -265,6 +293,8 @@ export function EventForm({
         solidarity_message: event.solidarity_message,
         allows_individual_registration: event.allows_individual_registration !== false,
         allows_pair_registration: event.allows_pair_registration || false,
+        allows_team_registration: event.allows_team_registration || false,
+        team_size: event.team_size ?? null,
         shirt_sizes: event.shirt_sizes || ["P", "M", "G", "GG", "XG"],
         shirt_sizes_config: event.shirt_sizes_config || null,
         max_participants: event.max_participants,
@@ -294,6 +324,8 @@ export function EventForm({
         solidarity_message: null,
         allows_individual_registration: true,
         allows_pair_registration: false,
+        allows_team_registration: false,
+        team_size: null,
         shirt_sizes: ["P", "M", "G", "GG", "XG"],
         shirt_sizes_config: null,
         max_participants: null,
@@ -744,7 +776,7 @@ export function EventForm({
             <label className="block text-sm font-medium text-neutral-700 mb-2">
               Tipo de inscrição permitida
             </label>
-            <div className="flex gap-6">
+            <div className="flex flex-wrap gap-6">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -763,11 +795,56 @@ export function EventForm({
                 />
                 <span className="text-sm text-neutral-700">Em dupla</span>
               </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  id="registration_team"
+                  {...register("allows_team_registration")}
+                  className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-neutral-300 rounded"
+                />
+                <span className="text-sm text-neutral-700">Em equipe</span>
+              </label>
             </div>
             <p className="text-xs text-neutral-500 mt-1">
               Selecione os tipos de inscrição permitidos para este evento
             </p>
           </div>
+
+          {/* Team Size - Only show when team registration is enabled */}
+          {watch("allows_team_registration") && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-blue-900 mb-1">
+                    Tamanho da equipe *
+                  </label>
+                  <Input
+                    type="number"
+                    {...register("team_size", {
+                      setValueAs: (v) => {
+                        if (!v || v === "") return null;
+                        const parsed = parseInt(v, 10);
+                        return isNaN(parsed) ? null : parsed;
+                      },
+                    })}
+                    placeholder="Número de membros"
+                    min="2"
+                    error={errors.team_size?.message}
+                  />
+                  {errors.team_size && (
+                    <p className="mt-1 text-sm text-red-600">
+                      {errors.team_size.message}
+                    </p>
+                  )}
+                  {!errors.team_size && (
+                    <p className="text-xs text-blue-700 mt-1">
+                      Quantas pessoas devem compor cada equipe (mínimo 2)
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Configurações de Exibição */}
           <div className="space-y-3 pt-4 border-t border-neutral-200">

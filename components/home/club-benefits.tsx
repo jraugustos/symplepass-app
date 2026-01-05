@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { Tag, Clock, Crown, Users, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -94,14 +95,15 @@ export function ClubBenefits() {
 
         {/* CTA Button */}
         <div className="text-center" data-animate style={{ animation: 'fadeSlideIn 1.0s ease-out 0.8s both' }}>
-          <Button
-            variant="primary"
-            size="lg"
-            disabled
-            className="bg-neutral-300 text-neutral-500 cursor-not-allowed shadow-lg"
-          >
-            Em breve
-          </Button>
+          <Link href="/clube-beneficios">
+            <Button
+              variant="primary"
+              size="lg"
+              className="shadow-lg"
+            >
+              Conhecer o Clube
+            </Button>
+          </Link>
         </div>
       </div>
     </section>

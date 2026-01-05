@@ -16,7 +16,8 @@
     "test:e2e": "echo 'E2E tests not configured. See TESTING.md for manual test scenarios.'",
     "db:migrate": "echo 'Run migrations in Supabase Dashboard SQL Editor. See DEPLOYMENT.md'",
     "db:seed": "echo 'Run seed.sql in Supabase Dashboard SQL Editor. See DEPLOYMENT.md'",
-    "postbuild": "echo 'Build complete. Run npm run start to test production build locally.'"
+    "postbuild": "echo 'Build complete. Run npm run start to test production build locally.'",
+    "stripe:setup-club": "npx tsx scripts/setup-stripe-club-product.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.0",

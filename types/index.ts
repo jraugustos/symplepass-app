@@ -19,7 +19,17 @@ import type {
   PaymentStatus,
   UserRole,
   ShirtSize,
+  Subscription,
+  SubscriptionWithUser,
+  SubscriptionStatus,
 } from './database.types'
+
+// Re-export subscription types explicitly for convenience
+export type {
+  Subscription,
+  SubscriptionWithUser,
+  SubscriptionStatus,
+}
 
 // ===== UI Component Types =====
 
@@ -96,6 +106,14 @@ export interface UserPanelData {
   preferences: UserPreferences
   sessions: UserSession[]
   stats: UserPanelStats
+  subscription: Subscription | null
+}
+
+export interface ClubMembershipData {
+  isActive: boolean
+  subscription: Subscription | null
+  currentPeriodEnd: string | null
+  cancelAtPeriodEnd: boolean
 }
 
 // ===== Shirt Size Types =====
@@ -141,6 +159,7 @@ export interface ReviewPageData {
   partnerShirtSize?: ShirtSize | null
   partnerShirtGender?: ShirtGender | null
   partnerData?: PartnerData
+  teamMembers?: ParticipantData[]
   user?: ReviewPageUser
   isAuthenticated: boolean
 }
@@ -155,7 +174,10 @@ export interface CheckoutSessionRequest {
   userData: ParticipantData
   partnerName?: string | null
   partnerData?: PartnerData | null
+  teamMembers?: ParticipantData[] | null
   subtotal: number
+  clubDiscount?: number
+  couponCode?: string | null
   serviceFee: number
   total: number
 }
@@ -168,6 +190,8 @@ export interface CheckoutSessionResponse {
 
 export interface PriceBreakdown {
   subtotal: number
+  clubDiscount?: number
+  couponDiscount?: number
   serviceFee: number
   total: number
 }
@@ -500,6 +524,8 @@ export interface EventFormDataAdmin {
   solidarity_message?: string | null
   allows_individual_registration: boolean
   allows_pair_registration: boolean
+  allows_team_registration: boolean
+  team_size?: number | null
   shirt_sizes: string[]
   shirt_sizes_config?: ShirtSizesByGender | null
   max_participants?: number | null

@@ -6,7 +6,7 @@ import { EVENT_PAGE_CONTENT_CLASS } from './layout-constants'
 import { getSportLabel } from '@/lib/constants/sports'
 
 interface EventAboutProps {
-  event: Pick<Event, 'description' | 'location' | 'start_date' | 'sport_type' | 'event_format' | 'banner_url' | 'event_type' | 'solidarity_message' | 'allows_individual_registration' | 'allows_pair_registration'>
+  event: Pick<Event, 'description' | 'location' | 'start_date' | 'sport_type' | 'event_format' | 'banner_url' | 'event_type' | 'solidarity_message' | 'allows_individual_registration' | 'allows_pair_registration' | 'allows_team_registration' | 'team_size'>
   minPrice: number | null
 }
 
@@ -116,6 +116,9 @@ export default function EventAbout({ event, minPrice }: EventAboutProps) {
                   )}
                   {event.allows_pair_registration && (
                     <Badge variant="info" size="sm">Dupla</Badge>
+                  )}
+                  {event.allows_team_registration && event.team_size && (
+                    <Badge variant="info" size="sm">Equipe ({event.team_size})</Badge>
                   )}
                 </div>
               </div>

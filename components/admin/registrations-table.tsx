@@ -206,7 +206,19 @@ export function RegistrationsTable({
                     </div>
                   </td>
                   <td className="px-4 py-4">
-                    {registration.registration_data?.partner ? (
+                    {registration.registration_data?.team_members && registration.registration_data.team_members.length > 0 ? (
+                      <div>
+                        <Badge variant="neutral" className="mb-1">Equipe ({registration.registration_data.team_members.length + 1})</Badge>
+                        <ul className="text-xs text-neutral-600 space-y-0.5">
+                          {registration.registration_data.team_members.slice(0, 2).map((member: any, idx: number) => (
+                            <li key={idx}>{member.name || `Membro ${idx + 2}`}</li>
+                          ))}
+                          {registration.registration_data.team_members.length > 2 && (
+                            <li className="text-neutral-400">+{registration.registration_data.team_members.length - 2} mais</li>
+                          )}
+                        </ul>
+                      </div>
+                    ) : registration.registration_data?.partner ? (
                       <div>
                         <p className="font-medium text-neutral-900">
                           {registration.registration_data.partner.name || registration.partner_name || 'N/A'}
@@ -339,7 +351,22 @@ export function RegistrationsTable({
                 <span className="font-medium">Categoria:</span>{' '}
                 {registration.event_categories?.name || 'N/A'}
               </p>
-              {(registration.registration_data?.partner || registration.partner_name) && (
+              {registration.registration_data?.team_members && registration.registration_data.team_members.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-neutral-100">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge variant="neutral">Equipe ({registration.registration_data.team_members.length + 1})</Badge>
+                  </div>
+                  <ul className="text-xs text-neutral-600 space-y-1">
+                    {registration.registration_data.team_members.map((member: any, idx: number) => (
+                      <li key={idx}>
+                        <span className="font-medium">{member.name || `Membro ${idx + 2}`}</span>
+                        {member.email && <span className="text-neutral-400"> - {member.email}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {!registration.registration_data?.team_members && (registration.registration_data?.partner || registration.partner_name) && (
                 <div className="mt-3 pt-3 border-t border-neutral-100">
                   <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-2">Participante 2</p>
                   <div>

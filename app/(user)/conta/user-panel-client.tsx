@@ -16,6 +16,7 @@ import type {
   PaymentHistoryItem,
   Profile,
   RegistrationWithDetails,
+  Subscription,
   TabId,
   UserPanelData,
   UserPreferences,
@@ -38,6 +39,7 @@ export function UserPanelClient({ initialData }: UserPanelClientProps) {
   const [paymentHistory] = useState<PaymentHistoryItem[]>(initialData.paymentHistory)
   const [photoOrders] = useState<PhotoOrderWithDetails[]>(initialData.photoOrders)
   const [stats] = useState(initialData.stats)
+  const [subscription, setSubscription] = useState<Subscription | null>(initialData.subscription)
   const [paymentPage, setPaymentPage] = useState(1)
   const [isPending, startTransition] = useTransition()
 
@@ -247,10 +249,12 @@ export function UserPanelClient({ initialData }: UserPanelClientProps) {
             <SettingsTab
               preferences={preferences}
               sessions={sessions}
+              subscription={subscription}
               onUpdate={handleSettingsUpdate}
               onDeleteSession={handleSessionDelete}
               onPasswordChange={handlePasswordChange}
               onDeleteAccount={handleAccountDeletion}
+              onSubscriptionUpdate={setSubscription}
             />
           )}
         </section>

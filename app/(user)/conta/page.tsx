@@ -5,6 +5,7 @@ import { getUserRegistrations } from '@/lib/data/registrations'
 import { getUserPhotoOrders } from '@/lib/data/photo-orders'
 import { getUserPreferences, getUserSessions } from '@/lib/data/user-preferences'
 import { getUserPaymentHistory } from '@/lib/data/payments'
+import { getActiveSubscription } from '@/lib/data/subscriptions'
 import type { Profile, UserPanelData, UserPanelStats } from '@/types'
 import { UserPanelClient } from './user-panel-client'
 
@@ -21,12 +22,13 @@ export default async function ContaPage() {
 
   const { user, profile } = userData
 
-  const [registrationsResult, photoOrdersResult, preferencesResult, paymentResult, sessionsResult] = await Promise.all([
+  const [registrationsResult, photoOrdersResult, preferencesResult, paymentResult, sessionsResult, subscriptionResult] = await Promise.all([
     getUserRegistrations(user.id),
     getUserPhotoOrders(user.id),
     getUserPreferences(user.id),
     getUserPaymentHistory(user.id, 40),
     getUserSessions(user.id),
+    getActiveSubscription(user.id),
   ])
 
   const registrations = registrationsResult.data ?? []
@@ -44,6 +46,7 @@ export default async function ContaPage() {
   }
   const paymentHistory = paymentResult.data ?? []
   const sessions = sessionsResult.data ?? []
+  const subscription = subscriptionResult.data ?? null
 
   const resolvedProfile: Profile =
     profile ??
@@ -84,6 +87,7 @@ export default async function ContaPage() {
     preferences,
     sessions,
     stats,
+    subscription,
   }
 
   return <UserPanelClient initialData={panelData} />

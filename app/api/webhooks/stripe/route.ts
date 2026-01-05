@@ -290,11 +290,120 @@ export async function POST(request: NextRequest) {
       }
 
       case 'customer.subscription.created':
-      case 'customer.subscription.updated':
-      case 'customer.subscription.deleted': {
-        const subscription = event.data.object
+      case 'customer.subscription.updated': {
+        const subscription = event.data.object as Stripe.Subscription
         console.log(`Subscription ${event.type}:`, subscription.id)
-        // TODO: Handle subscription events (future feature)
+
+        // Extract user_id from metadata
+        const userId = subscription.metadata?.userId
+        if (!userId) {
+          console.error('Missing userId in subscription metadata:', subscription.id)
+          break
+        }
+
+        const { upsertSubscription } = await import('@/lib/data/subscriptions')
+        type SubscriptionStatus = 'active' | 'canceled' | 'past_due' | 'unpaid' | 'incomplete' | 'trialing' | 'incomplete_expired' | 'paused'
+
+        await upsertSubscription(
+          userId,
+          subscription.id,
+          subscription.customer as string,
+          subscription.status as SubscriptionStatus,
+          new Date(subscription.current_period_start * 1000),
+          new Date(subscription.current_period_end * 1000),
+          subscription.cancel_at_period_end,
+          subscription.canceled_at ? new Date(subscription.canceled_at * 1000) : null,
+          subscription.metadata
+        )
+
+        break
+      }
+
+      case 'customer.subscription.deleted': {
+        const subscription = event.data.object as Stripe.Subscription
+        console.log('Subscription deleted:', subscription.id)
+
+        const { upsertSubscription } = await import('@/lib/data/subscriptions')
+
+        // Get existing subscription to retrieve user_id if not in metadata
+        const { getSubscriptionByStripeId } = await import('@/lib/data/subscriptions')
+        const { data: existingSub } = await getSubscriptionByStripeId(subscription.id)
+
+        const userId = subscription.metadata?.userId || existingSub?.user_id
+        if (!userId) {
+          console.error('Cannot determine userId for deleted subscription:', subscription.id)
+          break
+        }
+
+        await upsertSubscription(
+          userId,
+          subscription.id,
+          subscription.customer as string,
+          'canceled',
+          new Date(subscription.current_period_start * 1000),
+          new Date(subscription.current_period_end * 1000),
+          true,
+          new Date(),
+          subscription.metadata
+        )
+
+        break
+      }
+
+      case 'invoice.payment_succeeded': {
+        const invoice = event.data.object as Stripe.Invoice
+        console.log('Invoice payment succeeded:', invoice.id)
+
+        // Update subscription status if this is a subscription invoice
+        if (invoice.subscription) {
+          const { getSubscriptionByStripeId, upsertSubscription } = await import('@/lib/data/subscriptions')
+          const { data: existingSub } = await getSubscriptionByStripeId(invoice.subscription as string)
+
+          if (existingSub && existingSub.status !== 'active') {
+            // Reactivate subscription after successful payment
+            const stripeSubscription = await stripe.subscriptions.retrieve(invoice.subscription as string)
+            await upsertSubscription(
+              existingSub.user_id,
+              stripeSubscription.id,
+              stripeSubscription.customer as string,
+              'active',
+              new Date(stripeSubscription.current_period_start * 1000),
+              new Date(stripeSubscription.current_period_end * 1000),
+              stripeSubscription.cancel_at_period_end,
+              stripeSubscription.canceled_at ? new Date(stripeSubscription.canceled_at * 1000) : null,
+              stripeSubscription.metadata
+            )
+          }
+        }
+
+        break
+      }
+
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object as Stripe.Invoice
+        console.log('Invoice payment failed:', invoice.id)
+
+        // Update subscription status to past_due
+        if (invoice.subscription) {
+          const { getSubscriptionByStripeId, upsertSubscription } = await import('@/lib/data/subscriptions')
+          const { data: existingSub } = await getSubscriptionByStripeId(invoice.subscription as string)
+
+          if (existingSub) {
+            const stripeSubscription = await stripe.subscriptions.retrieve(invoice.subscription as string)
+            await upsertSubscription(
+              existingSub.user_id,
+              stripeSubscription.id,
+              stripeSubscription.customer as string,
+              'past_due',
+              new Date(stripeSubscription.current_period_start * 1000),
+              new Date(stripeSubscription.current_period_end * 1000),
+              stripeSubscription.cancel_at_period_end,
+              stripeSubscription.canceled_at ? new Date(stripeSubscription.canceled_at * 1000) : null,
+              stripeSubscription.metadata
+            )
+          }
+        }
+
         break
       }
 

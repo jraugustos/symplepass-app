@@ -23,12 +23,13 @@ interface FreeRegistrationRequest {
     userData: ParticipantData
     partnerName?: string | null
     partnerData?: PartnerData | null
+    teamMembers?: ParticipantData[] | null
 }
 
 export async function POST(request: Request) {
     try {
         const body = (await request.json()) as FreeRegistrationRequest
-        const { eventId, categoryId, shirtSize, shirtGender, userName, userEmail, userData, partnerName, partnerData } = body || {}
+        const { eventId, categoryId, shirtSize, shirtGender, userName, userEmail, userData, partnerName, partnerData, teamMembers } = body || {}
 
         if (
             !eventId ||
@@ -87,6 +88,33 @@ export async function POST(request: Request) {
 
             if (partnerData.shirtGender && !isValidShirtGender(partnerData.shirtGender)) {
                 return NextResponse.json({ error: 'Gênero da camiseta do parceiro inválido.' }, { status: 400 })
+            }
+        }
+
+        // Validate team members data if present
+        if (teamMembers && teamMembers.length > 0) {
+            for (let i = 0; i < teamMembers.length; i++) {
+                const member = teamMembers[i]
+                if (!member.name || !member.email || !member.cpf || !member.phone || !member.shirtSize) {
+                    return NextResponse.json({ error: `Dados do membro ${i + 2} incompletos.` }, { status: 400 })
+                }
+
+                if (!validateEmail(member.email)) {
+                    return NextResponse.json({ error: `Email do membro ${i + 2} inválido.` }, { status: 400 })
+                }
+
+                if (!validateCPF(member.cpf)) {
+                    return NextResponse.json({ error: `CPF do membro ${i + 2} inválido.` }, { status: 400 })
+                }
+
+                const phoneDigits = member.phone.replace(/\D/g, '')
+                if (phoneDigits.length !== 10 && phoneDigits.length !== 11) {
+                    return NextResponse.json({ error: `Telefone do membro ${i + 2} inválido.` }, { status: 400 })
+                }
+
+                if (member.shirtGender && !isValidShirtGender(member.shirtGender)) {
+                    return NextResponse.json({ error: `Gênero da camiseta do membro ${i + 2} inválido.` }, { status: 400 })
+                }
             }
         }
 
@@ -189,14 +217,31 @@ export async function POST(request: Request) {
             )
         }
 
-        // Validate registration constraints (capacity, window, pair registration)
+        // Normalize team members data
+        const normalizedTeamMembers = teamMembers && teamMembers.length > 0
+            ? teamMembers.map((member) => ({
+                name: member.name.trim(),
+                email: member.email.trim(),
+                cpf: member.cpf.trim(),
+                phone: member.phone.trim(),
+                shirtSize: member.shirtSize as ShirtSize,
+                shirtGender: isValidShirtGender(member.shirtGender) ? member.shirtGender : undefined,
+            }))
+            : null
+
+        // Validate registration constraints (capacity, window, pair/team registration)
         const isPairRegistration = !!normalizedPartnerData
+        const isTeamRegistration = !!normalizedTeamMembers && normalizedTeamMembers.length > 0
+        const teamSize = isTeamRegistration ? normalizedTeamMembers.length + 1 : undefined
+
         const validationResult = await validateRegistration(
             supabase,
             event.id,
             category.id,
             targetUserId,
-            isPairRegistration
+            isPairRegistration,
+            isTeamRegistration,
+            teamSize
         )
 
         if (!validationResult.valid) {
@@ -226,6 +271,7 @@ export async function POST(request: Request) {
             normalizedPartnerName,
             normalizedPartnerData,
             normalizedUserData,
+            normalizedTeamMembers,
             supabase
         )
 

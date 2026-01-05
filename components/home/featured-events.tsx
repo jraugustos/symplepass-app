@@ -9,9 +9,10 @@ import { getSportLabel } from '@/lib/constants/sports'
 
 interface FeaturedEventsProps {
   events: Event[]
+  isClubMember?: boolean
 }
 
-export function FeaturedEvents({ events }: FeaturedEventsProps) {
+export function FeaturedEvents({ events, isClubMember = false }: FeaturedEventsProps) {
   // Helper function to format date
   const formatEventDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -132,9 +133,11 @@ export function FeaturedEvents({ events }: FeaturedEventsProps) {
                   location={getLocation(event)}
                   category={getSportLabel(event.sport_type) || event.sport_type}
                   date={formatEventDate(event.start_date)}
+                  price={event.min_price}
                   description={event.description}
                   tags={[getSportLabel(event.sport_type) || event.sport_type]}
                   isComingSoon={event.status === 'published_no_registration' && !event.allow_page_access}
+                  showClubBadge={isClubMember}
                   onRegister={() => {
                     window.location.href = `/eventos/${event.slug}`
                   }}

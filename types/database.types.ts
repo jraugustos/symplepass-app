@@ -72,6 +72,28 @@ export type ShirtSize = string
 export type PhotoOrderStatus = 'pending' | 'confirmed' | 'cancelled'
 export type PhotoPaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded'
 
+// Subscription types
+export type SubscriptionStatus = 'active' | 'canceled' | 'past_due' | 'unpaid' | 'incomplete' | 'trialing' | 'incomplete_expired' | 'paused'
+
+export interface Subscription {
+  id: string
+  user_id: string
+  stripe_subscription_id: string
+  stripe_customer_id: string
+  status: SubscriptionStatus
+  current_period_start: string
+  current_period_end: string
+  cancel_at_period_end: boolean
+  canceled_at: string | null
+  metadata: Record<string, any> | null
+  created_at: string
+  updated_at: string
+}
+
+export interface SubscriptionWithUser extends Subscription {
+  user: User
+}
+
 export interface User {
   id: string
   email: string
@@ -104,6 +126,8 @@ export interface Event {
   solidarity_message: string | null
   allows_individual_registration: boolean
   allows_pair_registration: boolean
+  allows_team_registration: boolean
+  team_size: number | null
   shirt_sizes: string[]
   shirt_sizes_config?: any // JSONB field containing gender-based shirt sizes
   max_participants: number | null
@@ -427,6 +451,11 @@ export interface Database {
         Row: PhotoOrderItem
         Insert: Omit<PhotoOrderItem, 'id' | 'created_at'>
         Update: Partial<Omit<PhotoOrderItem, 'id' | 'created_at'>>
+      }
+      subscriptions: {
+        Row: Subscription
+        Insert: Omit<Subscription, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<Subscription, 'id' | 'created_at' | 'updated_at'>>
       }
     }
   }

@@ -6,7 +6,7 @@ type SupabaseServerClient = SupabaseClient<Database>
 export interface RegistrationValidationResult {
   valid: boolean
   error?: string
-  errorCode?: 'EVENT_NOT_FOUND' | 'CATEGORY_NOT_FOUND' | 'REGISTRATION_CLOSED' | 'REGISTRATION_NOT_STARTED' | 'REGISTRATION_NOT_ALLOWED' | 'EVENT_FULL' | 'CATEGORY_FULL' | 'PAIR_NOT_ALLOWED' | 'INDIVIDUAL_NOT_ALLOWED' | 'ALREADY_REGISTERED'
+  errorCode?: 'EVENT_NOT_FOUND' | 'CATEGORY_NOT_FOUND' | 'REGISTRATION_CLOSED' | 'REGISTRATION_NOT_STARTED' | 'REGISTRATION_NOT_ALLOWED' | 'EVENT_FULL' | 'CATEGORY_FULL' | 'PAIR_NOT_ALLOWED' | 'INDIVIDUAL_NOT_ALLOWED' | 'TEAM_NOT_ALLOWED' | 'INVALID_TEAM_SIZE' | 'ALREADY_REGISTERED'
 }
 
 export interface EventValidationData {
@@ -44,14 +44,16 @@ export async function validateRegistration(
   eventId: string,
   categoryId: string,
   userId: string,
-  isPairRegistration: boolean = false
+  isPairRegistration: boolean = false,
+  isTeamRegistration: boolean = false,
+  teamSize?: number
 ): Promise<RegistrationValidationResult> {
   const now = new Date().toISOString()
 
   // 1. Fetch event with validation fields
   const { data: eventData, error: eventError } = await supabase
     .from('events')
-    .select('id, title, slug, max_participants, registration_start, registration_end, allows_individual_registration, allows_pair_registration, status')
+    .select('id, title, slug, max_participants, registration_start, registration_end, allows_individual_registration, allows_pair_registration, allows_team_registration, team_size, status')
     .eq('id', eventId)
     .in('status', ['published', 'published_no_registration'])
     .single()
@@ -64,7 +66,7 @@ export async function validateRegistration(
     }
   }
 
-  const event = eventData as Pick<Event, 'id' | 'title' | 'slug' | 'max_participants' | 'registration_start' | 'registration_end' | 'allows_individual_registration' | 'allows_pair_registration' | 'status'>
+  const event = eventData as Pick<Event, 'id' | 'title' | 'slug' | 'max_participants' | 'registration_start' | 'registration_end' | 'allows_individual_registration' | 'allows_pair_registration' | 'allows_team_registration' | 'team_size' | 'status'>
 
   // 1.5. Check if event allows registrations
   if (event.status === 'published_no_registration') {
@@ -160,11 +162,31 @@ export async function validateRegistration(
   }
 
   // 6b. Check individual registration allowance
-  if (!isPairRegistration && event.allows_individual_registration === false) {
+  if (!isPairRegistration && !isTeamRegistration && event.allows_individual_registration === false) {
     return {
       valid: false,
-      error: 'Este evento não permite inscrição individual. Apenas inscrições em dupla são aceitas.',
+      error: 'Este evento não permite inscrição individual. Apenas inscrições em dupla ou equipe são aceitas.',
       errorCode: 'INDIVIDUAL_NOT_ALLOWED'
+    }
+  }
+
+  // 6c. Check team registration allowance
+  if (isTeamRegistration && !event.allows_team_registration) {
+    return {
+      valid: false,
+      error: 'Este evento não permite inscrição em equipe.',
+      errorCode: 'TEAM_NOT_ALLOWED'
+    }
+  }
+
+  // 6d. Check team size matches event configuration
+  if (isTeamRegistration && event.allows_team_registration) {
+    if (teamSize !== event.team_size) {
+      return {
+        valid: false,
+        error: `Este evento requer equipes com exatamente ${event.team_size} membros.`,
+        errorCode: 'INVALID_TEAM_SIZE'
+      }
     }
   }
 

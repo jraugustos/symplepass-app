@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
+import { useForm, useWatch, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { AlertTriangle } from 'lucide-react'
@@ -28,6 +28,15 @@ const ALL_SHIRT_GENDERS = [
   { value: 'infantil', label: 'Infantil' },
 ]
 
+const teamMemberSchema = z.object({
+  name: z.string().optional(),
+  email: z.string().email('Email inválido').optional().or(z.literal('')),
+  cpf: z.string().optional(),
+  phone: z.string().optional(),
+  shirtSize: z.string().optional(),
+  shirtGender: z.enum(['masculino', 'feminino', 'infantil']).optional().or(z.literal('')),
+})
+
 const editRegistrationSchema = z.object({
   category_id: z.string().uuid(),
   partner_name: z.string().optional(),
@@ -36,6 +45,7 @@ const editRegistrationSchema = z.object({
   partner_phone: z.string().optional(),
   partner_shirtSize: z.string().optional(),
   partner_shirtGender: z.enum(['masculino', 'feminino', 'infantil']).optional().or(z.literal('')),
+  team_members: z.array(teamMemberSchema).optional(),
 })
 
 type EditRegistrationFormData = z.infer<typeof editRegistrationSchema>
@@ -47,6 +57,7 @@ interface EditRegistrationModalProps {
   registration: any | null
   categories: EventCategory[]
   allowsPairRegistration: boolean
+  allowsTeamRegistration?: boolean
   shirtSizesConfig?: ShirtSizesByGender | null
 }
 
@@ -57,6 +68,7 @@ export function EditRegistrationModal({
   registration,
   categories,
   allowsPairRegistration,
+  allowsTeamRegistration,
   shirtSizesConfig,
 }: EditRegistrationModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -64,6 +76,7 @@ export function EditRegistrationModal({
   const [activeTab, setActiveTab] = useState('categoria')
 
   const hasPartner = registration?.registration_data?.partner || registration?.partner_name
+  const hasTeamMembers = registration?.registration_data?.team_members && registration.registration_data.team_members.length > 0
 
   const {
     register,
@@ -81,7 +94,13 @@ export function EditRegistrationModal({
       partner_phone: registration?.registration_data?.partner?.phone || '',
       partner_shirtSize: registration?.registration_data?.partner?.shirtSize || '',
       partner_shirtGender: registration?.registration_data?.partner?.shirtGender || '',
+      team_members: registration?.registration_data?.team_members || [],
     },
+  })
+
+  const { fields: teamMemberFields } = useFieldArray({
+    control,
+    name: 'team_members',
   })
 
   // Watch category_id and partner_shirtGender to get available options
@@ -122,6 +141,7 @@ export function EditRegistrationModal({
         partner_phone: registration.registration_data?.partner?.phone || '',
         partner_shirtSize: registration.registration_data?.partner?.shirtSize || '',
         partner_shirtGender: registration.registration_data?.partner?.shirtGender || '',
+        team_members: registration.registration_data?.team_members || [],
       })
       setError(null)
       setActiveTab('categoria')
@@ -177,6 +197,48 @@ export function EditRegistrationModal({
         }
       }
 
+      // Check for team members changes
+      const originalTeamMembers = registration?.registration_data?.team_members || []
+      const currentTeamMembers = data.team_members || []
+
+      // Compare team members to detect changes
+      const hasTeamMembersChanges = (() => {
+        if (originalTeamMembers.length !== currentTeamMembers.length) return true
+        for (let i = 0; i < originalTeamMembers.length; i++) {
+          const orig = originalTeamMembers[i]
+          const curr = currentTeamMembers[i]
+          if (
+            (orig?.name || '') !== (curr?.name || '') ||
+            (orig?.email || '') !== (curr?.email || '') ||
+            (orig?.cpf || '') !== (curr?.cpf || '') ||
+            (orig?.phone || '') !== (curr?.phone || '') ||
+            (orig?.shirtSize || '') !== (curr?.shirtSize || '') ||
+            (orig?.shirtGender || '') !== (curr?.shirtGender || '')
+          ) {
+            return true
+          }
+        }
+        return false
+      })()
+
+      if (hasTeamMembersChanges && currentTeamMembers.length > 0) {
+        updateData.team_members_data = currentTeamMembers.map((member) => {
+          const rawGender = member.shirtGender as string | undefined
+          const genderValue = rawGender && rawGender !== ''
+            ? rawGender as 'masculino' | 'feminino' | 'infantil'
+            : undefined
+
+          return {
+            name: member.name || '',
+            email: member.email || '',
+            cpf: member.cpf || '',
+            phone: member.phone || '',
+            shirtSize: member.shirtSize || '',
+            shirtGender: genderValue,
+          }
+        })
+      }
+
       // Only call API if there are changes
       if (Object.keys(updateData).length === 0) {
         onClose()
@@ -211,6 +273,9 @@ export function EditRegistrationModal({
               <TabsTrigger value="categoria">Categoria</TabsTrigger>
               {allowsPairRegistration && (
                 <TabsTrigger value="parceiro">Dados do Parceiro</TabsTrigger>
+              )}
+              {(allowsTeamRegistration || hasTeamMembers) && (
+                <TabsTrigger value="equipe">Membros da Equipe</TabsTrigger>
               )}
             </TabsList>
 
@@ -349,6 +414,108 @@ export function EditRegistrationModal({
                       ))}
                     </Select>
                   </div>
+                </div>
+              </TabsContent>
+            )}
+
+            {(allowsTeamRegistration || hasTeamMembers) && (
+              <TabsContent value="equipe">
+                <div className="space-y-6">
+                  {!hasTeamMembers && (
+                    <div className="rounded-lg bg-blue-50 border border-blue-200 p-3">
+                      <p className="text-sm text-blue-800">
+                        Esta inscrição não possui membros de equipe cadastrados.
+                      </p>
+                    </div>
+                  )}
+
+                  {teamMemberFields.map((field, index) => (
+                    <div key={field.id} className="border border-neutral-200 rounded-lg p-4 space-y-4">
+                      <h4 className="font-medium text-neutral-900">
+                        Membro {index + 2}
+                      </h4>
+
+                      <div>
+                        <label className="block text-sm font-medium text-neutral-700 mb-1">
+                          Nome
+                        </label>
+                        <Input
+                          type="text"
+                          placeholder="Nome completo"
+                          {...register(`team_members.${index}.name`)}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-neutral-700 mb-1">
+                            Email
+                          </label>
+                          <Input
+                            type="email"
+                            placeholder="email@exemplo.com"
+                            {...register(`team_members.${index}.email`)}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-neutral-700 mb-1">
+                            CPF
+                          </label>
+                          <Input
+                            type="text"
+                            placeholder="000.000.000-00"
+                            {...register(`team_members.${index}.cpf`)}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-neutral-700 mb-1">
+                            Telefone
+                          </label>
+                          <Input
+                            type="text"
+                            placeholder="(00) 00000-0000"
+                            {...register(`team_members.${index}.phone`)}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-neutral-700 mb-1">
+                            Tamanho da Camisa
+                          </label>
+                          <Select
+                            {...register(`team_members.${index}.shirtSize`)}
+                          >
+                            <option value="">Selecione</option>
+                            {availableShirtSizes.map((size) => (
+                              <option key={size} value={size}>
+                                {size}
+                              </option>
+                            ))}
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-neutral-700 mb-1">
+                          Gênero da Camisa
+                        </label>
+                        <Select
+                          {...register(`team_members.${index}.shirtGender`)}
+                        >
+                          <option value="">Selecione</option>
+                          {availableShirtGenders.map((gender) => (
+                            <option key={gender.value} value={gender.value}>
+                              {gender.label}
+                            </option>
+                          ))}
+                        </Select>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </TabsContent>
             )}

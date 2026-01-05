@@ -1,4 +1,6 @@
 import { getFeaturedEvents, getUpcomingEvents, getActiveEventsCount, getSportTypesWithActiveEvents } from '@/lib/data/events'
+import { isClubMember } from '@/lib/data/subscriptions'
+import { createClient } from '@/lib/supabase/server'
 import { Header } from '@/components/layout/header'
 import { Footer } from '@/components/layout/footer'
 import { HeroSection } from '@/components/home/hero-section'
@@ -11,6 +13,11 @@ import { ScrollAnimationWrapper } from '@/components/home/scroll-animation-wrapp
 export const revalidate = 3600
 
 export default async function Home() {
+  // Check if user is a club member
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const userIsClubMember = user ? await isClubMember(user.id, supabase) : false
+
   // Fetch data from Supabase
   const [featuredEvents, upcomingEvents, activeEventsCount, activeSportTypes] = await Promise.all([
     getFeaturedEvents(),
@@ -38,10 +45,10 @@ export default async function Home() {
           <HeroSection eventStats={eventStats} activeSportTypes={activeSportTypes} />
 
           {/* Featured Events Section */}
-          <FeaturedEvents events={featuredEvents} />
+          <FeaturedEvents events={featuredEvents} isClubMember={userIsClubMember} />
 
           {/* Upcoming Events Section */}
-          <UpcomingEvents events={upcomingEvents} />
+          <UpcomingEvents events={upcomingEvents} isClubMember={userIsClubMember} />
 
           {/* Club Benefits Section */}
           <ClubBenefits />

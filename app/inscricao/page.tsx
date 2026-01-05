@@ -4,6 +4,7 @@ import { Footer } from '@/components/layout/footer'
 import { getEventDetailBySlug } from '@/lib/data/events'
 import { createClient } from '@/lib/supabase/server'
 import { calculateServiceFee, calculateTotal } from '@/lib/utils'
+import { isClubMember } from '@/lib/data/subscriptions'
 import type { ReviewPageData, PriceBreakdown as PriceBreakdownData, ShirtSize, ShirtGender } from '@/types'
 import { ReviewClient } from './review-client'
 
@@ -97,6 +98,9 @@ export default async function ReviewPage({ searchParams }: ReviewPageProps) {
     profileGender = profileData?.gender ?? user.user_metadata?.gender ?? null
   }
 
+  // Check if user is a club member
+  const userIsClubMember = user ? await isClubMember(user.id, supabase) : false
+
   const normalizedProfileGender = (profileGender === 'masculino' || profileGender === 'feminino' || profileGender === 'infantil')
     ? (profileGender as ShirtGender)
     : null
@@ -135,7 +139,7 @@ export default async function ReviewPage({ searchParams }: ReviewPageProps) {
 
   return (
     <>
-      <ReviewClient {...reviewData} priceBreakdown={priceBreakdown} />
+      <ReviewClient {...reviewData} priceBreakdown={priceBreakdown} isClubMember={userIsClubMember} />
       <Footer variant="light" />
     </>
   )

@@ -2,7 +2,7 @@ import * as React from 'react'
 import { cn, formatCurrency } from '@/lib/utils'
 import { Button } from './button'
 import { StatusBadge } from './badge'
-import { MapPin, Calendar, Clock, Users, DollarSign, Check, Wifi, Trophy, Presentation, Dumbbell, Activity, Bike, Waves, TreePine, Volleyball } from 'lucide-react'
+import { MapPin, Calendar, Clock, Users, DollarSign, Check, Wifi, Trophy, Presentation, Dumbbell, Activity, Bike, Waves, TreePine, Volleyball, Crown } from 'lucide-react'
 
 export interface CardProps extends React.HTMLAttributes<HTMLDivElement> { }
 
@@ -103,6 +103,7 @@ export interface EventCardProps {
   onRegister?: () => void
   className?: string
   featured?: boolean
+  showClubBadge?: boolean
 }
 
 export function EventCard({
@@ -124,6 +125,7 @@ export function EventCard({
   onRegister,
   className,
   featured = false,
+  showClubBadge = false,
 }: EventCardProps) {
   const badgeVariantClasses = {
     warning: 'bg-amber-500/90 border-amber-400 text-white',
@@ -144,6 +146,14 @@ export function EventCard({
         <div className="flex gap-3 p-3">
           <div className="relative w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden">
             <img src={image} alt={title} className="w-full h-full object-cover" />
+            {showClubBadge && price !== undefined && price > 0 && (
+              <div className="absolute bottom-1 right-1">
+                <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-orange-500 to-orange-600 px-1.5 py-0.5 text-[10px] font-medium text-white shadow">
+                  <Crown className="w-2.5 h-2.5" />
+                  10%
+                </span>
+              </div>
+            )}
           </div>
           <div className="flex-1 min-w-0">
             <h4 className="text-sm font-semibold text-neutral-900 font-geist mb-1 truncate">
@@ -232,10 +242,16 @@ export function EventCard({
             )}
           </div>
 
-          <div className="absolute top-4 right-4">
+          <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
             <span className="inline-flex items-center rounded-full bg-neutral-900/30 backdrop-blur px-3 py-1 text-xs font-medium text-white">
               {date}
             </span>
+            {showClubBadge && price !== undefined && price > 0 && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-orange-500 to-orange-600 px-3 py-1 text-xs font-medium text-white shadow-lg">
+                <Crown className="w-3 h-3" />
+                10% off
+              </span>
+            )}
           </div>
         </div>
 
@@ -327,6 +343,14 @@ export function EventCard({
               </>
             )}
           </span>
+          <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
+            {showClubBadge && price !== undefined && price > 0 && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-orange-500 to-orange-600 px-3 py-1 text-xs font-medium text-white shadow-lg">
+                <Crown className="w-3 h-3" />
+                10% off
+              </span>
+            )}
+          </div>
           {price !== undefined && (
             <span className="absolute bottom-4 right-4 inline-flex items-center gap-1 px-3 py-1.5 text-sm bg-white/90 backdrop-blur-sm text-neutral-900 rounded-full font-semibold">
               R$ {price.toFixed(2)}

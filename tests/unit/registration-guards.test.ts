@@ -34,6 +34,7 @@ describe('Registration Guards', () => {
         from: vi.fn(() => ({
           select: vi.fn().mockReturnThis(),
           eq: vi.fn().mockReturnThis(),
+          in: vi.fn().mockReturnThis(),
           single: vi.fn().mockResolvedValue({ data: null, error: { code: 'PGRST116' } }),
         })),
       }
@@ -58,6 +59,7 @@ describe('Registration Guards', () => {
         from: vi.fn(() => ({
           select: vi.fn().mockReturnThis(),
           eq: vi.fn().mockReturnThis(),
+          in: vi.fn().mockReturnThis(),
           single: vi.fn().mockResolvedValue({
             data: {
               id: 'event-123',
@@ -67,6 +69,8 @@ describe('Registration Guards', () => {
               registration_start: futureDate,
               registration_end: null,
               allows_pair_registration: false,
+              allows_team_registration: false,
+              team_size: null,
               status: 'published',
             },
             error: null,
@@ -94,6 +98,7 @@ describe('Registration Guards', () => {
         from: vi.fn(() => ({
           select: vi.fn().mockReturnThis(),
           eq: vi.fn().mockReturnThis(),
+          in: vi.fn().mockReturnThis(),
           single: vi.fn().mockResolvedValue({
             data: {
               id: 'event-123',
@@ -103,6 +108,8 @@ describe('Registration Guards', () => {
               registration_start: null,
               registration_end: pastDate,
               allows_pair_registration: false,
+              allows_team_registration: false,
+              team_size: null,
               status: 'published',
             },
             error: null,
@@ -124,14 +131,13 @@ describe('Registration Guards', () => {
     })
 
     it('should return valid: false with PAIR_NOT_ALLOWED when event does not allow pairs', async () => {
-      let callCount = 0
-
       const mockSupabase = {
         from: vi.fn((table: string) => {
           if (table === 'events') {
             return {
               select: vi.fn().mockReturnThis(),
               eq: vi.fn().mockReturnThis(),
+              in: vi.fn().mockReturnThis(),
               single: vi.fn().mockResolvedValue({
                 data: {
                   id: 'event-123',
@@ -141,6 +147,8 @@ describe('Registration Guards', () => {
                   registration_start: null,
                   registration_end: null,
                   allows_pair_registration: false, // Does not allow pairs
+                  allows_team_registration: false,
+                  team_size: null,
                   status: 'published',
                 },
                 error: null,
@@ -151,6 +159,7 @@ describe('Registration Guards', () => {
             return {
               select: vi.fn().mockReturnThis(),
               eq: vi.fn().mockReturnThis(),
+              in: vi.fn().mockReturnThis(),
               single: vi.fn().mockResolvedValue({
                 data: {
                   id: 'category-123',
@@ -185,6 +194,140 @@ describe('Registration Guards', () => {
       expect(result.valid).toBe(false)
       expect(result.errorCode).toBe('PAIR_NOT_ALLOWED')
     })
+
+    it('should return valid: false with TEAM_NOT_ALLOWED when event does not allow teams', async () => {
+      const mockSupabase = {
+        from: vi.fn((table: string) => {
+          if (table === 'events') {
+            return {
+              select: vi.fn().mockReturnThis(),
+              eq: vi.fn().mockReturnThis(),
+              in: vi.fn().mockReturnThis(),
+              single: vi.fn().mockResolvedValue({
+                data: {
+                  id: 'event-123',
+                  title: 'Test Event',
+                  slug: 'test-event',
+                  max_participants: null,
+                  registration_start: null,
+                  registration_end: null,
+                  allows_pair_registration: true,
+                  allows_team_registration: false, // Does not allow teams
+                  team_size: null,
+                  status: 'published',
+                },
+                error: null,
+              }),
+            }
+          }
+          if (table === 'event_categories') {
+            return {
+              select: vi.fn().mockReturnThis(),
+              eq: vi.fn().mockReturnThis(),
+              in: vi.fn().mockReturnThis(),
+              single: vi.fn().mockResolvedValue({
+                data: {
+                  id: 'category-123',
+                  name: 'Test Category',
+                  event_id: 'event-123',
+                  max_participants: null,
+                  current_participants: 0,
+                },
+                error: null,
+              }),
+            }
+          }
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            in: vi.fn().mockReturnThis(),
+            single: vi.fn().mockResolvedValue({ data: null, error: null }),
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }
+        }),
+      }
+
+      const { validateRegistration } = await import('@/lib/validations/registration-guards')
+      const result = await validateRegistration(
+        mockSupabase as any,
+        'event-123',
+        'category-123',
+        'user-id',
+        false, // not pair
+        true, // isTeamRegistration
+        4 // teamSize
+      )
+
+      expect(result.valid).toBe(false)
+      expect(result.errorCode).toBe('TEAM_NOT_ALLOWED')
+    })
+
+    it('should return valid: false with INVALID_TEAM_SIZE when team size does not match event configuration', async () => {
+      const mockSupabase = {
+        from: vi.fn((table: string) => {
+          if (table === 'events') {
+            return {
+              select: vi.fn().mockReturnThis(),
+              eq: vi.fn().mockReturnThis(),
+              in: vi.fn().mockReturnThis(),
+              single: vi.fn().mockResolvedValue({
+                data: {
+                  id: 'event-123',
+                  title: 'Test Event',
+                  slug: 'test-event',
+                  max_participants: null,
+                  registration_start: null,
+                  registration_end: null,
+                  allows_pair_registration: false,
+                  allows_team_registration: true, // Allows teams
+                  team_size: 4, // Expects teams of 4
+                  status: 'published',
+                },
+                error: null,
+              }),
+            }
+          }
+          if (table === 'event_categories') {
+            return {
+              select: vi.fn().mockReturnThis(),
+              eq: vi.fn().mockReturnThis(),
+              in: vi.fn().mockReturnThis(),
+              single: vi.fn().mockResolvedValue({
+                data: {
+                  id: 'category-123',
+                  name: 'Test Category',
+                  event_id: 'event-123',
+                  max_participants: null,
+                  current_participants: 0,
+                },
+                error: null,
+              }),
+            }
+          }
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            in: vi.fn().mockReturnThis(),
+            single: vi.fn().mockResolvedValue({ data: null, error: null }),
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }
+        }),
+      }
+
+      const { validateRegistration } = await import('@/lib/validations/registration-guards')
+      const result = await validateRegistration(
+        mockSupabase as any,
+        'event-123',
+        'category-123',
+        'user-id',
+        false, // not pair
+        true, // isTeamRegistration
+        3 // teamSize (should be 4)
+      )
+
+      expect(result.valid).toBe(false)
+      expect(result.errorCode).toBe('INVALID_TEAM_SIZE')
+    })
   })
 
   describe('RegistrationValidationResult interface', () => {
@@ -197,6 +340,9 @@ describe('Registration Guards', () => {
         'EVENT_FULL',
         'CATEGORY_FULL',
         'PAIR_NOT_ALLOWED',
+        'INDIVIDUAL_NOT_ALLOWED',
+        'TEAM_NOT_ALLOWED',
+        'INVALID_TEAM_SIZE',
         'ALREADY_REGISTERED',
       ]
 

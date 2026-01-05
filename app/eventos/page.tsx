@@ -10,6 +10,8 @@ import {
   EmptyState,
 } from '@/components/eventos'
 import { getFilteredEvents, getFeaturedEvents, getFilterOptions } from '@/lib/data/events'
+import { isClubMember } from '@/lib/data/subscriptions'
+import { createClient } from '@/lib/supabase/server'
 import { parseFiltersFromSearchParams } from '@/lib/utils'
 import type { EventsListFilters } from '@/types'
 
@@ -36,6 +38,11 @@ export default async function EventosPage({ searchParams }: EventsPageProps) {
 
   const page = parsedFilters.page || 1
   const pageSize = 12
+
+  // Check if user is a club member
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const userIsClubMember = user ? await isClubMember(user.id, supabase) : false
 
   // Fetch data in parallel
   const [featuredEventsData, eventsData, filterOptionsData] = await Promise.all([
@@ -92,7 +99,7 @@ export default async function EventosPage({ searchParams }: EventsPageProps) {
           {/* Events Grid or Empty State */}
           {events.length > 0 ? (
             <>
-              <EventsGrid events={events} variant="grid" />
+              <EventsGrid events={events} variant="grid" isClubMember={userIsClubMember} />
 
               {/* Load More Button */}
               {hasMore && (

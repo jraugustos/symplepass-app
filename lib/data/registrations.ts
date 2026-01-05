@@ -28,6 +28,7 @@ export async function createRegistration(
   partnerName?: string | null,
   partnerData?: PartnerData | null,
   userData?: ParticipantData | null,
+  teamMembers?: ParticipantData[] | null,
   supabaseClient?: SupabaseServerClient
 ): Promise<RegistrationResult<Registration>> {
   try {
@@ -57,6 +58,18 @@ export async function createRegistration(
         shirtSize: partnerData.shirtSize,
         shirtGender: partnerData.shirtGender || null,
       }
+    }
+
+    // Add team members data if provided
+    if (teamMembers && teamMembers.length > 0) {
+      registrationDataPayload.team_members = teamMembers.map((member) => ({
+        name: member.name,
+        email: member.email,
+        cpf: member.cpf,
+        phone: member.phone,
+        shirtSize: member.shirtSize,
+        shirtGender: member.shirtGender || null,
+      }))
     }
 
     const registrationData = Object.keys(registrationDataPayload).length > 0 ? registrationDataPayload : null
@@ -136,6 +149,13 @@ export async function createRegistration(
     // Create or update partner profile if partner data is provided
     if (partnerData) {
       await createOrUpdatePartnerProfile(partnerData)
+    }
+
+    // Create or update profiles for team members if team data is provided
+    if (teamMembers && teamMembers.length > 0) {
+      for (const member of teamMembers) {
+        await createOrUpdatePartnerProfile(member)
+      }
     }
 
     return { data, error: null }

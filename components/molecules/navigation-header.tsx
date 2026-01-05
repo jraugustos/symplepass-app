@@ -2,8 +2,9 @@
 
 import * as React from 'react'
 import { cn, getInitials } from '@/lib/utils'
-import { Menu, X, User, LogOut, Settings, LayoutDashboard, Ticket } from 'lucide-react'
+import { Menu, X, User, LogOut, Settings, LayoutDashboard, Ticket, Crown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { NavigationVariant, UserRole } from '@/types'
 
 export interface NavigationHeaderProps {
@@ -13,6 +14,7 @@ export interface NavigationHeaderProps {
   userName?: string
   userEmail?: string
   userRole?: UserRole
+  isClubMember?: boolean
   onLogin?: () => void
   onLogout?: () => void
   onProfileClick?: (destination?: string) => void
@@ -26,6 +28,7 @@ export function NavigationHeader({
   userName,
   userEmail,
   userRole = 'user',
+  isClubMember = false,
   onLogin = () => { },
   onLogout = () => { },
   onProfileClick = () => { },
@@ -210,6 +213,12 @@ export function NavigationHeader({
                       >
                         {userEmail}
                       </p>
+                      {isClubMember && (
+                        <Badge variant="primary" size="sm" className="mt-2">
+                          <Crown className="w-3 h-3" />
+                          Membro do Clube
+                        </Badge>
+                      )}
                     </div>
 
                     {/* Menu Items */}
@@ -399,6 +408,12 @@ export function NavigationHeader({
                     >
                       {userEmail}
                     </p>
+                    {isClubMember && (
+                      <Badge variant="primary" size="sm" className="mt-2">
+                        <Crown className="w-3 h-3" />
+                        Membro do Clube
+                      </Badge>
+                    )}
                   </div>
                   <button
                     onClick={() => {

@@ -29,15 +29,20 @@ export default function CategorySelectionModal({
   const [partnerGender, setPartnerGender] = useState<ShirtGender | null>(null)
   const [partnerSize, setPartnerSize] = useState<ShirtSize>('')
   const [partnerName, setPartnerName] = useState('')
+  // Team members state for team registration
+  const [teamMembers, setTeamMembers] = useState<Array<{ name: string; gender: ShirtGender | null; size: ShirtSize }>>([])
   // Determine default registration type based on event settings
-  const getDefaultRegistrationType = (): 'individual' | 'dupla' => {
+  const getDefaultRegistrationType = (): 'individual' | 'dupla' | 'equipe' => {
     const allowsIndividual = event.allows_individual_registration !== false
     const allowsPair = event.allows_pair_registration === true
+    const allowsTeam = event.allows_team_registration === true
+    // If only team is allowed, default to equipe
+    if (!allowsIndividual && !allowsPair && allowsTeam) return 'equipe'
     // If only pair is allowed, default to dupla
     if (!allowsIndividual && allowsPair) return 'dupla'
     return 'individual'
   }
-  const [registrationType, setRegistrationType] = useState<'individual' | 'dupla'>(getDefaultRegistrationType())
+  const [registrationType, setRegistrationType] = useState<'individual' | 'dupla' | 'equipe'>(getDefaultRegistrationType())
 
   // Parse shirt sizes config from event
   const shirtSizesConfig: ShirtSizesByGender | null =
@@ -118,6 +123,24 @@ export default function CategorySelectionModal({
     }
   }, [partnerAvailableSizes, registrationType])
 
+  // Initialize team members when switching to team registration
+  useEffect(() => {
+    if (registrationType === 'equipe' && event.team_size && event.team_size > 0) {
+      const defaultGender = genderOptions.length > 0 ? genderOptions[0] : null
+      const defaultSize = defaultGender ? getSizesForGender(defaultGender)[0] || '' : ''
+      // Create array for team members (excluding the main registrant)
+      const membersCount = event.team_size - 1
+      const initialMembers = Array.from({ length: membersCount }, () => ({
+        name: '',
+        gender: defaultGender,
+        size: defaultSize as ShirtSize,
+      }))
+      setTeamMembers(initialMembers)
+    } else if (registrationType !== 'equipe') {
+      setTeamMembers([])
+    }
+  }, [registrationType, event.team_size, genderOptions])
+
   // Body scroll lock
   useEffect(() => {
     if (isOpen) {
@@ -153,9 +176,13 @@ export default function CategorySelectionModal({
   const hasShirtSizes = genderOptions.length > 0 && availableSizes && availableSizes.length > 0
   const allowsIndividualRegistration = event.allows_individual_registration !== false
   const allowsPairRegistration = event.allows_pair_registration === true
-  const showRegistrationTypeSelector = allowsIndividualRegistration && allowsPairRegistration
+  const allowsTeamRegistration = event.allows_team_registration === true
+  // Show registration type selector if more than one type is allowed
+  const registrationTypesAllowed = [allowsIndividualRegistration, allowsPairRegistration, allowsTeamRegistration].filter(Boolean).length
+  const showRegistrationTypeSelector = registrationTypesAllowed > 1
   const isFreeEvent = event.event_type === 'free' || event.event_type === 'solidarity'
   const requiresPartnerInfo = registrationType === 'dupla'
+  const requiresTeamInfo = registrationType === 'equipe'
   const hasPartnerShirtSelection = requiresPartnerInfo && genderOptions.length > 0 && partnerAvailableSizes.length > 0
 
   const handleConfirm = () => {
@@ -174,6 +201,17 @@ export default function CategorySelectionModal({
         params.set('partner_size', partnerSize)
         params.set('partner_gender', partnerGender || '')
       }
+    }
+
+    // Add team members data for team registration
+    if (requiresTeamInfo && teamMembers.length > 0) {
+      params.set('team_size', String(event.team_size || teamMembers.length + 1))
+      teamMembers.forEach((member, index) => {
+        const memberNum = index + 1
+        params.set(`team_member_${memberNum}_name`, member.name || '')
+        params.set(`team_member_${memberNum}_size`, member.size || '')
+        params.set(`team_member_${memberNum}_gender`, member.gender || '')
+      })
     }
 
     router.push(`/inscricao?${params.toString()}`)
@@ -242,33 +280,66 @@ export default function CategorySelectionModal({
               </div>
             )}
 
-            {/* Registration type selector (individual / dupla) - only show if both options are available */}
+            {/* Registration type selector (individual / dupla / equipe) - only show if multiple options are available */}
             {showRegistrationTypeSelector && (
               <div>
                 <label className="block text-sm font-medium text-neutral-900 mb-2 font-geist">
                   Tipo de inscrição
                 </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {(['individual', 'dupla'] as const).map((type) => (
+                <div className={cn(
+                  'grid gap-2',
+                  registrationTypesAllowed === 2 ? 'grid-cols-2' : 'grid-cols-3'
+                )}>
+                  {allowsIndividualRegistration && (
                     <button
-                      key={type}
                       type="button"
                       onClick={() => {
-                        setRegistrationType(type)
-                        if (type === 'individual') {
-                          setPartnerName('')
-                        }
+                        setRegistrationType('individual')
+                        setPartnerName('')
                       }}
                       className={cn(
                         'rounded-lg border px-3 py-2 text-sm font-medium font-geist transition-all',
-                        registrationType === type
+                        registrationType === 'individual'
                           ? 'border-orange-500 bg-orange-50 text-orange-900'
                           : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
                       )}
                     >
-                      {type === 'individual' ? 'Individual' : 'Dupla'}
+                      Individual
                     </button>
-                  ))}
+                  )}
+                  {allowsPairRegistration && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRegistrationType('dupla')
+                      }}
+                      className={cn(
+                        'rounded-lg border px-3 py-2 text-sm font-medium font-geist transition-all',
+                        registrationType === 'dupla'
+                          ? 'border-orange-500 bg-orange-50 text-orange-900'
+                          : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
+                      )}
+                    >
+                      Dupla
+                    </button>
+                  )}
+                  {allowsTeamRegistration && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRegistrationType('equipe')
+                        setPartnerName('')
+                      }}
+                      className={cn(
+                        'rounded-lg border px-3 py-2 text-sm font-medium font-geist transition-all',
+                        registrationType === 'equipe'
+                          ? 'border-orange-500 bg-orange-50 text-orange-900'
+                          : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
+                      )}
+                    >
+                      Equipe ({event.team_size})
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -277,7 +348,9 @@ export default function CategorySelectionModal({
             {!showRegistrationTypeSelector && (
               <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
                 <p className="text-sm font-medium text-blue-900 font-geist">
-                  {registrationType === 'dupla'
+                  {registrationType === 'equipe'
+                    ? `👥 Este evento aceita apenas inscrições em equipe (${event.team_size} pessoas)`
+                    : registrationType === 'dupla'
                     ? '👥 Este evento aceita apenas inscrições em dupla'
                     : '👤 Este evento aceita apenas inscrições individuais'}
                 </p>
@@ -423,6 +496,109 @@ export default function CategorySelectionModal({
                 )}
               </div>
             )}
+
+            {/* Team Members Form (conditional) */}
+            {requiresTeamInfo && teamMembers.length > 0 && (
+              <div className="space-y-4">
+                <div className="rounded-lg border border-purple-200 bg-purple-50 p-3">
+                  <p className="text-sm font-medium text-purple-900 font-geist">
+                    👥 Inscrição em equipe - {event.team_size} pessoas
+                  </p>
+                  <p className="mt-1 text-xs text-purple-800 font-geist">
+                    Preencha os dados básicos de cada membro. Os dados completos (email, CPF, telefone) serão coletados na próxima etapa.
+                  </p>
+                </div>
+
+                {teamMembers.map((member, index) => {
+                  const memberGenderSizes = getSizesForGender(member.gender)
+                  return (
+                    <div key={index} className="rounded-lg border border-neutral-200 bg-neutral-50 p-4 space-y-3">
+                      <p className="text-sm font-medium text-neutral-900 font-geist">
+                        Membro {index + 2}
+                      </p>
+
+                      {/* Name */}
+                      <div>
+                        <label className="block text-xs font-medium text-neutral-700 mb-1 font-geist">
+                          Nome
+                        </label>
+                        <input
+                          type="text"
+                          value={member.name}
+                          onChange={(e) => {
+                            const updated = [...teamMembers]
+                            updated[index].name = e.target.value
+                            setTeamMembers(updated)
+                          }}
+                          placeholder="Nome completo"
+                          className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent font-geist text-sm"
+                        />
+                      </div>
+
+                      {/* Gender selector */}
+                      <div className="grid grid-cols-3 gap-2">
+                        {genderOptions.map((gender) => (
+                          <label
+                            key={gender}
+                            className={cn(
+                              'cursor-pointer rounded-lg border px-2 py-1.5 text-center text-xs font-medium transition-all font-geist',
+                              member.gender === gender
+                                ? 'border-orange-500 bg-orange-50 text-orange-900'
+                                : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
+                            )}
+                          >
+                            <input
+                              type="radio"
+                              name={`team-member-${index}-gender`}
+                              value={gender}
+                              checked={member.gender === gender}
+                              onChange={(e) => {
+                                const updated = [...teamMembers]
+                                updated[index].gender = e.target.value as ShirtGender
+                                const newSizes = getSizesForGender(e.target.value as ShirtGender)
+                                updated[index].size = (newSizes[0] || '') as ShirtSize
+                                setTeamMembers(updated)
+                              }}
+                              className="sr-only"
+                            />
+                            {GENDER_LABELS[gender]}
+                          </label>
+                        ))}
+                      </div>
+
+                      {/* Size selector */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {memberGenderSizes.map((size) => (
+                          <label
+                            key={size}
+                            className={cn(
+                              'inline-flex items-center justify-center cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-medium transition-all font-geist whitespace-nowrap',
+                              member.size === size
+                                ? 'border-orange-500 bg-orange-50 text-orange-900'
+                                : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
+                            )}
+                          >
+                            <input
+                              type="radio"
+                              name={`team-member-${index}-size`}
+                              value={size}
+                              checked={member.size === size}
+                              onChange={(e) => {
+                                const updated = [...teamMembers]
+                                updated[index].size = e.target.value as ShirtSize
+                                setTeamMembers(updated)
+                              }}
+                              className="sr-only"
+                            />
+                            {size}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
           {/* Footer */}
@@ -441,7 +617,8 @@ export default function CategorySelectionModal({
                 !hasShirtSizes ||
                 !selectedSize ||
                 !selectedGender ||
-                (requiresPartnerInfo && !partnerName.trim())
+                (requiresPartnerInfo && !partnerName.trim()) ||
+                (requiresTeamInfo && teamMembers.some(m => !m.name.trim() || !m.size))
               }
             >
               Continuar

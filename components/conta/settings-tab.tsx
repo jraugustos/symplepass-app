@@ -1,11 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { Key, Trash2 } from 'lucide-react'
+import Link from 'next/link'
+import { Key, Trash2, Crown, AlertCircle, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Input, FormField } from '@/components/ui/input'
 import { Modal, ModalBody, ModalFooter, ModalHeader, ModalTitle } from '@/components/ui/modal'
-import type { UserPreferences, UserSession } from '@/types'
+import { formatDateShort } from '@/lib/utils'
+import type { UserPreferences, UserSession, Subscription } from '@/types'
 
 type ToggleProps = {
   checked: boolean
@@ -33,24 +36,33 @@ function PreferenceToggle({ checked, onToggle }: ToggleProps) {
 type SettingsTabProps = {
   preferences: UserPreferences
   sessions: UserSession[]
+  subscription: Subscription | null
   onUpdate: (values: Partial<UserPreferences>) => Promise<{ error?: string }> | void
   onDeleteSession: (sessionId: string) => Promise<{ error?: string }> | void
   onPasswordChange: (currentPassword: string, newPassword: string) => Promise<{ error?: string }> | void
   onDeleteAccount: (password: string) => Promise<{ error?: string }> | void
+  onSubscriptionUpdate: (subscription: Subscription | null) => void
 }
 
 export function SettingsTab({
   preferences,
+  subscription,
   onUpdate,
   onPasswordChange,
   onDeleteAccount,
+  onSubscriptionUpdate,
 }: SettingsTabProps) {
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [passwordModalOpen, setPasswordModalOpen] = useState(false)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [cancelSubscriptionModalOpen, setCancelSubscriptionModalOpen] = useState(false)
   const [passwordForm, setPasswordForm] = useState({ current: '', next: '', confirm: '' })
   const [deletePassword, setDeletePassword] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
+  const [isSubscriptionLoading, setIsSubscriptionLoading] = useState(false)
+
+  const isActiveMember = subscription?.status === 'active' || subscription?.status === 'trialing'
+  const isCanceledButActive = isActiveMember && subscription?.cancel_at_period_end
 
   const handlePreferencesUpdate = async (values: Partial<UserPreferences>) => {
     const result = await onUpdate(values)
@@ -117,6 +129,72 @@ export function SettingsTab({
     }
   }
 
+  const handleManageSubscription = async () => {
+    setIsSubscriptionLoading(true)
+    try {
+      const response = await fetch('/api/club/customer-portal', {
+        method: 'POST',
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        setStatusMessage(data.error || 'Erro ao acessar portal')
+        return
+      }
+      if (data.url) {
+        window.open(data.url, '_blank')
+      }
+    } catch (error) {
+      setStatusMessage('Erro ao conectar com o servidor')
+    } finally {
+      setIsSubscriptionLoading(false)
+    }
+  }
+
+  const handleCancelSubscription = async () => {
+    setIsSubscriptionLoading(true)
+    try {
+      const response = await fetch('/api/club/cancel-subscription', {
+        method: 'POST',
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        setStatusMessage(data.error || 'Erro ao cancelar assinatura')
+        return
+      }
+      if (data.subscription) {
+        onSubscriptionUpdate(data.subscription)
+      }
+      setStatusMessage('Assinatura cancelada. Você terá acesso aos benefícios até o fim do período pago.')
+      setCancelSubscriptionModalOpen(false)
+    } catch (error) {
+      setStatusMessage('Erro ao conectar com o servidor')
+    } finally {
+      setIsSubscriptionLoading(false)
+    }
+  }
+
+  const handleReactivateSubscription = async () => {
+    setIsSubscriptionLoading(true)
+    try {
+      const response = await fetch('/api/club/reactivate-subscription', {
+        method: 'POST',
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        setStatusMessage(data.error || 'Erro ao reativar assinatura')
+        return
+      }
+      if (data.subscription) {
+        onSubscriptionUpdate(data.subscription)
+      }
+      setStatusMessage('Assinatura reativada com sucesso!')
+    } catch (error) {
+      setStatusMessage('Erro ao conectar com o servidor')
+    } finally {
+      setIsSubscriptionLoading(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="grid gap-6 lg:grid-cols-2">
@@ -171,6 +249,84 @@ export function SettingsTab({
           </Button>
         </section>
       </div>
+
+      {/* Club Benefits Section */}
+      <section className="rounded-3xl border border-orange-200 bg-gradient-to-br from-orange-50 to-white p-6 shadow-[0_25px_60px_rgba(249,115,22,0.08)]">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-orange-600">
+            <Crown className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <h3 className="text-xl font-semibold text-neutral-900">Clube de Benefícios</h3>
+            {isActiveMember ? (
+              <Badge variant="success" size="sm">Assinatura Ativa</Badge>
+            ) : (
+              <p className="text-sm text-neutral-500">Descontos exclusivos em eventos</p>
+            )}
+          </div>
+        </div>
+
+        {isActiveMember && subscription ? (
+          <div className="space-y-4">
+            {isCanceledButActive ? (
+              <div className="flex items-center gap-2 text-warning-600 bg-warning/10 rounded-lg px-3 py-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span className="text-sm">
+                  Sua assinatura será cancelada em {formatDateShort(subscription.current_period_end)}
+                </span>
+              </div>
+            ) : (
+              <p className="text-sm text-neutral-600">
+                Renovação automática em {formatDateShort(subscription.current_period_end)}
+              </p>
+            )}
+            <div className="flex flex-wrap gap-3">
+              <Button
+                variant="secondary"
+                className="rounded-xl"
+                onClick={handleManageSubscription}
+                disabled={isSubscriptionLoading}
+              >
+                <ExternalLink className="w-4 h-4" />
+                {isSubscriptionLoading ? 'Carregando...' : 'Gerenciar Assinatura'}
+              </Button>
+              {isCanceledButActive ? (
+                <Button
+                  variant="primary"
+                  className="rounded-xl"
+                  onClick={handleReactivateSubscription}
+                  disabled={isSubscriptionLoading}
+                >
+                  <Crown className="w-4 h-4" />
+                  {isSubscriptionLoading ? 'Carregando...' : 'Reativar Assinatura'}
+                </Button>
+              ) : (
+                <Button
+                  variant="ghost"
+                  className="rounded-xl text-neutral-500 hover:text-error-600"
+                  onClick={() => setCancelSubscriptionModalOpen(true)}
+                  disabled={isSubscriptionLoading}
+                >
+                  Cancelar Assinatura
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-sm text-neutral-600">
+              Assine o Clube Symplepass por R$ 15/mês e tenha 10% de desconto em todas as inscrições,
+              acesso antecipado a eventos e descontos em estabelecimentos parceiros.
+            </p>
+            <Link href="/clube-beneficios">
+              <Button variant="primary" className="rounded-xl">
+                <Crown className="w-4 h-4" />
+                Assinar por R$ 15/mês
+              </Button>
+            </Link>
+          </div>
+        )}
+      </section>
 
       <section className="rounded-3xl border border-red-200 bg-red-50 p-6 shadow-[0_25px_60px_rgba(239,68,68,0.18)] space-y-4">
         <div>
@@ -265,6 +421,40 @@ export function SettingsTab({
           </Button>
           <Button variant="destructive" isLoading={isProcessing} onClick={handleAccountDeletion}>
             Excluir definitivamente
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Cancel Subscription Modal */}
+      <Modal open={cancelSubscriptionModalOpen} onOpenChange={setCancelSubscriptionModalOpen}>
+        <ModalHeader onClose={() => setCancelSubscriptionModalOpen(false)}>
+          <ModalTitle>Cancelar Assinatura</ModalTitle>
+        </ModalHeader>
+        <ModalBody className="space-y-4 text-sm text-neutral-700">
+          <p>
+            Tem certeza que deseja cancelar sua assinatura do Clube de Benefícios?
+          </p>
+          {subscription && (
+            <div className="bg-neutral-50 rounded-lg p-4 border border-neutral-200">
+              <p className="font-medium text-neutral-900 mb-1">O que acontece ao cancelar:</p>
+              <ul className="text-sm text-neutral-600 space-y-1">
+                <li>• Seus benefícios continuam ativos até {formatDateShort(subscription.current_period_end)}</li>
+                <li>• Após essa data, você perderá os descontos em inscrições</li>
+                <li>• Você pode reativar a qualquer momento</li>
+              </ul>
+            </div>
+          )}
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="secondary" onClick={() => setCancelSubscriptionModalOpen(false)}>
+            Voltar
+          </Button>
+          <Button
+            variant="destructive"
+            isLoading={isSubscriptionLoading}
+            onClick={handleCancelSubscription}
+          >
+            Confirmar Cancelamento
           </Button>
         </ModalFooter>
       </Modal>

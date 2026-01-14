@@ -6,6 +6,7 @@ import type { EventsListFilters, PaginatedEventsResponse, FilterOption } from '@
  * Fetches featured events for the home page
  * Returns up to 3 published events marked as featured, ordered by start date
  * Includes both 'published' and 'published_no_registration' events
+ * Also calculates min_price from event categories
  * @returns Promise<Event[]> Array of featured events, empty array on error
  */
 export async function getFeaturedEvents(): Promise<Event[]> {
@@ -14,7 +15,10 @@ export async function getFeaturedEvents(): Promise<Event[]> {
 
     const { data, error } = await supabase
       .from('events')
-      .select('*')
+      .select(`
+        *,
+        event_categories (price)
+      `)
       .eq('is_featured', true)
       .in('status', ['published', 'published_no_registration'])
       .order('start_date', { ascending: true })
@@ -25,7 +29,23 @@ export async function getFeaturedEvents(): Promise<Event[]> {
       return []
     }
 
-    return data || []
+    // Calculate min_price from categories for each event
+    const eventsWithPrices = (data || []).map((event: any) => {
+      const categories = event.event_categories || []
+      const prices = categories.map((cat: any) => cat.price).filter((p: any) => p !== null && p !== undefined)
+      const min_price = prices.length > 0 ? Math.min(...prices) : undefined
+      const max_price = prices.length > 0 ? Math.max(...prices) : undefined
+
+      // Remove the nested event_categories from the result
+      const { event_categories, ...eventData } = event
+      return {
+        ...eventData,
+        min_price,
+        max_price,
+      }
+    })
+
+    return eventsWithPrices
   } catch (error) {
     console.error('Unexpected error fetching featured events:', error)
     return []
@@ -36,6 +56,7 @@ export async function getFeaturedEvents(): Promise<Event[]> {
  * Fetches upcoming published events
  * Returns events with start date in the future, ordered by start date ascending
  * Includes both 'published' and 'published_no_registration' events
+ * Also calculates min_price from event categories
  * @param limit - Maximum number of events to return (default: 5)
  * @returns Promise<Event[]> Array of upcoming events, empty array on error
  */
@@ -46,7 +67,10 @@ export async function getUpcomingEvents(limit: number = 5): Promise<Event[]> {
 
     const { data, error } = await supabase
       .from('events')
-      .select('*')
+      .select(`
+        *,
+        event_categories (price)
+      `)
       .in('status', ['published', 'published_no_registration'])
       .gte('start_date', now)
       .order('start_date', { ascending: true })
@@ -57,7 +81,23 @@ export async function getUpcomingEvents(limit: number = 5): Promise<Event[]> {
       return []
     }
 
-    return data || []
+    // Calculate min_price from categories for each event
+    const eventsWithPrices = (data || []).map((event: any) => {
+      const categories = event.event_categories || []
+      const prices = categories.map((cat: any) => cat.price).filter((p: any) => p !== null && p !== undefined)
+      const min_price = prices.length > 0 ? Math.min(...prices) : undefined
+      const max_price = prices.length > 0 ? Math.max(...prices) : undefined
+
+      // Remove the nested event_categories from the result
+      const { event_categories, ...eventData } = event
+      return {
+        ...eventData,
+        min_price,
+        max_price,
+      }
+    })
+
+    return eventsWithPrices
   } catch (error) {
     console.error('Unexpected error fetching upcoming events:', error)
     return []
@@ -351,14 +391,17 @@ export async function getFilteredEvents(
     // Try to use materialized view first, fallback to events table
     let queryBuilder = supabase
       .from('events')
-      .select('*', { count: 'exact' })
+      .select(`
+        *,
+        event_categories (price)
+      `, { count: 'exact' })
       .in('status', ['published', 'published_no_registration'])
 
     // Apply text search on title, description, and location
     if (filters.search) {
       // Search in title, description, and location fields
       queryBuilder = queryBuilder.or(
-        `title.ilike.%${filters.search}%,description.ilike.%${filters.search}%,location->>city.ilike.%${filters.search}%`
+        `title.ilike.%${filters.search}%,description.ilike.%${filters.search}%,location->city.ilike.%${filters.search}%`
       )
     }
 
@@ -429,14 +472,27 @@ export async function getFilteredEvents(
       }
     }
 
-    // Events already have min_price and max_price from the materialized view
-    const events = (data || []) as Event[]
+    // Calculate min_price and max_price from categories for each event
+    const eventsWithPrices = (data || []).map((event: any) => {
+      const categories = event.event_categories || []
+      const prices = categories.map((cat: any) => cat.price).filter((p: any) => p !== null && p !== undefined)
+      const min_price = prices.length > 0 ? Math.min(...prices) : undefined
+      const max_price = prices.length > 0 ? Math.max(...prices) : undefined
+
+      // Remove the nested event_categories from the result
+      const { event_categories, ...eventData } = event
+      return {
+        ...eventData,
+        min_price,
+        max_price,
+      }
+    }) as Event[]
 
     const total = count || 0
-    const hasMore = from + events.length < total
+    const hasMore = from + eventsWithPrices.length < total
 
     return {
-      events,
+      events: eventsWithPrices,
       total,
       page,
       pageSize,

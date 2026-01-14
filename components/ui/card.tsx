@@ -283,7 +283,11 @@ export function EventCard({
                   </>
                 ) : (
                   <span>
-                    {price !== undefined && price > 0 ? `a partir de ${formatCurrency(price)}` : 'Gratuito'}
+                    {price === undefined 
+                      ? 'Em breve' 
+                      : price > 0 
+                        ? `a partir de ${formatCurrency(price)}` 
+                        : 'Gratuito'}
                   </span>
                 )}
               </div>
@@ -291,7 +295,11 @@ export function EventCard({
               <div className="text-right">
                 {time ? (
                   <span className="text-neutral-900">
-                    {price !== undefined && price > 0 ? formatCurrency(price) : 'Gratuito'}
+                    {price === undefined 
+                      ? 'Em breve' 
+                      : price > 0 
+                        ? formatCurrency(price) 
+                        : 'Gratuito'}
                   </span>
                 ) : (
                   <span>{isVirtual ? 'Virtual' : 'Presencial'}</span>

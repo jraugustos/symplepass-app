@@ -84,6 +84,112 @@ export function ReviewClient({
 
   const isTeamRegistration = teamMembersData.length > 0
 
+  // Duplicate data validation for duo/team registrations
+  const duplicateErrors = useMemo(() => {
+    const errors: {
+      partnerCpf?: string
+      partnerEmail?: string
+      partnerPhone?: string
+      teamMembers: Array<{
+        cpf?: string
+        email?: string
+        phone?: string
+      }>
+    } = { teamMembers: [] }
+
+    // Normalize functions for comparison
+    const normalizeValue = (value: string) => value.replace(/\D/g, '').toLowerCase().trim()
+    const normalizeEmail = (value: string) => value.toLowerCase().trim()
+
+    // Get user data for comparison
+    const userCpfNormalized = normalizeValue(userCpf)
+    const userEmailNormalized = normalizeEmail(email)
+    const userPhoneNormalized = normalizeValue(userPhone)
+
+    // Check partner data against user data
+    if (partnerName) {
+      const partnerCpfNormalized = normalizeValue(partnerCpf)
+      const partnerEmailNormalized = normalizeEmail(partnerEmail)
+      const partnerPhoneNormalized = normalizeValue(partnerPhone)
+
+      if (partnerCpfNormalized && userCpfNormalized && partnerCpfNormalized === userCpfNormalized) {
+        errors.partnerCpf = 'O CPF do parceiro(a) não pode ser igual ao seu.'
+      }
+      if (partnerEmailNormalized && userEmailNormalized && partnerEmailNormalized === userEmailNormalized) {
+        errors.partnerEmail = 'O e-mail do parceiro(a) não pode ser igual ao seu.'
+      }
+      if (partnerPhoneNormalized && userPhoneNormalized && partnerPhoneNormalized === userPhoneNormalized) {
+        errors.partnerPhone = 'O telefone do parceiro(a) não pode ser igual ao seu.'
+      }
+    }
+
+    // Check team members data
+    if (isTeamRegistration) {
+      // Collect all data for cross-comparison
+      const allCpfs: Array<{ value: string; label: string; index: number }> = []
+      const allEmails: Array<{ value: string; label: string; index: number }> = []
+      const allPhones: Array<{ value: string; label: string; index: number }> = []
+
+      // Add user data
+      if (userCpfNormalized) allCpfs.push({ value: userCpfNormalized, label: 'seus dados', index: -1 })
+      if (userEmailNormalized) allEmails.push({ value: userEmailNormalized, label: 'seus dados', index: -1 })
+      if (userPhoneNormalized) allPhones.push({ value: userPhoneNormalized, label: 'seus dados', index: -1 })
+
+      // Check each team member
+      teamMembersData.forEach((member, index) => {
+        const memberErrors: { cpf?: string; email?: string; phone?: string } = {}
+        const memberCpfNormalized = normalizeValue(member.cpf)
+        const memberEmailNormalized = normalizeEmail(member.email)
+        const memberPhoneNormalized = normalizeValue(member.phone)
+
+        // Check CPF against all previous entries
+        if (memberCpfNormalized) {
+          const duplicate = allCpfs.find(c => c.value === memberCpfNormalized)
+          if (duplicate) {
+            memberErrors.cpf = duplicate.index === -1
+              ? 'O CPF não pode ser igual ao seu.'
+              : `O CPF não pode ser igual ao do Membro ${duplicate.index + 2}.`
+          }
+          allCpfs.push({ value: memberCpfNormalized, label: `Membro ${index + 2}`, index })
+        }
+
+        // Check email against all previous entries
+        if (memberEmailNormalized) {
+          const duplicate = allEmails.find(e => e.value === memberEmailNormalized)
+          if (duplicate) {
+            memberErrors.email = duplicate.index === -1
+              ? 'O e-mail não pode ser igual ao seu.'
+              : `O e-mail não pode ser igual ao do Membro ${duplicate.index + 2}.`
+          }
+          allEmails.push({ value: memberEmailNormalized, label: `Membro ${index + 2}`, index })
+        }
+
+        // Check phone against all previous entries
+        if (memberPhoneNormalized) {
+          const duplicate = allPhones.find(p => p.value === memberPhoneNormalized)
+          if (duplicate) {
+            memberErrors.phone = duplicate.index === -1
+              ? 'O telefone não pode ser igual ao seu.'
+              : `O telefone não pode ser igual ao do Membro ${duplicate.index + 2}.`
+          }
+          allPhones.push({ value: memberPhoneNormalized, label: `Membro ${index + 2}`, index })
+        }
+
+        errors.teamMembers[index] = memberErrors
+      })
+    }
+
+    return errors
+  }, [userCpf, email, userPhone, partnerName, partnerCpf, partnerEmail, partnerPhone, isTeamRegistration, teamMembersData])
+
+  // Check if there are any duplicate errors
+  const hasDuplicateErrors = useMemo(() => {
+    if (duplicateErrors.partnerCpf || duplicateErrors.partnerEmail || duplicateErrors.partnerPhone) {
+      return true
+    }
+    return duplicateErrors.teamMembers.some(m => m.cpf || m.email || m.phone)
+  }, [duplicateErrors])
+
   // Calculate club member discount
   const categoryPrice = category.price || 0
   const clubDiscount = useMemo(() => {
@@ -198,7 +304,7 @@ export function ReviewClient({
     })
   }, [isTeamRegistration, teamMembersData])
 
-  const isFormValid = isUserDataValid && termsAccepted && isPartnerDataValid && isTeamDataValid
+  const isFormValid = isUserDataValid && termsAccepted && isPartnerDataValid && isTeamDataValid && !hasDuplicateErrors
 
   // Get current search params for login redirect
   const searchParams = useSearchParams()
@@ -558,10 +664,13 @@ export function ReviewClient({
                       placeholder="email@exemplo.com"
                       value={partnerEmail}
                       onChange={(event) => setPartnerEmail(event.target.value)}
-                      error={!!partnerEmail && !isPartnerEmailValid}
+                      error={!!partnerEmail && (!isPartnerEmailValid || !!duplicateErrors.partnerEmail)}
                     />
                     {!isPartnerEmailValid && partnerEmail && (
                       <p className="text-sm text-rose-500">Informe um e-mail válido.</p>
+                    )}
+                    {duplicateErrors.partnerEmail && (
+                      <p className="text-sm text-rose-500">{duplicateErrors.partnerEmail}</p>
                     )}
                   </div>
 
@@ -572,10 +681,13 @@ export function ReviewClient({
                       placeholder="000.000.000-00"
                       value={partnerCpf}
                       onChange={(event) => setPartnerCpf(formatCPF(event.target.value))}
-                      error={!!partnerCpf && !isPartnerCpfValid}
+                      error={!!partnerCpf && (!isPartnerCpfValid || !!duplicateErrors.partnerCpf)}
                     />
                     {!isPartnerCpfValid && partnerCpf && (
                       <p className="text-sm text-rose-500">CPF inválido.</p>
+                    )}
+                    {duplicateErrors.partnerCpf && (
+                      <p className="text-sm text-rose-500">{duplicateErrors.partnerCpf}</p>
                     )}
                   </div>
 
@@ -586,10 +698,13 @@ export function ReviewClient({
                       placeholder="(00) 00000-0000"
                       value={partnerPhone}
                       onChange={(event) => setPartnerPhone(formatPhone(event.target.value))}
-                      error={!!partnerPhone && !isPartnerPhoneValid}
+                      error={!!partnerPhone && (!isPartnerPhoneValid || !!duplicateErrors.partnerPhone)}
                     />
                     {!isPartnerPhoneValid && partnerPhone && (
                       <p className="text-sm text-rose-500">Telefone inválido.</p>
+                    )}
+                    {duplicateErrors.partnerPhone && (
+                      <p className="text-sm text-rose-500">{duplicateErrors.partnerPhone}</p>
                     )}
                   </div>
 
@@ -682,6 +797,7 @@ export function ReviewClient({
                     const isMemberCpfValid = validateCPF(member.cpf)
                     const memberPhoneDigits = member.phone.replace(/\D/g, '')
                     const isMemberPhoneValid = memberPhoneDigits.length === 10 || memberPhoneDigits.length === 11
+                    const memberDuplicateErrors = duplicateErrors.teamMembers[index] || {}
 
                     return (
                       <div key={index} className="rounded-2xl border border-purple-200 bg-purple-50/50 p-4 sm:p-5 space-y-4">
@@ -723,11 +839,14 @@ export function ReviewClient({
                             }}
                             className={cn(
                               "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                              !!member.email && !isMemberEmailValid ? "border-rose-500 focus-visible:ring-rose-500" : ""
+                              !!member.email && (!isMemberEmailValid || !!memberDuplicateErrors.email) ? "border-rose-500 focus-visible:ring-rose-500" : ""
                             )}
                           />
                           {!isMemberEmailValid && member.email && (
                             <p className="text-sm text-rose-500">Informe um e-mail válido.</p>
+                          )}
+                          {memberDuplicateErrors.email && (
+                            <p className="text-sm text-rose-500">{memberDuplicateErrors.email}</p>
                           )}
                         </div>
 
@@ -744,11 +863,14 @@ export function ReviewClient({
                             }}
                             className={cn(
                               "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                              !!member.cpf && !isMemberCpfValid ? "border-rose-500 focus-visible:ring-rose-500" : ""
+                              !!member.cpf && (!isMemberCpfValid || !!memberDuplicateErrors.cpf) ? "border-rose-500 focus-visible:ring-rose-500" : ""
                             )}
                           />
                           {!isMemberCpfValid && member.cpf && (
                             <p className="text-sm text-rose-500">CPF inválido.</p>
+                          )}
+                          {memberDuplicateErrors.cpf && (
+                            <p className="text-sm text-rose-500">{memberDuplicateErrors.cpf}</p>
                           )}
                         </div>
 
@@ -765,11 +887,14 @@ export function ReviewClient({
                             }}
                             className={cn(
                               "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                              !!member.phone && !isMemberPhoneValid ? "border-rose-500 focus-visible:ring-rose-500" : ""
+                              !!member.phone && (!isMemberPhoneValid || !!memberDuplicateErrors.phone) ? "border-rose-500 focus-visible:ring-rose-500" : ""
                             )}
                           />
                           {!isMemberPhoneValid && member.phone && (
                             <p className="text-sm text-rose-500">Telefone inválido.</p>
+                          )}
+                          {memberDuplicateErrors.phone && (
+                            <p className="text-sm text-rose-500">{memberDuplicateErrors.phone}</p>
                           )}
                         </div>
 

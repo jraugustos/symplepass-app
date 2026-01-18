@@ -133,7 +133,7 @@ export async function validateRegistration(
     if (eventRegistrations !== null && eventRegistrations >= event.max_participants) {
       return {
         valid: false,
-        error: 'Este evento atingiu o número máximo de participantes.',
+        error: 'Este evento atingiu o número máximo de atletas.',
         errorCode: 'EVENT_FULL'
       }
     }
@@ -150,7 +150,7 @@ export async function validateRegistration(
     if (categoryRegistrations !== null && categoryRegistrations >= category.max_participants) {
       return {
         valid: false,
-        error: `A categoria "${category.name}" atingiu o número máximo de participantes.`,
+        error: `A categoria "${category.name}" atingiu o número máximo de atletas.`,
         errorCode: 'CATEGORY_FULL'
       }
     }

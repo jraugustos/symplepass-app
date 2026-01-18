@@ -72,7 +72,7 @@ export function calculatePricePerParticipant(price: number, participantCount: nu
  * @param allowsTeamRegistration - Whether event allows team registration
  * @param teamSize - Team size for team events
  * @param allowsIndividualRegistration - Whether event allows individual registration
- * @returns Formatted label like "R$80 por participante" or null if not applicable
+ * @returns Formatted label like "R$80 por atleta" or null if not applicable
  */
 export function formatPricePerParticipant(
   price: number | null | undefined,
@@ -97,7 +97,7 @@ export function formatPricePerParticipant(
   }
 
   const pricePerParticipant = calculatePricePerParticipant(price, participantCount)
-  return `${formatCurrency(pricePerParticipant)} por participante`
+  return `${formatCurrency(pricePerParticipant)} por atleta`
 }
 
 /**
@@ -110,7 +110,7 @@ export function calculateServiceFee(subtotal: number): number {
     return 0
   }
 
-  return Math.round(subtotal * 0.1 * 100) / 100
+  return 0
 }
 
 /**

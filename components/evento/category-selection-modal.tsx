@@ -288,7 +288,7 @@ export default function CategorySelectionModal({
                         : event.team_size && event.team_size > 1
                           ? category.price / event.team_size
                           : category.price
-                    )} por participante
+                    )} por atleta
                   </p>
                 )}
               </div>

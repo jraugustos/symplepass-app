@@ -390,7 +390,7 @@ export function EventCard({
             {participants !== undefined && (
               <span className="flex items-center gap-1.5 text-sm text-neutral-500">
                 <Users className="w-4 h-4" />
-                {participants} participantes
+                {participants} atletas
               </span>
             )}
           </div>

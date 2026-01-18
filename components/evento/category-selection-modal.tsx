@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowRight, X } from 'lucide-react'
 import { formatCurrency, cn } from '@/lib/utils'
@@ -29,6 +29,7 @@ export default function CategorySelectionModal({
   const [partnerGender, setPartnerGender] = useState<ShirtGender | null>(null)
   const [partnerSize, setPartnerSize] = useState<ShirtSize>('')
   const [partnerName, setPartnerName] = useState('')
+  const [isNavigating, setIsNavigating] = useState(false)
   // Team members state for team registration
   const [teamMembers, setTeamMembers] = useState<Array<{ name: string; gender: ShirtGender | null; size: ShirtSize }>>([])
   // Determine default registration type based on event settings
@@ -51,24 +52,28 @@ export default function CategorySelectionModal({
   // Check if category has specific gender restrictions (array)
   const categoryGenders = category?.shirt_genders || null
 
-  // Filter gender options based on category restriction
-  const genderOptions: ShirtGender[] = categoryGenders && categoryGenders.length > 0
-    // If category has specific genders, only show those genders
-    ? categoryGenders.filter((gender) => {
+  // Filter gender options based on category restriction - memoized to prevent infinite loops
+  const genderOptions: ShirtGender[] = useMemo(() => {
+    if (categoryGenders && categoryGenders.length > 0) {
+      // If category has specific genders, only show those genders
+      return categoryGenders.filter((gender) => {
         // Also ensure the gender has sizes configured
         if (shirtSizesConfig) {
           return shirtSizesConfig[gender] && shirtSizesConfig[gender]!.length > 0
         }
         return DEFAULT_SHIRT_SIZES_BY_GENDER[gender]?.length > 0
       })
+    }
     // Otherwise, show all genders that have sizes configured
-    : shirtSizesConfig
-      ? (Object.keys(GENDER_LABELS) as ShirtGender[]).filter(
+    if (shirtSizesConfig) {
+      return (Object.keys(GENDER_LABELS) as ShirtGender[]).filter(
         (gender) => shirtSizesConfig[gender] && shirtSizesConfig[gender]!.length > 0
       )
-      : (Object.keys(GENDER_LABELS) as ShirtGender[]).filter(
-        (gender) => DEFAULT_SHIRT_SIZES_BY_GENDER[gender]?.length > 0
-      )
+    }
+    return (Object.keys(GENDER_LABELS) as ShirtGender[]).filter(
+      (gender) => DEFAULT_SHIRT_SIZES_BY_GENDER[gender]?.length > 0
+    )
+  }, [categoryGenders, shirtSizesConfig])
 
   const getSizesForGender = (gender: ShirtGender | null) => {
     if (!gender) return []
@@ -78,7 +83,7 @@ export default function CategorySelectionModal({
     return DEFAULT_SHIRT_SIZES_BY_GENDER[gender] || []
   }
 
-  // Align selected genders with available options when category or genderOptions change
+  // Align selected genders with available options when category changes
   useEffect(() => {
     if (genderOptions.length === 0) {
       setSelectedGender(null)
@@ -100,11 +105,12 @@ export default function CategorySelectionModal({
         return prev && genderOptions.includes(prev) ? prev : genderOptions[0]
       })
     }
-  }, [genderOptions, registrationType, categoryGenders])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category?.id, registrationType])
 
-  // Get available sizes for selected gender(s)
-  const availableSizes = getSizesForGender(selectedGender)
-  const partnerAvailableSizes = getSizesForGender(partnerGender)
+  // Get available sizes for selected gender(s) - memoized to prevent infinite loops
+  const availableSizes = useMemo(() => getSizesForGender(selectedGender), [selectedGender, shirtSizesConfig])
+  const partnerAvailableSizes = useMemo(() => getSizesForGender(partnerGender), [partnerGender, shirtSizesConfig])
 
   // Set initial size when gender changes
   useEffect(() => {
@@ -113,7 +119,7 @@ export default function CategorySelectionModal({
     } else {
       setSelectedSize('')
     }
-  }, [selectedGender, availableSizes])
+  }, [selectedGender])
 
   useEffect(() => {
     if (partnerAvailableSizes && partnerAvailableSizes.length > 0 && registrationType === 'dupla') {
@@ -121,7 +127,7 @@ export default function CategorySelectionModal({
     } else if (registrationType !== 'dupla') {
       setPartnerSize('')
     }
-  }, [partnerAvailableSizes, registrationType])
+  }, [partnerGender, registrationType])
 
   // Initialize team members when switching to team registration
   useEffect(() => {
@@ -139,7 +145,8 @@ export default function CategorySelectionModal({
     } else if (registrationType !== 'equipe') {
       setTeamMembers([])
     }
-  }, [registrationType, event.team_size, genderOptions])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registrationType, event.team_size])
 
   // Body scroll lock
   useEffect(() => {
@@ -177,7 +184,6 @@ export default function CategorySelectionModal({
   const allowsIndividualRegistration = event.allows_individual_registration !== false
   const allowsPairRegistration = event.allows_pair_registration === true
   const allowsTeamRegistration = event.allows_team_registration === true
-  // Show registration type selector if more than one type is allowed
   const registrationTypesAllowed = [allowsIndividualRegistration, allowsPairRegistration, allowsTeamRegistration].filter(Boolean).length
   const showRegistrationTypeSelector = registrationTypesAllowed > 1
   const isFreeEvent = event.event_type === 'free' || event.event_type === 'solidarity'
@@ -185,8 +191,17 @@ export default function CategorySelectionModal({
   const requiresTeamInfo = registrationType === 'equipe'
   const hasPartnerShirtSelection = requiresPartnerInfo && genderOptions.length > 0 && partnerAvailableSizes.length > 0
 
+  const isButtonDisabled = !hasShirtSizes ||
+    !selectedSize ||
+    !selectedGender ||
+    (requiresPartnerInfo && !partnerName.trim()) ||
+    (requiresTeamInfo && teamMembers.some(m => !m.name.trim() || !m.size))
+
   const handleConfirm = () => {
-    // Navigate to inscription review page with query params
+    if (isNavigating) return
+
+    setIsNavigating(true)
+
     const params = new URLSearchParams({
       event: eventSlug,
       category: category.id,
@@ -203,7 +218,6 @@ export default function CategorySelectionModal({
       }
     }
 
-    // Add team members data for team registration
     if (requiresTeamInfo && teamMembers.length > 0) {
       params.set('team_size', String(event.team_size || teamMembers.length + 1))
       teamMembers.forEach((member, index) => {
@@ -260,9 +274,23 @@ export default function CategorySelectionModal({
           <div className="mt-4 space-y-3">
             {/* Price box */}
             {!isFreeEvent && (
-              <div className="flex items-center justify-between rounded-lg border border-neutral-200 p-3">
-                <span className="text-sm text-neutral-500 font-geist">Valor da inscrição</span>
-                <span className="text-lg font-semibold font-geist">{formatCurrency(category.price)}</span>
+              <div className="flex flex-col rounded-lg border border-neutral-200 p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-neutral-500 font-geist">Valor da inscrição</span>
+                  <span className="text-lg font-semibold font-geist">{formatCurrency(category.price)}</span>
+                </div>
+                {/* Per-participant price label for duo/team registrations */}
+                {category.price > 0 && (registrationType === 'dupla' || registrationType === 'equipe') && (
+                  <p className="text-xs text-neutral-500 font-geist text-right mt-1">
+                    {formatCurrency(
+                      registrationType === 'dupla'
+                        ? category.price / 2
+                        : event.team_size && event.team_size > 1
+                          ? category.price / event.team_size
+                          : category.price
+                    )} por participante
+                  </p>
+                )}
               </div>
             )}
 
@@ -351,8 +379,8 @@ export default function CategorySelectionModal({
                   {registrationType === 'equipe'
                     ? `👥 Este evento aceita apenas inscrições em equipe (${event.team_size} pessoas)`
                     : registrationType === 'dupla'
-                    ? '👥 Este evento aceita apenas inscrições em dupla'
-                    : '👤 Este evento aceita apenas inscrições individuais'}
+                      ? '👥 Este evento aceita apenas inscrições em dupla'
+                      : '👤 Este evento aceita apenas inscrições individuais'}
                 </p>
               </div>
             )}
@@ -613,16 +641,10 @@ export default function CategorySelectionModal({
               className="inline-flex items-center gap-2 text-sm font-medium rounded-full px-4 py-2 text-white font-geist disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ backgroundImage: hasShirtSizes ? 'linear-gradient(to right, rgb(249, 115, 22), rgb(245, 158, 11))' : 'linear-gradient(to right, rgb(163, 163, 163), rgb(115, 115, 115))' }}
               onClick={handleConfirm}
-              disabled={
-                !hasShirtSizes ||
-                !selectedSize ||
-                !selectedGender ||
-                (requiresPartnerInfo && !partnerName.trim()) ||
-                (requiresTeamInfo && teamMembers.some(m => !m.name.trim() || !m.size))
-              }
+              disabled={isButtonDisabled || isNavigating}
             >
-              Continuar
-              <ArrowRight className="w-4 h-4" />
+              {isNavigating ? 'Carregando...' : 'Continuar'}
+              {!isNavigating && <ArrowRight className="w-4 h-4" />}
             </button>
           </div>
         </div>

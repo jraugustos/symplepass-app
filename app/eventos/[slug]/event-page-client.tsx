@@ -150,6 +150,10 @@ export default function EventPageClient({
                 eventType={event.event_type}
                 eventStatus={event.status}
                 solidarityMessage={event.solidarity_message}
+                allowsPairRegistration={event.allows_pair_registration}
+                allowsTeamRegistration={event.allows_team_registration}
+                allowsIndividualRegistration={event.allows_individual_registration}
+                teamSize={event.team_size}
                 onCategorySelect={handleCategorySelect}
               />
             </EventSectionWrapper>
@@ -162,10 +166,10 @@ export default function EventPageClient({
               (event.course_info.specification_type === 'course' && event.show_course_info) ||
               (event.course_info.specification_type === 'championship_format' && event.show_championship_format)
             ) && (
-              <EventSectionWrapper id="percurso" showTitle={false}>
-                <EventCourse courseInfo={event.course_info} />
-              </EventSectionWrapper>
-            )}
+                <EventSectionWrapper id="percurso" showTitle={false}>
+                  <EventCourse courseInfo={event.course_info} />
+                </EventSectionWrapper>
+              )}
 
             <EventSectionWrapper id="regulamento" showTitle={false}>
               <EventRegulations
@@ -213,6 +217,10 @@ export default function EventPageClient({
           eventType={event.event_type}
           eventStatus={event.status}
           solidarityMessage={event.solidarity_message}
+          allowsPairRegistration={event.allows_pair_registration}
+          allowsTeamRegistration={event.allows_team_registration}
+          allowsIndividualRegistration={event.allows_individual_registration}
+          teamSize={event.team_size}
           onCtaClick={scrollToCategories}
         />
       </div>

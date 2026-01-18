@@ -9,7 +9,7 @@ import {
 } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Trash2, GripVertical } from "lucide-react";
+import { Plus, Trash2, GripVertical, ExternalLink } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
@@ -415,8 +415,19 @@ export function EventForm({
   };
 
   // Publish - with full validation
-  const handlePublish = submitForm((data) =>
-    handleFormSubmit(data),
+  const handlePublish = submitForm(
+    (data) => handleFormSubmit(data),
+    (validationErrors) => {
+      // Scroll to top to show error messages
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      // Get first error message to display
+      const firstError = Object.values(validationErrors)[0];
+      const errorMessage = firstError?.message ||
+        (firstError?.root?.message) ||
+        "Por favor, preencha todos os campos obrigatórios.";
+      setError(typeof errorMessage === 'string' ? errorMessage : "Erro de validação");
+      console.error("Validation errors:", validationErrors);
+    }
   );
 
   const bannerUrl = watch("banner_url");
@@ -1066,6 +1077,17 @@ export function EventForm({
                   ? (status === "published" ? "Atualizando..." : "Publicando...")
                   : (status === "published" ? "Atualizar" : "Publicar")}
               </Button>
+              {event?.slug && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(`/eventos/${event.slug}`, "_blank")}
+                >
+                  <ExternalLink className="w-4 h-4 mr-1" />
+                  Ver Página
+                </Button>
+              )}
             </div>
           </div>
         </div>

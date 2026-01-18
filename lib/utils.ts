@@ -23,6 +23,84 @@ export function formatCurrency(amount: number | null): string {
 }
 
 /**
+ * Calculate the number of participants for an event based on registration type
+ * @param allowsPairRegistration - Whether event allows pair registration
+ * @param allowsTeamRegistration - Whether event allows team registration
+ * @param teamSize - Team size for team events
+ * @param allowsIndividualRegistration - Whether event allows individual registration (defaults to true)
+ * @returns Number of participants (1 for individual, 2 for pair, teamSize for team)
+ */
+export function getParticipantCount(
+  allowsPairRegistration: boolean | null | undefined,
+  allowsTeamRegistration: boolean | null | undefined,
+  teamSize: number | null | undefined,
+  allowsIndividualRegistration: boolean | null | undefined = true
+): number {
+  // If only team registration is allowed, use team size
+  if (allowsTeamRegistration && teamSize && teamSize > 1 && !allowsPairRegistration && !allowsIndividualRegistration) {
+    return teamSize
+  }
+  // If only pair registration is allowed, return 2
+  if (allowsPairRegistration && !allowsIndividualRegistration && !allowsTeamRegistration) {
+    return 2
+  }
+  // For events that allow multiple types, prioritize showing the smaller group (pair over team)
+  if (allowsPairRegistration && !allowsIndividualRegistration) {
+    return 2
+  }
+  // Default to individual
+  return 1
+}
+
+/**
+ * Calculate price per participant for duo/team events
+ * @param price - Total price of registration
+ * @param participantCount - Number of participants (from getParticipantCount)
+ * @returns Price per participant
+ */
+export function calculatePricePerParticipant(price: number, participantCount: number): number {
+  if (participantCount <= 1 || !price) {
+    return price
+  }
+  return Math.round((price / participantCount) * 100) / 100
+}
+
+/**
+ * Format price per participant label for duo/team events
+ * @param price - Total price of registration
+ * @param allowsPairRegistration - Whether event allows pair registration
+ * @param allowsTeamRegistration - Whether event allows team registration
+ * @param teamSize - Team size for team events
+ * @param allowsIndividualRegistration - Whether event allows individual registration
+ * @returns Formatted label like "R$80 por participante" or null if not applicable
+ */
+export function formatPricePerParticipant(
+  price: number | null | undefined,
+  allowsPairRegistration: boolean | null | undefined,
+  allowsTeamRegistration: boolean | null | undefined,
+  teamSize: number | null | undefined,
+  allowsIndividualRegistration: boolean | null | undefined = true
+): string | null {
+  if (!price || price <= 0) {
+    return null
+  }
+
+  const participantCount = getParticipantCount(
+    allowsPairRegistration,
+    allowsTeamRegistration,
+    teamSize,
+    allowsIndividualRegistration
+  )
+
+  if (participantCount <= 1) {
+    return null
+  }
+
+  const pricePerParticipant = calculatePricePerParticipant(price, participantCount)
+  return `${formatCurrency(pricePerParticipant)} por participante`
+}
+
+/**
  * Calculate the 10% service fee for a subtotal.
  * @param subtotal - Base amount for the calculation
  * @returns Service fee rounded to two decimal places

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { formatCurrency, cn } from '@/lib/utils'
+import { formatCurrency, cn, formatPricePerParticipant } from '@/lib/utils'
 import type { EventType, EventStatus } from '@/types/database.types'
 import { EVENT_PAGE_CONTENT_CLASS } from './layout-constants'
 
@@ -12,10 +12,24 @@ interface StickyCtaBarProps {
   eventType: EventType
   eventStatus: EventStatus
   solidarityMessage?: string | null
+  allowsPairRegistration?: boolean | null
+  allowsTeamRegistration?: boolean | null
+  allowsIndividualRegistration?: boolean | null
+  teamSize?: number | null
   onCtaClick: () => void
 }
 
-export default function StickyCtaBar({ minPrice, eventType, eventStatus, solidarityMessage, onCtaClick }: StickyCtaBarProps) {
+export default function StickyCtaBar({
+  minPrice,
+  eventType,
+  eventStatus,
+  solidarityMessage,
+  allowsPairRegistration,
+  allowsTeamRegistration,
+  allowsIndividualRegistration,
+  teamSize,
+  onCtaClick
+}: StickyCtaBarProps) {
   const [isVisible, setIsVisible] = useState(false)
   const registrationsNotAllowed = eventStatus === 'published_no_registration'
 
@@ -60,11 +74,23 @@ export default function StickyCtaBar({ minPrice, eventType, eventStatus, solidar
             {eventType === 'free'
               ? 'Evento gratuito'
               : eventType === 'solidarity'
-              ? solidarityMessage || 'Evento solidário'
-              : minPrice !== null
-              ? formatCurrency(minPrice)
-              : 'Consulte valores'}
+                ? solidarityMessage || 'Evento solidário'
+                : minPrice !== null
+                  ? formatCurrency(minPrice)
+                  : 'Consulte valores'}
           </p>
+          {eventType === 'paid' && minPrice !== null && minPrice > 0 && (() => {
+            const perParticipantLabel = formatPricePerParticipant(
+              minPrice,
+              allowsPairRegistration,
+              allowsTeamRegistration,
+              teamSize,
+              allowsIndividualRegistration
+            )
+            return perParticipantLabel ? (
+              <p className="text-xs text-neutral-500">{perParticipantLabel}</p>
+            ) : null
+          })()}
         </div>
 
         <Button

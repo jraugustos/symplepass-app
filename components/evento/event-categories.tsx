@@ -1,6 +1,6 @@
 'use client'
 
-import { formatCurrency, calculateLot } from '@/lib/utils'
+import { formatCurrency, calculateLot, formatPricePerParticipant } from '@/lib/utils'
 import { Badge, StatusBadge } from '@/components/ui/badge'
 import type { EventCategory, EventType, EventStatus } from '@/types/database.types'
 import { EVENT_PAGE_CONTENT_CLASS } from './layout-constants'
@@ -10,10 +10,24 @@ interface EventCategoriesProps {
   eventType: EventType
   eventStatus: EventStatus
   solidarityMessage?: string | null
+  allowsPairRegistration?: boolean | null
+  allowsTeamRegistration?: boolean | null
+  allowsIndividualRegistration?: boolean | null
+  teamSize?: number | null
   onCategorySelect: (category: EventCategory) => void
 }
 
-export default function EventCategories({ categories, eventType, eventStatus, solidarityMessage, onCategorySelect }: EventCategoriesProps) {
+export default function EventCategories({
+  categories,
+  eventType,
+  eventStatus,
+  solidarityMessage,
+  allowsPairRegistration,
+  allowsTeamRegistration,
+  allowsIndividualRegistration,
+  teamSize,
+  onCategorySelect
+}: EventCategoriesProps) {
   const registrationsNotAllowed = eventStatus === 'published_no_registration'
   if (!categories || categories.length === 0) {
     return (
@@ -46,15 +60,14 @@ export default function EventCategories({ categories, eventType, eventStatus, so
               eventType === 'free'
                 ? 'Evento gratuito'
                 : eventType === 'solidarity'
-                ? solidarityMessage || 'Evento solidário'
-                : formatCurrency(category.price)
+                  ? solidarityMessage || 'Evento solidário'
+                  : formatCurrency(category.price)
 
             return (
               <div
                 key={category.id}
-                className={`rounded-xl border border-neutral-200 p-4 font-geist ${
-                  isSoldOut ? 'bg-neutral-50 opacity-70' : 'bg-white'
-                }`}
+                className={`rounded-xl border border-neutral-200 p-4 font-geist ${isSoldOut ? 'bg-neutral-50 opacity-70' : 'bg-white'
+                  }`}
               >
                 {/* Layout flex */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -95,17 +108,28 @@ export default function EventCategories({ categories, eventType, eventStatus, so
                     {/* Price */}
                     <div className="text-left sm:text-right">
                       <p className="text-sm font-medium font-geist">{priceLabel}</p>
+                      {eventType === 'paid' && category.price > 0 && (() => {
+                        const perParticipantLabel = formatPricePerParticipant(
+                          category.price,
+                          allowsPairRegistration,
+                          allowsTeamRegistration,
+                          teamSize,
+                          allowsIndividualRegistration
+                        )
+                        return perParticipantLabel ? (
+                          <p className="text-xs text-neutral-500 font-geist">{perParticipantLabel}</p>
+                        ) : null
+                      })()}
                     </div>
 
                     {/* Button desktop */}
                     <button
                       onClick={() => onCategorySelect(category)}
                       disabled={isSoldOut || registrationsNotAllowed}
-                      className={`hidden sm:inline-flex items-center justify-center gap-2 text-sm font-medium rounded-full px-4 py-2.5 whitespace-nowrap font-geist ${
-                        isSoldOut || registrationsNotAllowed
+                      className={`hidden sm:inline-flex items-center justify-center gap-2 text-sm font-medium rounded-full px-4 py-2.5 whitespace-nowrap font-geist ${isSoldOut || registrationsNotAllowed
                           ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed border-0'
                           : 'text-white hover:opacity-95 border-0'
-                      }`}
+                        }`}
                       style={
                         isSoldOut || registrationsNotAllowed
                           ? undefined
@@ -121,11 +145,10 @@ export default function EventCategories({ categories, eventType, eventStatus, so
                 <button
                   onClick={() => onCategorySelect(category)}
                   disabled={isSoldOut || registrationsNotAllowed}
-                  className={`mt-3 sm:hidden w-full inline-flex items-center justify-center gap-2 text-sm font-medium rounded-full px-4 py-2.5 font-geist ${
-                    isSoldOut || registrationsNotAllowed
+                  className={`mt-3 sm:hidden w-full inline-flex items-center justify-center gap-2 text-sm font-medium rounded-full px-4 py-2.5 font-geist ${isSoldOut || registrationsNotAllowed
                       ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed'
                       : 'text-white hover:opacity-95'
-                  }`}
+                    }`}
                   style={
                     isSoldOut || registrationsNotAllowed
                       ? undefined

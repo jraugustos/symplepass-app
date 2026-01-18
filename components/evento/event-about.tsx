@@ -1,5 +1,5 @@
 import { MapPin, Calendar, Clock, Activity, Monitor, CheckCircle2, Users } from 'lucide-react'
-import { formatEventDate, formatTime, extractLocationString, formatCurrency } from '@/lib/utils'
+import { formatEventDate, formatTime, extractLocationString, formatCurrency, formatPricePerParticipant } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import type { Event } from '@/types/database.types'
 import { EVENT_PAGE_CONTENT_CLASS } from './layout-constants'
@@ -154,11 +154,24 @@ export default function EventAbout({ event, minPrice }: EventAboutProps) {
                 {event.event_type === 'free'
                   ? 'Evento Gratuito'
                   : event.event_type === 'solidarity'
-                  ? event.solidarity_message || 'Evento Solidário'
-                  : minPrice !== null
-                  ? formatCurrency(minPrice)
-                  : 'Consulte valores'}
+                    ? event.solidarity_message || 'Evento Solidário'
+                    : minPrice !== null
+                      ? formatCurrency(minPrice)
+                      : 'Consulte valores'}
               </p>
+              {/* Per-participant price label for duo/team events */}
+              {event.event_type === 'paid' && minPrice !== null && minPrice > 0 && (() => {
+                const perParticipantLabel = formatPricePerParticipant(
+                  minPrice,
+                  event.allows_pair_registration,
+                  event.allows_team_registration,
+                  event.team_size,
+                  event.allows_individual_registration
+                )
+                return perParticipantLabel ? (
+                  <p className="text-sm text-neutral-500 font-geist mt-1">{perParticipantLabel}</p>
+                ) : null
+              })()}
 
               {/* CTA Button */}
               <a

@@ -52,6 +52,15 @@ export async function validateRegistration(
 
   console.log('validateRegistration: Starting validation', { eventId, categoryId, userId, isPairRegistration, isTeamRegistration, teamSize })
 
+  // Debug: First try to find the event without status filter
+  const { data: debugEvent, error: debugError } = await supabase
+    .from('events')
+    .select('id, status, title')
+    .eq('id', eventId)
+    .maybeSingle()
+
+  console.log('validateRegistration: Debug event lookup (no status filter)', { debugEvent, debugError })
+
   // 1. Fetch event with validation fields
   const { data: eventData, error: eventError } = await supabase
     .from('events')
@@ -60,10 +69,10 @@ export async function validateRegistration(
     .in('status', ['published', 'published_no_registration'])
     .single()
 
-  console.log('validateRegistration: Event query result', { eventData: eventData ? { id: eventData.id, status: eventData.status } : null, eventError })
+  console.log('validateRegistration: Event query result', { eventData: eventData ? 'found' : null, eventError })
 
   if (eventError || !eventData) {
-    console.error('validateRegistration: Event not found', { eventId, eventError, eventData })
+    console.error('validateRegistration: Event not found', { eventId, eventError, eventData, debugEvent })
     return {
       valid: false,
       error: 'Evento não encontrado ou não está disponível para inscrições.',

@@ -137,12 +137,14 @@ export async function POST(request: Request) {
         }
 
         // Validate event and check if it's free or solidarity (use admin client to bypass RLS)
-        const { data: event, error: eventError } = await adminSupabase
+        const { data: eventData, error: eventError } = await adminSupabase
             .from('events')
             .select('id, title, slug, event_type, solidarity_message, start_date, location')
             .eq('id', eventId)
             .eq('status', 'published')
             .single()
+
+        const event = eventData as { id: string; title: string; slug: string; event_type: string; solidarity_message: string | null; start_date: string; location: { city?: string } | null } | null
 
         if (eventError || !event) {
             console.error('Evento não encontrado ou indisponível:', eventError)
@@ -158,11 +160,13 @@ export async function POST(request: Request) {
         }
 
         // Validate category (use admin client to bypass RLS)
-        const { data: category, error: categoryError } = await adminSupabase
+        const { data: categoryData, error: categoryError } = await adminSupabase
             .from('event_categories')
             .select('id, name, price, event_id')
             .eq('id', categoryId)
             .single()
+
+        const category = categoryData as { id: string; name: string; price: number; event_id: string } | null
 
         if (categoryError || !category || category.event_id !== event.id) {
             console.error('Categoria inválida para o evento:', categoryError)

@@ -18,6 +18,8 @@ const PRICE_TOLERANCE = 0.01
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as CheckoutSessionRequest
+    console.log('create-session: Request body received', JSON.stringify(body, null, 2))
+
     const {
       eventId,
       categoryId,
@@ -144,6 +146,8 @@ export async function POST(request: Request) {
 
     const supabase = createClient()
     const adminSupabase = createAdminClient()
+    console.log('create-session: Clients created successfully')
+
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -162,12 +166,17 @@ export async function POST(request: Request) {
     }
 
     // Validate event (use admin client to bypass RLS for server-side validation)
-    const { data: event, error: eventError } = await adminSupabase
+    console.log('create-session: Querying event', { eventId })
+    const { data: eventData, error: eventError } = await adminSupabase
       .from('events')
       .select('id, title, slug')
       .eq('id', eventId)
       .eq('status', 'published')
       .single()
+
+    const event = eventData as { id: string; title: string; slug: string } | null
+
+    console.log('create-session: Event query result', { event, eventError })
 
     if (eventError || !event) {
       console.error('Evento não encontrado ou indisponível:', eventError)
@@ -175,11 +184,13 @@ export async function POST(request: Request) {
     }
 
     // Validate category (use admin client to bypass RLS for server-side validation)
-    const { data: category, error: categoryError } = await adminSupabase
+    const { data: categoryData, error: categoryError } = await adminSupabase
       .from('event_categories')
       .select('id, name, price, event_id')
       .eq('id', categoryId)
       .single()
+
+    const category = categoryData as { id: string; name: string; price: number; event_id: string } | null
 
     if (categoryError || !category || category.event_id !== event.id) {
       console.error('Categoria inválida para o evento:', categoryError)
@@ -299,23 +310,32 @@ export async function POST(request: Request) {
 
     console.log('create-session: Calling validateRegistration', { eventId: event.id, categoryId: category.id, targetUserId, isPairRegistration, isTeamRegistration, teamSize })
 
-    const validationResult = await validateRegistration(
-      adminSupabase,
-      event.id,
-      category.id,
-      targetUserId,
-      isPairRegistration,
-      isTeamRegistration,
-      teamSize
-    )
-
-    console.log('create-session: validateRegistration result', validationResult)
+    let validationResult
+    try {
+      validationResult = await validateRegistration(
+        adminSupabase,
+        event.id,
+        category.id,
+        targetUserId,
+        isPairRegistration,
+        isTeamRegistration,
+        teamSize
+      )
+      console.log('create-session: validateRegistration result', validationResult)
+    } catch (validationError) {
+      console.error('create-session: validateRegistration threw exception', validationError)
+      return NextResponse.json({ error: 'Erro ao validar inscrição.' }, { status: 500 })
+    }
 
     if (!validationResult.valid) {
       const statusCode = validationResult.errorCode === 'ALREADY_REGISTERED' ? 409 : 400
       console.error('create-session: Validation failed', { error: validationResult.error, code: validationResult.errorCode })
       return NextResponse.json(
-        { error: validationResult.error, code: validationResult.errorCode },
+        {
+          error: validationResult.error,
+          code: validationResult.errorCode,
+          debug: { eventId: event.id, categoryId: category.id, targetUserId, isPairRegistration, isTeamRegistration }
+        },
         { status: statusCode }
       )
     }

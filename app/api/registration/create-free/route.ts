@@ -119,6 +119,7 @@ export async function POST(request: Request) {
         }
 
         const supabase = createClient()
+        const adminSupabase = createAdminClient()
         const {
             data: { user },
         } = await supabase.auth.getUser()
@@ -135,8 +136,8 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Informe um nome válido.' }, { status: 400 })
         }
 
-        // Validate event and check if it's free or solidarity
-        const { data: event, error: eventError } = await supabase
+        // Validate event and check if it's free or solidarity (use admin client to bypass RLS)
+        const { data: event, error: eventError } = await adminSupabase
             .from('events')
             .select('id, title, slug, event_type, solidarity_message, start_date, location')
             .eq('id', eventId)
@@ -156,8 +157,8 @@ export async function POST(request: Request) {
             )
         }
 
-        // Validate category
-        const { data: category, error: categoryError } = await supabase
+        // Validate category (use admin client to bypass RLS)
+        const { data: category, error: categoryError } = await adminSupabase
             .from('event_categories')
             .select('id, name, price, event_id')
             .eq('id', categoryId)
@@ -235,7 +236,7 @@ export async function POST(request: Request) {
         const teamSize = isTeamRegistration ? normalizedTeamMembers.length + 1 : undefined
 
         const validationResult = await validateRegistration(
-            supabase,
+            adminSupabase,
             event.id,
             category.id,
             targetUserId,
@@ -295,7 +296,6 @@ export async function POST(request: Request) {
         if (!isAlreadyConfirmed) {
             // Update registration to confirmed status immediately
             // Use admin client to bypass RLS (user may not be the auth.uid() if created via checkout)
-            const adminSupabase = createAdminClient()
             const { error: updateError } = await (adminSupabase
                 .from('registrations') as any)
                 .update({

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { stripe } from '@/lib/stripe/client'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { calculateServiceFee, calculateTotal, validateEmail, validateCPF } from '@/lib/utils'
 import { getEnv } from '@/lib/env'
 import { createRegistration, updateRegistrationStripeSession } from '@/lib/data/registrations'
@@ -143,6 +143,7 @@ export async function POST(request: Request) {
     }
 
     const supabase = createClient()
+    const adminSupabase = createAdminClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -160,8 +161,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Informe um nome válido.' }, { status: 400 })
     }
 
-    // Validate event
-    const { data: event, error: eventError } = await supabase
+    // Validate event (use admin client to bypass RLS for server-side validation)
+    const { data: event, error: eventError } = await adminSupabase
       .from('events')
       .select('id, title, slug')
       .eq('id', eventId)
@@ -173,8 +174,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Evento não encontrado.' }, { status: 404 })
     }
 
-    // Validate category
-    const { data: category, error: categoryError } = await supabase
+    // Validate category (use admin client to bypass RLS for server-side validation)
+    const { data: category, error: categoryError } = await adminSupabase
       .from('event_categories')
       .select('id, name, price, event_id')
       .eq('id', categoryId)
@@ -295,7 +296,7 @@ export async function POST(request: Request) {
     const teamSize = isTeamRegistration ? normalizedTeamMembers.length + 1 : undefined
 
     const validationResult = await validateRegistration(
-      supabase,
+      adminSupabase,
       event.id,
       category.id,
       targetUserId,

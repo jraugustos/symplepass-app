@@ -8,7 +8,7 @@ import type { Event } from '@/types/database.types'
 import { EVENT_PAGE_CONTENT_CLASS } from './layout-constants'
 
 interface EventHeroProps {
-  event: Pick<Event, 'title' | 'banner_url' | 'location' | 'start_date' | 'sport_type' | 'event_type' | 'solidarity_message'>
+  event: Pick<Event, 'title' | 'banner_url' | 'location' | 'start_date' | 'sport_type' | 'event_type' | 'solidarity_message' | 'allows_pair_registration' | 'allows_team_registration' | 'allows_individual_registration' | 'team_size'>
   minPrice: number | null
   onCtaClick: () => void
   header?: React.ReactNode
@@ -20,6 +20,31 @@ export default function EventHero({ event, minPrice, onCtaClick, header }: Event
 
   const isFreeEvent = event.event_type === 'free' || event.event_type === 'solidarity'
   const eventTypeLabel = event.event_type === 'solidarity' ? 'Solidário' : event.event_type === 'free' ? 'Gratuito' : null
+
+  // Calculate price per athlete for duo/team events
+  const allowsPairRegistration = event.allows_pair_registration ?? false
+  const allowsTeamRegistration = event.allows_team_registration ?? false
+  const allowsIndividualRegistration = event.allows_individual_registration ?? true
+  const teamSize = event.team_size
+
+  const pricePerAthlete = (() => {
+    if (minPrice === null || minPrice <= 0) return minPrice
+
+    // If only pair registration is allowed (no individual)
+    if (allowsPairRegistration && !allowsIndividualRegistration && !allowsTeamRegistration) {
+      return Math.round((minPrice / 2) * 100) / 100
+    }
+
+    // If only team registration is allowed (no individual, no pair)
+    if (allowsTeamRegistration && !allowsIndividualRegistration && !allowsPairRegistration && teamSize && teamSize > 1) {
+      return Math.round((minPrice / teamSize) * 100) / 100
+    }
+
+    // Default: show full price
+    return minPrice
+  })()
+
+  const showPerAthleteLabel = pricePerAthlete !== minPrice && pricePerAthlete !== null
 
   return (
     <div className="relative w-full text-white">
@@ -72,8 +97,10 @@ export default function EventHero({ event, minPrice, onCtaClick, header }: Event
                 <span>
                   {isFreeEvent
                     ? 'Inscreva-se gratuitamente'
-                    : minPrice !== null
-                      ? `Inscreva-se a partir de ${formatCurrency(minPrice)}`
+                    : pricePerAthlete !== null
+                      ? showPerAthleteLabel
+                        ? `Inscreva-se por ${formatCurrency(pricePerAthlete)}/atleta`
+                        : `Inscreva-se a partir de ${formatCurrency(pricePerAthlete)}`
                       : 'Inscreva-se'}
                 </span>
                 <ArrowRight className="ml-2 h-5 w-5" />

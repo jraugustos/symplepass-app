@@ -55,7 +55,7 @@ export async function validateRegistration(
   // 1. Fetch event with validation fields
   const { data: eventData, error: eventError } = await supabase
     .from('events')
-    .select('id, title, slug, max_participants, registration_start, registration_end, allows_individual_registration, allows_pair_registration, allows_team_registration, team_size, status')
+    .select('*')
     .eq('id', eventId)
     .in('status', ['published', 'published_no_registration'])
     .single()
@@ -71,7 +71,11 @@ export async function validateRegistration(
     }
   }
 
-  const event = eventData as Pick<Event, 'id' | 'title' | 'slug' | 'max_participants' | 'registration_start' | 'registration_end' | 'allows_individual_registration' | 'allows_pair_registration' | 'allows_team_registration' | 'team_size' | 'status'>
+  const event = eventData as Event
+  const allowsIndividualRegistration = event.allows_individual_registration ?? true
+  const allowsPairRegistration = event.allows_pair_registration ?? false
+  const allowsTeamRegistration = event.allows_team_registration ?? false
+  const configuredTeamSize = typeof event.team_size === 'number' ? event.team_size : null
 
   // 1.5. Check if event allows registrations
   if (event.status === 'published_no_registration') {
@@ -158,7 +162,7 @@ export async function validateRegistration(
   }
 
   // 6. Check pair registration allowance
-  if (isPairRegistration && !event.allows_pair_registration) {
+  if (isPairRegistration && !allowsPairRegistration) {
     return {
       valid: false,
       error: 'Este evento não permite inscrição em dupla.',
@@ -167,7 +171,7 @@ export async function validateRegistration(
   }
 
   // 6b. Check individual registration allowance
-  if (!isPairRegistration && !isTeamRegistration && event.allows_individual_registration === false) {
+  if (!isPairRegistration && !isTeamRegistration && allowsIndividualRegistration === false) {
     return {
       valid: false,
       error: 'Este evento não permite inscrição individual. Apenas inscrições em dupla ou equipe são aceitas.',
@@ -176,7 +180,7 @@ export async function validateRegistration(
   }
 
   // 6c. Check team registration allowance
-  if (isTeamRegistration && !event.allows_team_registration) {
+  if (isTeamRegistration && !allowsTeamRegistration) {
     return {
       valid: false,
       error: 'Este evento não permite inscrição em equipe.',
@@ -185,11 +189,11 @@ export async function validateRegistration(
   }
 
   // 6d. Check team size matches event configuration
-  if (isTeamRegistration && event.allows_team_registration) {
-    if (teamSize !== event.team_size) {
+  if (isTeamRegistration && allowsTeamRegistration) {
+    if (configuredTeamSize !== null && teamSize !== configuredTeamSize) {
       return {
         valid: false,
-        error: `Este evento requer equipes com exatamente ${event.team_size} membros.`,
+        error: `Este evento requer equipes com exatamente ${configuredTeamSize} membros.`,
         errorCode: 'INVALID_TEAM_SIZE'
       }
     }

@@ -207,8 +207,8 @@ export async function POST(request: Request) {
       )
     }
 
-    // Calculate server-side discounts
-    const clubDiscountData = await getClubMemberDiscount(targetUserId, categoryPrice, supabase)
+    // Calculate server-side discounts (use admin client to bypass RLS on subscriptions table)
+    const clubDiscountData = await getClubMemberDiscount(targetUserId, categoryPrice, adminSupabase)
 
     // Validate coupon if provided
     let couponDiscountData: { valid: boolean; discountAmount?: number; coupon?: any } = { valid: false }

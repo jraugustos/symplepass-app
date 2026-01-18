@@ -112,6 +112,11 @@ export async function getActiveSubscription(
       .maybeSingle()
 
     if (error) {
+      // If the table doesn't exist, gracefully return null (no subscription)
+      if (error.code === 'PGRST205' || error.message?.includes('subscriptions')) {
+        console.warn('Subscriptions table not found, skipping club membership check')
+        return { data: null, error: null }
+      }
       console.error('Error fetching active subscription:', error)
       return { data: null, error: error.message }
     }

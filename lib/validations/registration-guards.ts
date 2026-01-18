@@ -59,6 +59,7 @@ export async function validateRegistration(
     .single()
 
   if (eventError || !eventData) {
+    console.error('validateRegistration: Event not found', { eventId, eventError, eventData })
     return {
       valid: false,
       error: 'Evento não encontrado ou não está disponível para inscrições.',

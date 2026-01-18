@@ -140,13 +140,13 @@ export function ReviewClient({
     }
   }, [userAvailableSizes, userShirtSize])
 
-  // Set initial partner shirt size when gender changes
+  // Set initial partner shirt size when gender changes or when size is empty
   useEffect(() => {
     if (
       partnerName &&
       partnerAvailableSizes &&
       partnerAvailableSizes.length > 0 &&
-      !partnerAvailableSizes.includes(partnerShirtSize)
+      (!partnerShirtSize || !partnerAvailableSizes.includes(partnerShirtSize))
     ) {
       setPartnerShirtSize(partnerAvailableSizes[0])
     }

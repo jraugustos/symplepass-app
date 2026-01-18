@@ -18,7 +18,6 @@ const PRICE_TOLERANCE = 0.01
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as CheckoutSessionRequest
-    console.log('create-session: Request body received', JSON.stringify(body, null, 2))
 
     const {
       eventId,
@@ -146,7 +145,6 @@ export async function POST(request: Request) {
 
     const supabase = createClient()
     const adminSupabase = createAdminClient()
-    console.log('create-session: Clients created successfully')
 
     const {
       data: { user },
@@ -166,7 +164,6 @@ export async function POST(request: Request) {
     }
 
     // Validate event (use admin client to bypass RLS for server-side validation)
-    console.log('create-session: Querying event', { eventId })
     const { data: eventData, error: eventError } = await adminSupabase
       .from('events')
       .select('id, title, slug')
@@ -175,8 +172,6 @@ export async function POST(request: Request) {
       .single()
 
     const event = eventData as { id: string; title: string; slug: string } | null
-
-    console.log('create-session: Event query result', { event, eventError })
 
     if (eventError || !event) {
       console.error('Evento não encontrado ou indisponível:', eventError)
@@ -218,10 +213,8 @@ export async function POST(request: Request) {
       )
     }
 
-    // Calculate server-side discounts
-    // TEMPORARILY DISABLED: Club membership check until subscriptions are properly configured
-    // const clubDiscountData = await getClubMemberDiscount(targetUserId, categoryPrice, adminSupabase)
-    const clubDiscountData = { isEligible: false, discountAmount: 0, discountPercentage: 0 }
+    // Calculate server-side discounts (use admin client to bypass RLS on subscriptions table)
+    const clubDiscountData = await getClubMemberDiscount(targetUserId, categoryPrice, adminSupabase)
 
     // Validate coupon if provided
     let couponDiscountData: { valid: boolean; discountAmount?: number; coupon?: any } = { valid: false }
@@ -308,34 +301,20 @@ export async function POST(request: Request) {
     const isTeamRegistration = !!normalizedTeamMembers && normalizedTeamMembers.length > 0
     const teamSize = isTeamRegistration ? normalizedTeamMembers.length + 1 : undefined
 
-    console.log('create-session: Calling validateRegistration', { eventId: event.id, categoryId: category.id, targetUserId, isPairRegistration, isTeamRegistration, teamSize })
-
-    let validationResult
-    try {
-      validationResult = await validateRegistration(
-        adminSupabase,
-        event.id,
-        category.id,
-        targetUserId,
-        isPairRegistration,
-        isTeamRegistration,
-        teamSize
-      )
-      console.log('create-session: validateRegistration result', validationResult)
-    } catch (validationError) {
-      console.error('create-session: validateRegistration threw exception', validationError)
-      return NextResponse.json({ error: 'Erro ao validar inscrição.' }, { status: 500 })
-    }
+    const validationResult = await validateRegistration(
+      adminSupabase,
+      event.id,
+      category.id,
+      targetUserId,
+      isPairRegistration,
+      isTeamRegistration,
+      teamSize
+    )
 
     if (!validationResult.valid) {
       const statusCode = validationResult.errorCode === 'ALREADY_REGISTERED' ? 409 : 400
-      console.error('create-session: Validation failed', { error: validationResult.error, code: validationResult.errorCode })
       return NextResponse.json(
-        {
-          error: validationResult.error,
-          code: validationResult.errorCode,
-          debug: { eventId: event.id, categoryId: category.id, targetUserId, isPairRegistration, isTeamRegistration }
-        },
+        { error: validationResult.error, code: validationResult.errorCode },
         { status: statusCode }
       )
     }

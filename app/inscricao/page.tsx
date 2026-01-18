@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 
 export const revalidate = 3600
 
-const VALID_SHIRT_SIZES: ShirtSize[] = ['P', 'M', 'G', 'GG', 'XG']
+const VALID_SHIRT_SIZES: ShirtSize[] = ['PP', 'P', 'M', 'G', 'GG', 'XG', 'XGG']
 
 interface ReviewPageProps {
   searchParams: Record<string, string | string[] | undefined>

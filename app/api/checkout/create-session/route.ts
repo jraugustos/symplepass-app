@@ -11,7 +11,7 @@ import type { CheckoutSessionRequest, ShirtSize, ShirtGender, ParticipantData } 
 
 export const runtime = 'nodejs'
 
-const ALLOWED_SHIRT_SIZES: ShirtSize[] = ['P', 'M', 'G', 'GG', 'XG']
+const ALLOWED_SHIRT_SIZES: ShirtSize[] = ['PP', 'P', 'M', 'G', 'GG', 'XG', 'XGG']
 const VALID_SHIRT_GENDERS: ShirtGender[] = ['masculino', 'feminino', 'infantil']
 const PRICE_TOLERANCE = 0.01
 

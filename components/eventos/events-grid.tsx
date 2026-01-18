@@ -61,6 +61,10 @@ export function EventsGrid({ events, variant = 'grid', isClubMember = false }: E
               badge={eventBadge}
               isComingSoon={isComingSoon}
               showClubBadge={isClubMember}
+              allowsPairRegistration={event.allows_pair_registration ?? false}
+              allowsTeamRegistration={event.allows_team_registration ?? false}
+              allowsIndividualRegistration={event.allows_individual_registration ?? true}
+              teamSize={event.team_size ?? undefined}
               onRegister={() => router.push(`/eventos/${event.slug}`)}
             />
           </div>

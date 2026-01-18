@@ -138,6 +138,10 @@ export function FeaturedEvents({ events, isClubMember = false }: FeaturedEventsP
                   tags={[getSportLabel(event.sport_type) || event.sport_type]}
                   isComingSoon={event.status === 'published_no_registration' && !event.allow_page_access}
                   showClubBadge={isClubMember}
+                  allowsPairRegistration={event.allows_pair_registration ?? false}
+                  allowsTeamRegistration={event.allows_team_registration ?? false}
+                  allowsIndividualRegistration={event.allows_individual_registration ?? true}
+                  teamSize={event.team_size ?? undefined}
                   onRegister={() => {
                     window.location.href = `/eventos/${event.slug}`
                   }}

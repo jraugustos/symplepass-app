@@ -104,6 +104,11 @@ export interface EventCardProps {
   className?: string
   featured?: boolean
   showClubBadge?: boolean
+  // Props for per-athlete price calculation
+  allowsPairRegistration?: boolean
+  allowsTeamRegistration?: boolean
+  allowsIndividualRegistration?: boolean
+  teamSize?: number
 }
 
 export function EventCard({
@@ -126,7 +131,36 @@ export function EventCard({
   className,
   featured = false,
   showClubBadge = false,
+  allowsPairRegistration = false,
+  allowsTeamRegistration = false,
+  allowsIndividualRegistration = true,
+  teamSize,
 }: EventCardProps) {
+  // Calculate price per athlete for duo/team events
+  const pricePerAthlete = (() => {
+    if (price === undefined || price === null || price <= 0) return price
+
+    // If only pair registration is allowed (no individual)
+    if (allowsPairRegistration && !allowsIndividualRegistration && !allowsTeamRegistration) {
+      return Math.round((price / 2) * 100) / 100
+    }
+
+    // If only team registration is allowed (no individual, no pair)
+    if (allowsTeamRegistration && !allowsIndividualRegistration && !allowsPairRegistration && teamSize && teamSize > 1) {
+      return Math.round((price / teamSize) * 100) / 100
+    }
+
+    // For events that allow multiple types but prioritize pair over individual
+    if (allowsPairRegistration && !allowsIndividualRegistration) {
+      return Math.round((price / 2) * 100) / 100
+    }
+
+    // Default: show full price (individual registration or mixed types)
+    return price
+  })()
+
+  // Check if we should show "por atleta" label
+  const showPerAthleteLabel = pricePerAthlete !== price && pricePerAthlete !== undefined
   const badgeVariantClasses = {
     warning: 'bg-amber-500/90 border-amber-400 text-white',
     error: 'bg-red-500/90 border-red-400 text-white',
@@ -283,10 +317,12 @@ export function EventCard({
                   </>
                 ) : (
                   <span>
-                    {price === undefined 
-                      ? 'Em breve' 
-                      : price > 0 
-                        ? `a partir de ${formatCurrency(price)}` 
+                    {pricePerAthlete === undefined
+                      ? 'Em breve'
+                      : pricePerAthlete > 0
+                        ? showPerAthleteLabel
+                          ? `${formatCurrency(pricePerAthlete)} por atleta`
+                          : `a partir de ${formatCurrency(pricePerAthlete)}`
                         : 'Gratuito'}
                   </span>
                 )}
@@ -295,10 +331,12 @@ export function EventCard({
               <div className="text-right">
                 {time ? (
                   <span className="text-neutral-900">
-                    {price === undefined 
-                      ? 'Em breve' 
-                      : price > 0 
-                        ? formatCurrency(price) 
+                    {pricePerAthlete === undefined
+                      ? 'Em breve'
+                      : pricePerAthlete > 0
+                        ? showPerAthleteLabel
+                          ? `${formatCurrency(pricePerAthlete)}/atleta`
+                          : formatCurrency(pricePerAthlete)
                         : 'Gratuito'}
                   </span>
                 ) : (

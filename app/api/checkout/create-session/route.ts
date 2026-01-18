@@ -295,6 +295,8 @@ export async function POST(request: Request) {
     const isTeamRegistration = !!normalizedTeamMembers && normalizedTeamMembers.length > 0
     const teamSize = isTeamRegistration ? normalizedTeamMembers.length + 1 : undefined
 
+    console.log('create-session: Calling validateRegistration', { eventId: event.id, categoryId: category.id, targetUserId, isPairRegistration, isTeamRegistration, teamSize })
+
     const validationResult = await validateRegistration(
       adminSupabase,
       event.id,
@@ -305,8 +307,11 @@ export async function POST(request: Request) {
       teamSize
     )
 
+    console.log('create-session: validateRegistration result', validationResult)
+
     if (!validationResult.valid) {
       const statusCode = validationResult.errorCode === 'ALREADY_REGISTERED' ? 409 : 400
+      console.error('create-session: Validation failed', { error: validationResult.error, code: validationResult.errorCode })
       return NextResponse.json(
         { error: validationResult.error, code: validationResult.errorCode },
         { status: statusCode }

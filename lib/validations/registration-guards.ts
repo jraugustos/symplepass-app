@@ -50,6 +50,8 @@ export async function validateRegistration(
 ): Promise<RegistrationValidationResult> {
   const now = new Date().toISOString()
 
+  console.log('validateRegistration: Starting validation', { eventId, categoryId, userId, isPairRegistration, isTeamRegistration, teamSize })
+
   // 1. Fetch event with validation fields
   const { data: eventData, error: eventError } = await supabase
     .from('events')
@@ -57,6 +59,8 @@ export async function validateRegistration(
     .eq('id', eventId)
     .in('status', ['published', 'published_no_registration'])
     .single()
+
+  console.log('validateRegistration: Event query result', { eventData: eventData ? { id: eventData.id, status: eventData.status } : null, eventError })
 
   if (eventError || !eventData) {
     console.error('validateRegistration: Event not found', { eventId, eventError, eventData })

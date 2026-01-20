@@ -200,6 +200,7 @@ export async function updateRegistrationStripeSession(
 
 /**
  * Retrieves a registration record by its Stripe session ID.
+ * Uses admin client by default to bypass RLS - needed for webhook context where there's no user session.
  * @returns Registration linked to session or null if not found
  */
 export async function getRegistrationByStripeSession(
@@ -207,7 +208,8 @@ export async function getRegistrationByStripeSession(
   supabaseClient?: SupabaseServerClient
 ): Promise<RegistrationResult<Registration>> {
   try {
-    const supabase = getClient(supabaseClient)
+    // Use admin client to bypass RLS - webhooks don't have user authentication context
+    const supabase = supabaseClient ?? createAdminClient()
 
     const { data, error } = await supabase
       .from('registrations')
@@ -332,7 +334,8 @@ export async function getRegistrationByStripeSessionWithDetails(
   supabaseClient?: SupabaseServerClient
 ): Promise<RegistrationResult<RegistrationWithDetails>> {
   try {
-    const supabase = getClient(supabaseClient)
+    // Use admin client to bypass RLS - webhooks don't have user authentication context
+    const supabase = supabaseClient ?? createAdminClient()
 
     const { data, error } = await supabase
       .from('registrations')
@@ -352,7 +355,7 @@ export async function getRegistrationByStripeSessionWithDetails(
       return { data: null, error: error.message }
     }
 
-    return { data: (data as RegistrationWithDetails) || null, error: null }
+    return { data: data ? (data as RegistrationWithDetails) : null, error: null }
   } catch (error) {
     console.error('Unexpected error fetching registration with details:', error)
     return { data: null, error: 'Unable to fetch registration' }

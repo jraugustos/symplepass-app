@@ -224,7 +224,7 @@ export function EventForm({
   const [editingCategory, setEditingCategory] = useState<
     EventCategory | undefined
   >();
-    const [draggedCategoryIndex, setDraggedCategoryIndex] = useState<number | null>(null);
+  const [draggedCategoryIndex, setDraggedCategoryIndex] = useState<number | null>(null);
   const [localCategories, setLocalCategories] = useState<EventCategory[]>(categories);
 
   // Keep localCategories in sync with prop
@@ -369,7 +369,7 @@ export function EventForm({
     }
   }, [success]);
 
-  
+
   // Note: shirt_sizes field is kept for backward compatibility
   // but shirt_sizes_config is now the primary source for gender-based sizes
 
@@ -456,6 +456,7 @@ export function EventForm({
         draft: "Rascunho salvo com sucesso.",
         published: "Publicado com sucesso.",
         published_no_registration: "Publicado sem inscrições.",
+        pending_approval: "Evento enviado para aprovação.",
         cancelled: "Evento cancelado com sucesso.",
         completed: "Evento marcado como concluído.",
       };

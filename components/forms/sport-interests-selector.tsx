@@ -59,7 +59,7 @@ export function SportInterestsSelector({
         </p>
       )}
 
-      <div className="space-y-6">
+      <div className="grid gap-6 grid-cols-1">
         {(Object.entries(SPORT_CATEGORIES) as [SportCategoryKey, typeof SPORT_CATEGORIES[SportCategoryKey]][]).map(
           ([categoryKey, category]) => {
             const categoryValues = category.items.map((item) => item.value)
@@ -67,22 +67,22 @@ export function SportInterestsSelector({
             const allSelected = selectedCount === categoryValues.length
 
             return (
-              <div key={categoryKey} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-semibold text-neutral-700">{category.label}</h4>
+              <div key={categoryKey} className="flex flex-col rounded-xl border border-neutral-100 bg-neutral-50 p-4 shadow-sm transition-all hover:border-neutral-200 hover:shadow-md">
+                <div className="mb-4 flex items-center justify-between">
+                  <h4 className="font-semibold text-neutral-800">{category.label}</h4>
                   <button
                     type="button"
                     onClick={() => handleSelectCategory(categoryKey)}
                     disabled={disabled}
                     className={cn(
-                      'text-xs px-2 py-1 rounded-full transition-colors',
+                      'text-xs font-medium transition-colors hover:underline',
                       allSelected
-                        ? 'bg-primary-100 text-primary-700 hover:bg-primary-200'
-                        : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200',
-                      disabled && 'opacity-50 cursor-not-allowed'
+                        ? 'text-orange-600'
+                        : 'text-neutral-500 hover:text-orange-600',
+                      disabled && 'opacity-50 cursor-not-allowed no-underline'
                     )}
                   >
-                    {allSelected ? 'Desmarcar todos' : 'Selecionar todos'}
+                    {allSelected ? 'Remover todos' : 'Selecionar'}
                   </button>
                 </div>
 
@@ -99,15 +99,15 @@ export function SportInterestsSelector({
                         onClick={() => handleToggle(sport.value)}
                         disabled={isDisabled}
                         className={cn(
-                          'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all',
+                          'flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all',
                           isSelected
-                            ? 'bg-primary-500 text-white shadow-sm'
-                            : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200',
+                            ? 'bg-orange-600 text-white shadow-sm ring-2 ring-orange-100'
+                            : 'bg-neutral-50 text-neutral-600 hover:bg-neutral-100',
                           isDisabled && !isSelected && 'opacity-50 cursor-not-allowed',
-                          !isDisabled && 'hover:scale-105'
+                          !isDisabled && !isSelected && 'hover:scale-105'
                         )}
                       >
-                        {isSelected && <Check className="w-3.5 h-3.5" />}
+                        {isSelected && <Check className="h-3 w-3" />}
                         {sport.label}
                       </button>
                     )

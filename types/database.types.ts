@@ -5,8 +5,9 @@
  */
 
 export type UserRole = 'user' | 'admin' | 'organizer'
-export type EventStatus = 'draft' | 'published' | 'published_no_registration' | 'cancelled' | 'completed'
+export type EventStatus = 'draft' | 'published' | 'published_no_registration' | 'cancelled' | 'completed' | 'pending_approval'
 export type EventType = 'paid' | 'free' | 'solidarity'
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 export const EVENT_FORMATS = ['presencial', 'online', 'workshop', 'hibrido'] as const
 export type EventFormat = typeof EVENT_FORMATS[number]
 export type SportType =
@@ -143,6 +144,12 @@ export interface Event {
   allow_page_access: boolean // When false with published_no_registration status, buttons show "Em breve"
   created_at: string
   updated_at: string
+  // Approval workflow fields
+  service_fee: number
+  approval_status: ApprovalStatus | null
+  approval_notes: string | null
+  approved_by: string | null
+  approved_at: string | null
   // Computed fields from event_categories (available when querying from events_with_prices view)
   // These are REQUIRED (non-null) when queried from events_with_prices materialized view
   // COALESCE ensures they default to 0 for events with no categories
@@ -275,6 +282,27 @@ export interface EventDetailData extends Event {
   faqs: EventFAQ[]
   regulations: EventRegulation[]
   organizer: EventOrganizer | null
+}
+
+// ============================================================
+// ORGANIZER INVITE TOKENS
+// ============================================================
+
+export interface OrganizerInviteToken {
+  id: string
+  token: string
+  email: string | null
+  created_by: string
+  used_by: string | null
+  used_at: string | null
+  expires_at: string
+  revoked_at: string | null
+  created_at: string
+}
+
+export interface OrganizerInviteTokenWithDetails extends OrganizerInviteToken {
+  creator: User
+  usedByUser: User | null
 }
 
 // ============================================================
@@ -456,6 +484,11 @@ export interface Database {
         Row: Subscription
         Insert: Omit<Subscription, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Omit<Subscription, 'id' | 'created_at' | 'updated_at'>>
+      }
+      organizer_invite_tokens: {
+        Row: OrganizerInviteToken
+        Insert: Omit<OrganizerInviteToken, 'id' | 'created_at'>
+        Update: Partial<Omit<OrganizerInviteToken, 'id' | 'created_at'>>
       }
     }
   }

@@ -431,9 +431,13 @@ export async function getFilteredEvents(
     // if (filters.min_price !== undefined) {
     //   queryBuilder = queryBuilder.gte('min_price', filters.min_price)
     // }
-    // if (filters.max_price !== undefined) {
-    //   queryBuilder = queryBuilder.lte('max_price', filters.max_price)
-    // }
+    if (filters.max_price !== undefined) {
+      queryBuilder = queryBuilder.lte('max_price', filters.max_price)
+    }
+
+    if (filters.organizer_id) {
+      queryBuilder = queryBuilder.eq('organizer_id', filters.organizer_id)
+    }
 
     // Apply sorting directly on database fields
     switch (sort) {
@@ -577,9 +581,13 @@ export async function getFilterOptions(): Promise<{
   cities: FilterOption[]
   states: FilterOption[]
   sportTypes: FilterOption[]
+  organizers: FilterOption[]
 }> {
   try {
     const supabase = createClient()
+
+    // Get active organizers
+    const organizers = await getActiveOrganizers()
 
     // Get all published events
     const { data: events, error } = await supabase
@@ -589,7 +597,7 @@ export async function getFilterOptions(): Promise<{
 
     if (error || !events) {
       console.error('Error fetching filter options:', error)
-      return { cities: [], states: [], sportTypes: [] }
+      return { cities: [], states: [], sportTypes: [], organizers: [] }
     }
 
     // Extract unique cities
@@ -651,10 +659,67 @@ export async function getFilterOptions(): Promise<{
       }))
       .sort((a, b) => a.label.localeCompare(b.label))
 
-    return { cities, states, sportTypes }
+    return { cities, states, sportTypes, organizers }
   } catch (error) {
     console.error('Unexpected error fetching filter options:', error)
-    return { cities: [], states: [], sportTypes: [] }
+    return { cities: [], states: [], sportTypes: [], organizers: [] }
+  }
+}
+
+/**
+ * Get organizers that have active events
+ * @returns Promise<FilterOption[]> Array of organizers with active events count
+ */
+export async function getActiveOrganizers(): Promise<FilterOption[]> {
+  try {
+    const supabase = createClient()
+
+    // Get active events with organizer_id
+    const { data: events, error } = await supabase
+      .from('events')
+      .select('organizer_id')
+      .in('status', ['published', 'published_no_registration'])
+      .not('organizer_id', 'is', null)
+
+    if (error || !events) {
+      console.error('Error fetching events for organizer filter:', error)
+      return []
+    }
+
+    // Count events per organizer
+    const organizerCounts = new Map<string, number>()
+    events.forEach(event => {
+      if (event.organizer_id) {
+        organizerCounts.set(event.organizer_id, (organizerCounts.get(event.organizer_id) || 0) + 1)
+      }
+    })
+
+    if (organizerCounts.size === 0) {
+      return []
+    }
+
+    // Fetch organizer details
+    const organizerIds = Array.from(organizerCounts.keys())
+    const { data: organizers, error: organizersError } = await supabase
+      .from('event_organizers')
+      .select('profile_id, company_name')
+      .in('profile_id', organizerIds)
+
+    if (organizersError || !organizers) {
+      console.error('Error fetching organizer details:', organizersError)
+      return []
+    }
+
+    // Map to FilterOption
+    return organizers.map(org => ({
+      value: org.profile_id,
+      label: org.company_name,
+      count: organizerCounts.get(org.profile_id) || 0
+    })).sort((a, b) => a.label.localeCompare(b.label))
+
+  } catch (error) {
+    console.error('Unexpected error in getActiveOrganizers:', error)
+    return []
   }
 }
 

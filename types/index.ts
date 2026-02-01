@@ -403,6 +403,7 @@ export interface EventsListFilters extends EventFilters {
   max_price?: number
   sort?: SortOption
   page?: number
+  organizer_id?: string
 }
 
 export interface PaginatedEventsResponse {
@@ -661,6 +662,7 @@ export interface ReportFilters {
   event_id?: string
   sport_type?: string
   payment_status?: PaymentStatus
+  organizer_id?: string
 }
 
 export interface FinancialReportExport {

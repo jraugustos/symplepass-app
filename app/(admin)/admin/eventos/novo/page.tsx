@@ -6,6 +6,9 @@ import { createEvent } from '@/lib/data/admin-events'
 import { EventForm } from '@/components/admin'
 import { EventFormDataAdmin } from '@/types'
 import { revalidatePath } from 'next/cache'
+import { createAdminClient } from '@/lib/supabase/server'
+import { sendAdminNewEventEmail } from '@/lib/email/send-event-status'
+import { formatDateShort } from '@/lib/utils'
 
 export const metadata = {
   title: 'Criar Evento - Admin Symplepass',
@@ -21,7 +24,7 @@ export default async function NovoEventoPage() {
   async function createEventAction(data: EventFormDataAdmin) {
     'use server'
     const result = await getCurrentUser()
-    if (!result || !result.user) {
+    if (!result || !result.user || !result.profile) {
       throw new Error('User not authenticated')
     }
 
@@ -42,14 +45,44 @@ export default async function NovoEventoPage() {
       solidarity_message: data.solidarity_message,
       status: data.status as any,
       is_featured: data.is_featured,
-    })
+    }, result.profile.role as 'admin' | 'organizer')
 
     if (createResult.error) {
       throw new Error(createResult.error)
     }
 
     revalidatePath('/admin/eventos')
-    redirect(`/admin/eventos/${createResult.data?.id}/editar`)
+
+    // If organizer, redirect to events list with success message
+    // If admin, redirect to edit page
+    if (result.profile.role === 'organizer') {
+      // Notify admins about new pending event
+      try {
+        const supabase = createAdminClient()
+        const { data: admins } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('role', 'admin')
+
+        const adminEmails = (admins as any[])?.map(a => a.email).filter(Boolean) as string[]
+
+        if (adminEmails && adminEmails.length > 0 && result.profile.full_name) {
+          await sendAdminNewEventEmail({
+            adminEmails,
+            eventName: data.title,
+            organizerName: result.profile.full_name,
+            submittedAt: formatDateShort(new Date()),
+          })
+        }
+      } catch (error) {
+        console.error('Failed to notify admins:', error)
+      }
+
+      revalidatePath('/admin/aprovacoes')
+      redirect('/admin/eventos?created=true')
+    } else {
+      redirect(`/admin/eventos/${createResult.data?.id}/editar`)
+    }
   }
 
   return (

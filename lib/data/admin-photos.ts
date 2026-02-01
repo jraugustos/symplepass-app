@@ -53,6 +53,7 @@ export interface AdminPhotoOrderWithDetails extends PhotoOrder {
  */
 export interface PhotoOrderFilters {
   event_id?: string
+  organizer_id?: string
   payment_status?: 'pending' | 'paid' | 'failed' | 'refunded'
   search?: string
   start_date?: string
@@ -784,10 +785,11 @@ export async function getAllPhotoOrders(
           full_name,
           email
         ),
-        events (
+        events!inner (
           id,
           title,
-          slug
+          slug,
+          organizer_id
         ),
         photo_order_items (
           id,
@@ -800,6 +802,11 @@ export async function getAllPhotoOrders(
     // Apply event_id filter if provided
     if (filters.event_id) {
       query = query.eq('event_id', filters.event_id)
+    }
+
+    // Apply organizer_id filter if provided
+    if (filters.organizer_id) {
+      query = query.eq('events.organizer_id', filters.organizer_id)
     }
 
     // Apply payment_status filter
@@ -875,13 +882,24 @@ export async function getAllPhotoOrders(
  * Get all photo orders statistics (across all events)
  * @returns Statistics about all photo orders
  */
-export async function getAllPhotoOrderStats() {
+export async function getAllPhotoOrderStats(organizerId?: string) {
   try {
     const supabase = await createClient()
 
-    const { data: orders, error } = await supabase
+    let query = supabase
       .from('photo_orders')
-      .select('status, payment_status, total_amount')
+      .select(`
+        status, 
+        payment_status, 
+        total_amount,
+        events!inner(organizer_id)
+      `)
+
+    if (organizerId) {
+      query = query.eq('events.organizer_id', organizerId)
+    }
+
+    const { data: orders, error } = await query
 
     if (error) {
       console.error('Error fetching all photo order stats:', error)

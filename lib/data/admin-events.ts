@@ -179,34 +179,37 @@ export async function getEventByIdForAdmin(eventId: string) {
 /**
  * Create a new event
  */
-export async function createEvent(eventData: {
-  title: string;
-  description: string;
-  location: {
-    city: string;
-    state: string;
-    venue?: string;
-    address?: string;
-  };
-  start_date: string;
-  sport_type: SportType;
-  event_type: EventType;
-  event_format: EventFormat;
-  organizer_id: string;
-  banner_url?: string | null;
-  end_date?: string | null;
-  max_participants?: number | null;
-  registration_start?: string | null;
-  registration_end?: string | null;
-  solidarity_message?: string | null;
-  allows_individual_registration?: boolean;
-  allows_pair_registration?: boolean;
-  shirt_sizes?: string[];
-  shirt_sizes_config?: any;
-  status?: EventStatus;
-  is_featured?: boolean;
-  has_organizer?: boolean;
-}) {
+export async function createEvent(
+  eventData: {
+    title: string;
+    description: string;
+    location: {
+      city: string;
+      state: string;
+      venue?: string;
+      address?: string;
+    };
+    start_date: string;
+    sport_type: SportType;
+    event_type: EventType;
+    event_format: EventFormat;
+    organizer_id: string;
+    banner_url?: string | null;
+    end_date?: string | null;
+    max_participants?: number | null;
+    registration_start?: string | null;
+    registration_end?: string | null;
+    solidarity_message?: string | null;
+    allows_individual_registration?: boolean;
+    allows_pair_registration?: boolean;
+    shirt_sizes?: string[];
+    shirt_sizes_config?: any;
+    status?: EventStatus;
+    is_featured?: boolean;
+    has_organizer?: boolean;
+  },
+  userRole?: 'admin' | 'organizer'
+) {
   try {
     const supabase = await createClient();
 
@@ -232,12 +235,26 @@ export async function createEvent(eventData: {
     // Prepare data for insertion, removing shirt_sizes field
     const { shirt_sizes, ...dataWithoutShirtSizes } = eventData;
 
+    // Determine status and approval_status based on user role
+    let finalStatus: EventStatus = eventData.status || "draft";
+    let approvalStatus: 'pending' | 'approved' | null = null;
+
+    if (userRole === 'organizer') {
+      // Organizers create events in pending_approval status
+      finalStatus = 'pending_approval';
+      approvalStatus = 'pending';
+    } else if (userRole === 'admin') {
+      // Admins create events that are auto-approved
+      approvalStatus = 'approved';
+    }
+
     const { data, error } = await supabase
       .from("events")
       .insert({
         ...dataWithoutShirtSizes,
         slug,
-        status: eventData.status || "draft",
+        status: finalStatus,
+        approval_status: approvalStatus,
         is_featured: eventData.is_featured || false,
         has_organizer:
           eventData.has_organizer !== undefined
@@ -523,4 +540,148 @@ export async function getEventStats(eventId: string) {
     console.error("Error in getEventStats:", error);
     return null;
   }
+}
+
+/**
+ * Approve an event and set service fee
+ * Only admins can approve events
+ */
+export async function approveEvent(
+  eventId: string,
+  serviceFee: number,
+  adminId: string,
+  notes?: string
+) {
+  try {
+    const supabase = createAdminClient();
+
+    const { data, error } = await supabase
+      .from("events")
+      // @ts-ignore - Type mismatch between Supabase client and local types
+      .update({
+        status: "published" as EventStatus,
+        approval_status: "approved",
+        service_fee: serviceFee,
+        approved_by: adminId,
+        approved_at: new Date().toISOString(),
+        approval_notes: notes || null,
+      })
+      .eq("id", eventId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("[approveEvent] Error approving event:", error);
+      return { data: null, error: error.message };
+    }
+
+    return { data, error: null };
+  } catch (error) {
+    console.error("[approveEvent] Error in approveEvent:", error);
+    return { data: null, error: "Failed to approve event" };
+  }
+}
+
+/**
+ * Reject an event with reason
+ * Only admins can reject events
+ */
+export async function rejectEvent(
+  eventId: string,
+  adminId: string,
+  reason: string
+) {
+  try {
+    const supabase = createAdminClient();
+
+    const { data, error } = await supabase
+      .from("events")
+      // @ts-ignore - Type mismatch between Supabase client and local types
+      .update({
+        status: "draft" as EventStatus,
+        approval_status: "rejected",
+        approved_by: adminId,
+        approved_at: new Date().toISOString(),
+        approval_notes: reason,
+      })
+      .eq("id", eventId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("[rejectEvent] Error rejecting event:", error);
+      return { data: null, error: error.message };
+    }
+
+    return { data, error: null };
+  } catch (error) {
+    console.error("[rejectEvent] Error in rejectEvent:", error);
+    return { data: null, error: "Failed to reject event" };
+  }
+}
+
+/**
+ * Get events pending approval
+ * Only returns events with status 'pending_approval'
+ */
+export async function getPendingApprovalEvents() {
+  try {
+    const supabase = createAdminClient();
+
+    const { data, error } = await supabase
+      .from("events")
+      .select(`
+        *,
+        profiles:organizer_id(id, full_name, email)
+      `)
+      .eq("status", "pending_approval")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("[getPendingApprovalEvents] Error fetching events:", error);
+      return { data: [], error: error.message };
+    }
+
+    return { data: data || [], error: null };
+  } catch (error) {
+    console.error("[getPendingApprovalEvents] Error:", error);
+    return { data: [], error: "Failed to fetch pending events" };
+  }
+}
+
+/**
+ * Get count of events pending approval
+ */
+export async function getPendingApprovalCount(): Promise<number> {
+  try {
+    const supabase = createAdminClient();
+
+    const { count, error } = await supabase
+      .from("events")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "pending_approval");
+
+    if (error) {
+      console.error("[getPendingApprovalCount] Error:", error);
+      return 0;
+    }
+
+    return count || 0;
+  } catch (error) {
+    console.error("[getPendingApprovalCount] Error:", error);
+    return 0;
+  }
+}
+
+/**
+ * Get events for organizer (filtered by organizer_id)
+ */
+export async function getEventsForOrganizer(
+  organizerId: string,
+  filters: Omit<AdminEventFilters, "organizer_id"> = {}
+) {
+  return getAllEventsForAdmin({
+    ...filters,
+    organizer_id: organizerId,
+  });
 }

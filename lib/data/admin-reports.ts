@@ -40,48 +40,48 @@ type RegistrationRevenueRow = {
   status?: string | null
   total_amount?: number | null
   event_categories?:
-    | {
-        price?: number | null
-        name?: string | null
-      }
-    | Array<{
-        price?: number | null
-        name?: string | null
-      }>
-    | null
+  | {
+    price?: number | null
+    name?: string | null
+  }
+  | Array<{
+    price?: number | null
+    name?: string | null
+  }>
+  | null
   events?:
-    | {
-        id?: string
-        title?: string | null
-        sport_type?: string | null
-        start_date?: string | null
-        created_at?: string | null
-      }
-    | Array<{
-        id?: string
-        title?: string | null
-        sport_type?: string | null
-        start_date?: string | null
-        created_at?: string | null
-      }>
-    | null
+  | {
+    id?: string
+    title?: string | null
+    sport_type?: string | null
+    start_date?: string | null
+    created_at?: string | null
+  }
+  | Array<{
+    id?: string
+    title?: string | null
+    sport_type?: string | null
+    start_date?: string | null
+    created_at?: string | null
+  }>
+  | null
   profiles?: {
     full_name?: string | null
     email?: string | null
     cpf?: string | null
   } | null
   payments?:
-    | Array<{
-        payment_method?: string | null
-        transaction_id?: string | null
-        status?: string | null
-      }>
-    | {
-        payment_method?: string | null
-        transaction_id?: string | null
-        status?: string | null
-      }
-    | null
+  | Array<{
+    payment_method?: string | null
+    transaction_id?: string | null
+    status?: string | null
+  }>
+  | {
+    payment_method?: string | null
+    transaction_id?: string | null
+    status?: string | null
+  }
+  | null
 }
 
 function normalizeRelation<T>(value: T | T[] | null | undefined): T | null {
@@ -98,6 +98,7 @@ export interface ReportFilters {
   start_date?: string
   end_date?: string
   event_id?: string
+  organizer_id?: string
   sport_type?: string
   payment_status?: string
 }
@@ -105,7 +106,7 @@ export interface ReportFilters {
 export async function getFinancialOverview(filters: ReportFilters = {}): Promise<FinancialOverview | null> {
   try {
     const supabase = await createClient()
-    const { start_date, end_date, event_id, sport_type, payment_status } = filters
+    const { start_date, end_date, event_id, organizer_id, sport_type, payment_status } = filters
 
     // Build base query for registrations
     let regQuery = supabase
@@ -115,11 +116,15 @@ export async function getFinancialOverview(filters: ReportFilters = {}): Promise
         payment_status,
         status,
         event_categories:category_id(price),
-        events:event_id(id, sport_type, created_at)
+        events:event_id!inner(id, sport_type, created_at, organizer_id)
       `)
 
     if (event_id) {
       regQuery = regQuery.eq('event_id', event_id)
+    }
+
+    if (organizer_id) {
+      regQuery = regQuery.eq('events.organizer_id', organizer_id)
     }
 
     if (sport_type) {
@@ -198,11 +203,15 @@ export async function getSalesTrends(filters: ReportFilters = {}): Promise<Sales
         created_at,
         payment_status,
         event_categories:category_id(price),
-        events:event_id(sport_type)
+        events:event_id!inner(sport_type, organizer_id)
       `)
 
     if (event_id) {
       query = query.eq('event_id', event_id)
+    }
+
+    if (filters.organizer_id) {
+      query = query.eq('events.organizer_id', filters.organizer_id)
     }
 
     if (sport_type) {
@@ -262,7 +271,7 @@ export async function getSalesTrends(filters: ReportFilters = {}): Promise<Sales
 export async function getEventPerformance(filters: ReportFilters = {}): Promise<EventPerformanceData[]> {
   try {
     const supabase = await createClient()
-    const { start_date, end_date, sport_type } = filters
+    const { start_date, end_date, sport_type, organizer_id } = filters
 
     let query = supabase
       .from('events')
@@ -276,6 +285,10 @@ export async function getEventPerformance(filters: ReportFilters = {}): Promise<
           event_categories:category_id(price)
         )
       `)
+
+    if (organizer_id) {
+      query = query.eq('organizer_id', organizer_id)
+    }
 
     if (sport_type) {
       query = query.eq('sport_type', sport_type)
@@ -333,11 +346,15 @@ export async function getPaymentStatusBreakdown(filters: ReportFilters = {}): Pr
       .select(`
         payment_status,
         event_categories:category_id(price),
-        events:event_id(sport_type)
+        events:event_id!inner(sport_type, organizer_id)
       `)
 
     if (event_id) {
       query = query.eq('event_id', event_id)
+    }
+
+    if (filters.organizer_id) {
+      query = query.eq('events.organizer_id', filters.organizer_id)
     }
 
     if (sport_type) {
@@ -417,7 +434,7 @@ export async function exportFinancialReport(filters: ReportFilters = {}): Promis
       .select(`
         created_at,
         payment_status,
-        events:event_id(title),
+        events:event_id!inner(title, organizer_id),
         event_categories:category_id(name, price),
         profiles:user_id(full_name, email, cpf),
         payments(payment_method, transaction_id, status)
@@ -425,6 +442,10 @@ export async function exportFinancialReport(filters: ReportFilters = {}): Promis
 
     if (event_id) {
       query = query.eq('event_id', event_id)
+    }
+
+    if (filters.organizer_id) {
+      query = query.eq('events.organizer_id', filters.organizer_id)
     }
 
     if (sport_type) {

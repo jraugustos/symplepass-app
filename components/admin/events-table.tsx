@@ -27,6 +27,8 @@ export function EventsTable({
   const [loadingEventId, setLoadingEventId] = useState<string | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [eventToDelete, setEventToDelete] = useState<string | null>(null)
+  const [closeDialogOpen, setCloseDialogOpen] = useState(false)
+  const [eventToClose, setEventToClose] = useState<string | null>(null)
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -50,6 +52,8 @@ export function EventsTable({
         return 'warning'
       case 'draft':
         return 'neutral'
+      case 'pending_approval':
+        return 'warning'
       case 'cancelled':
         return 'error'
       case 'completed':
@@ -67,6 +71,8 @@ export function EventsTable({
         return 'Publicado - sem inscrições'
       case 'draft':
         return 'Rascunho'
+      case 'pending_approval':
+        return 'Aguardando aprovação'
       case 'cancelled':
         return 'Cancelado'
       case 'completed':
@@ -163,9 +169,26 @@ export function EventsTable({
                   {formatDate(event.start_date)}
                 </td>
                 <td className="px-4 py-4">
-                  <Badge variant={getStatusBadgeVariant(event.status)}>
-                    {getStatusLabel(event.status)}
-                  </Badge>
+                  <div className="flex flex-col gap-1">
+                    <Badge variant={getStatusBadgeVariant(event.status)}>
+                      {getStatusLabel(event.status)}
+                    </Badge>
+                    {event.status === 'published' && (
+                      <Badge variant="success" className="text-xs">
+                        Inscrições abertas
+                      </Badge>
+                    )}
+                    {event.approval_status === 'pending' && (
+                      <Badge variant="warning" className="text-xs">
+                        Pendente de aprovação
+                      </Badge>
+                    )}
+                    {event.approval_status === 'rejected' && (
+                      <Badge variant="error" className="text-xs">
+                        Rejeitado
+                      </Badge>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-4">
                   <div className="flex items-center justify-end gap-2">
@@ -187,6 +210,20 @@ export function EventsTable({
                     >
                       <Users className="h-4 w-4" />
                     </Button>
+                    {event.status === 'published' && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setEventToClose(event.id)
+                          setCloseDialogOpen(true)
+                        }}
+                        disabled={loadingEventId === event.id}
+                        title="Fechar inscrições"
+                      >
+                        <EyeOff className="h-4 w-4" />
+                      </Button>
+                    )}
                     <div className="relative" ref={openDropdownId === event.id ? dropdownRef : null}>
                       <Button
                         size="sm"
@@ -311,9 +348,26 @@ export function EventsTable({
                 ? `${event.location.city}, ${event.location.state}`
                 : ''} • {formatDate(event.start_date)}
             </p>
-            <Badge variant={getStatusBadgeVariant(event.status)} className="mb-3">
-              {getStatusLabel(event.status)}
-            </Badge>
+            <div className="flex flex-wrap gap-2 mb-3">
+              <Badge variant={getStatusBadgeVariant(event.status)}>
+                {getStatusLabel(event.status)}
+              </Badge>
+              {event.status === 'published' && (
+                <Badge variant="success" className="text-xs">
+                  Inscrições abertas
+                </Badge>
+              )}
+              {event.approval_status === 'pending' && (
+                <Badge variant="warning" className="text-xs">
+                  Pendente de aprovação
+                </Badge>
+              )}
+              {event.approval_status === 'rejected' && (
+                <Badge variant="error" className="text-xs">
+                  Rejeitado
+                </Badge>
+              )}
+            </div>
             <div className="flex gap-2 mt-3">
               <Button
                 size="sm"
@@ -333,6 +387,20 @@ export function EventsTable({
                 <Users className="h-4 w-4 mr-1" />
                 Inscrições
               </Button>
+              {event.status === 'published' && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setEventToClose(event.id)
+                    setCloseDialogOpen(true)
+                  }}
+                  className="flex-1"
+                >
+                  <EyeOff className="h-4 w-4 mr-1" />
+                  Fechar
+                </Button>
+              )}
             </div>
           </div>
         ))}
@@ -347,6 +415,22 @@ export function EventsTable({
         cancelText="Cancelar"
         destructive
         onConfirm={handleDelete}
+      />
+
+      <ConfirmDialog
+        open={closeDialogOpen}
+        onOpenChange={setCloseDialogOpen}
+        title="Fechar inscrições do evento"
+        description="Tem certeza que deseja fechar as inscrições para este evento? O evento permanecerá visível, mas não será possível realizar novas inscrições."
+        confirmText="Fechar inscrições"
+        cancelText="Cancelar"
+        destructive
+        onConfirm={() => {
+          if (eventToClose) {
+            handleStatusChange(eventToClose, 'published_no_registration')
+            setEventToClose(null)
+          }
+        }}
       />
     </>
   )

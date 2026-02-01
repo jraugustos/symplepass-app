@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next"
 import { GeistSans } from "geist/font/sans"
 import { cn } from "@/lib/utils"
 import { AuthProvider } from "@/contexts/auth-context"
+import { Toaster } from "sonner"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -29,7 +30,9 @@ export default function RootLayout({
         <AuthProvider>
           {children}
         </AuthProvider>
+        <Toaster position="top-center" richColors />
       </body>
     </html>
   )
 }
+

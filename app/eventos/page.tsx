@@ -34,6 +34,7 @@ export default async function EventosPage({ searchParams }: EventsPageProps) {
     start_date: parsedFilters.start_date,
     end_date: parsedFilters.end_date,
     sort: parsedFilters.sort,
+    organizer_id: parsedFilters.organizer_id,
   }
 
   const page = parsedFilters.page || 1
@@ -63,6 +64,8 @@ export default async function EventosPage({ searchParams }: EventsPageProps) {
     filters.max_price ||
     filters.start_date ||
     filters.end_date ||
+    filters.end_date ||
+    filters.organizer_id ||
     (filters.sort && filters.sort !== 'date_asc')
   )
 

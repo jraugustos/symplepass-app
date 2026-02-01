@@ -635,3 +635,69 @@ export async function completeProfile(
     return { error: 'Erro ao completar perfil. Tente novamente.' }
   }
 }
+
+/**
+ * Sign up action for organizer signup flow
+ * Returns userId on success for token consumption
+ */
+export async function signUpAction(data: {
+  email: string
+  password: string
+  fullName: string
+  phone?: string
+}): Promise<{ userId?: string; error?: string }> {
+  try {
+    const supabase = await createClient()
+
+    const { data: authData, error } = await supabase.auth.signUp({
+      email: data.email,
+      password: data.password,
+      options: {
+        data: {
+          full_name: data.fullName,
+        },
+      },
+    })
+
+    if (error) {
+      console.error('Sign up error:', error)
+      return { error: getAuthErrorMessage(error.message) }
+    }
+
+    if (!authData.user) {
+      return { error: 'Erro ao criar usuário' }
+    }
+
+    // Update profile with phone if provided
+    if (data.phone) {
+      await supabase
+        .from('profiles')
+        .update({ phone: data.phone })
+        .eq('id', authData.user.id)
+    }
+
+    // Send welcome email (non-blocking)
+    sendWelcomeEmail({
+      userName: data.fullName,
+      userEmail: data.email,
+    }).catch((err) => {
+      console.error('Failed to send welcome email:', err)
+    })
+
+    // Add user to Resend contacts (non-blocking)
+    addUserContact({
+      email: data.email,
+      fullName: data.fullName,
+    }).catch((err) => {
+      console.error('Failed to add user to Resend contacts:', err)
+    })
+
+    revalidatePath('/', 'layout')
+
+    return { userId: authData.user.id }
+  } catch (error) {
+    console.error('Sign up error:', error)
+    return { error: 'Erro ao criar conta. Tente novamente.' }
+  }
+}
+

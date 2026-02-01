@@ -16,6 +16,7 @@ interface SearchParams {
   sport_type?: string
   search?: string
   page?: string
+  created?: string
 }
 
 export const metadata = {
@@ -41,6 +42,8 @@ export default async function EventosAdminPage({
     search: searchParams.search,
     page: searchParams.page ? parseInt(searchParams.page) : 1,
     pageSize: 20,
+    // Filter by organizer_id if user is an organizer
+    organizer_id: profile.role === 'organizer' ? user.id : undefined,
   }
 
   const { events, total, page, pageSize } = await getAllEventsForAdmin(filters)
@@ -79,12 +82,13 @@ export default async function EventosAdminPage({
   }
 
   const totalPages = Math.ceil(total / pageSize)
+  const pageTitle = profile.role === 'organizer' ? 'Meus Eventos' : 'Gerenciar Eventos'
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-neutral-900">Gerenciar Eventos</h1>
+          <h1 className="text-2xl font-bold text-neutral-900">{pageTitle}</h1>
           <p className="text-neutral-600 mt-1">
             {total} evento{total !== 1 ? 's' : ''} encontrado{total !== 1 ? 's' : ''}
           </p>
@@ -109,6 +113,7 @@ export default async function EventosAdminPage({
         events={events}
         onStatusChange={updateEventStatusAction}
         onDelete={deleteEventAction}
+        success={searchParams.created === 'true'}
       />
 
       {/* Pagination */}

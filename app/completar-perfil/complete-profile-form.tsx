@@ -102,93 +102,116 @@ export default function CompleteProfileForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="relative pb-24">
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {error}
         </div>
       )}
 
-      {/* Full Name */}
-      <div>
-        <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-1">
-          Nome completo
-        </label>
-        <input
-          type="text"
-          id="fullName"
-          value={fullName}
-          onChange={(e) => {
-            setFullName(e.target.value)
-            if (fieldErrors.fullName) {
-              setFieldErrors((prev) => ({ ...prev, fullName: '' }))
-            }
-          }}
-          className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors ${
-            fieldErrors.fullName ? 'border-red-500' : 'border-gray-300'
-          }`}
-          placeholder="Seu nome completo"
-          disabled={isPending}
-        />
-        {fieldErrors.fullName && (
-          <p className="mt-1 text-sm text-red-600">{fieldErrors.fullName}</p>
-        )}
+      <div className="space-y-10">
+        {/* Section: Personal Info */}
+        <section className="space-y-6">
+          <div className="border-b border-neutral-100 pb-2">
+            <h3 className="text-lg font-semibold text-neutral-900">
+              Dados Pessoais
+            </h3>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Full Name */}
+            <div className="space-y-1.5">
+              <label htmlFor="fullName" className="block text-sm font-medium text-neutral-700">
+                Nome completo
+              </label>
+              <input
+                type="text"
+                id="fullName"
+                value={fullName}
+                onChange={(e) => {
+                  setFullName(e.target.value)
+                  if (fieldErrors.fullName) {
+                    setFieldErrors((prev) => ({ ...prev, fullName: '' }))
+                  }
+                }}
+                className={`w-full rounded-lg border px-4 py-2.5 text-neutral-900 shadow-sm transition-colors focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 ${fieldErrors.fullName ? 'border-red-500' : 'border-neutral-200 hover:border-neutral-300'
+                  }`}
+                placeholder="Seu nome completo"
+                disabled={isPending}
+              />
+              {fieldErrors.fullName && (
+                <p className="text-sm text-red-600">{fieldErrors.fullName}</p>
+              )}
+            </div>
+
+            {/* Phone */}
+            <div className="space-y-1.5">
+              <label htmlFor="phone" className="block text-sm font-medium text-neutral-700">
+                Telefone
+              </label>
+              <input
+                type="tel"
+                id="phone"
+                value={phone}
+                onChange={handlePhoneChange}
+                className={`w-full rounded-lg border px-4 py-2.5 text-neutral-900 shadow-sm transition-colors focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 ${fieldErrors.phone ? 'border-red-500' : 'border-neutral-200 hover:border-neutral-300'
+                  }`}
+                placeholder="(XX) XXXXX-XXXX"
+                disabled={isPending}
+              />
+              {fieldErrors.phone && (
+                <p className="text-sm text-red-600">{fieldErrors.phone}</p>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* Section: Interests */}
+        <section className="space-y-6">
+          <div className="border-b border-neutral-100 pb-2">
+            <h3 className="text-lg font-semibold text-neutral-900">
+              Seus Interesses
+            </h3>
+            <p className="mt-1 text-sm text-neutral-500">
+              Selecione os esportes que você pratica ou acompanha para receber recomendações personalizadas.
+            </p>
+          </div>
+
+          <div>
+            <SportInterestsSelector
+              value={favoriteSports}
+              onChange={(value) => {
+                setFavoriteSports(value)
+                if (fieldErrors.favoriteSports) {
+                  setFieldErrors((prev) => ({ ...prev, favoriteSports: '' }))
+                }
+              }}
+              disabled={isPending}
+              error={fieldErrors.favoriteSports}
+            />
+          </div>
+        </section>
       </div>
 
-      {/* Phone */}
-      <div>
-        <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
-          Telefone
-        </label>
-        <input
-          type="tel"
-          id="phone"
-          value={phone}
-          onChange={handlePhoneChange}
-          className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors ${
-            fieldErrors.phone ? 'border-red-500' : 'border-gray-300'
-          }`}
-          placeholder="(XX) XXXXX-XXXX"
-          disabled={isPending}
-        />
-        {fieldErrors.phone && (
-          <p className="mt-1 text-sm text-red-600">{fieldErrors.phone}</p>
-        )}
+      {/* Fixed Footer */}
+      <div className="fixed bottom-0 right-0 z-20 w-full border-t border-neutral-200 bg-white p-4 lg:w-[58.333333%] xl:w-[66.666667%]">
+        <div className="mx-auto flex max-w-2xl justify-end">
+          <button
+            type="submit"
+            disabled={isPending}
+            className="flex items-center justify-center gap-2 rounded-lg bg-orange-600 px-8 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Salvando...
+              </>
+            ) : (
+              'Continuar'
+            )}
+          </button>
+        </div>
       </div>
-
-      {/* Favorite Sports */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-3">
-          Quais esportes você pratica ou acompanha?
-        </label>
-        <SportInterestsSelector
-          value={favoriteSports}
-          onChange={(value) => {
-            setFavoriteSports(value)
-            if (fieldErrors.favoriteSports) {
-              setFieldErrors((prev) => ({ ...prev, favoriteSports: '' }))
-            }
-          }}
-          disabled={isPending}
-          error={fieldErrors.favoriteSports}
-        />
-      </div>
-
-      {/* Submit Button */}
-      <button
-        type="submit"
-        disabled={isPending}
-        className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 px-4 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-      >
-        {isPending ? (
-          <>
-            <Loader2 className="w-5 h-5 animate-spin" />
-            Salvando...
-          </>
-        ) : (
-          'Continuar'
-        )}
-      </button>
     </form>
   )
 }

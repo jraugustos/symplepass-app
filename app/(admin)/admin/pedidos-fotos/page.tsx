@@ -29,6 +29,8 @@ export default async function PedidosFotosPage({
     redirect('/login')
   }
 
+  const organizerId = result.profile.role === 'organizer' ? result.profile.id : undefined
+
   const filters = {
     payment_status: searchParams.payment_status,
     search: searchParams.search,
@@ -36,11 +38,12 @@ export default async function PedidosFotosPage({
     end_date: searchParams.end_date,
     page: searchParams.page ? parseInt(searchParams.page) : 1,
     pageSize: 20,
+    organizer_id: organizerId,
   }
 
   const [ordersResult, stats] = await Promise.all([
     getAllPhotoOrders(filters),
-    getAllPhotoOrderStats(),
+    getAllPhotoOrderStats(organizerId),
   ])
 
   return (

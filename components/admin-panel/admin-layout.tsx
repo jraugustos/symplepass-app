@@ -18,7 +18,7 @@ export function AdminLayout({ children, user, profile }: AdminLayoutProps) {
         <div className="min-h-screen bg-neutral-50 flex">
             {/* Sidebar for Desktop */}
             <aside className="hidden md:block w-64 border-r border-neutral-200 bg-white fixed inset-y-0 left-0 z-20">
-                <Sidebar />
+                <Sidebar userRole={profile.role} />
             </aside>
 
             {/* Mobile Sidebar Overlay */}
@@ -36,7 +36,7 @@ export function AdminLayout({ children, user, profile }: AdminLayoutProps) {
                     sidebarOpen ? "translate-x-0" : "-translate-x-full"
                 )}
             >
-                <Sidebar />
+                <Sidebar userRole={profile.role} />
             </aside>
 
             {/* Main Content */}

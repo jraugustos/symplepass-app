@@ -44,6 +44,7 @@ export default async function RelatoriosPage({
     event_id: searchParams.event_id,
     sport_type: searchParams.sport_type,
     payment_status: searchParams.payment_status,
+    organizer_id: result.profile.role === 'organizer' ? result.profile.id : undefined,
   }
 
   const [overview, salesTrends, eventPerformance, paymentBreakdown, { events }] = await Promise.all([

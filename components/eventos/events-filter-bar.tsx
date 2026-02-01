@@ -33,6 +33,7 @@ interface EventsFilterBarProps {
     cities: FilterOption[]
     states: FilterOption[]
     sportTypes: FilterOption[]
+    organizers?: FilterOption[]
   }
 }
 
@@ -70,6 +71,7 @@ export function EventsFilterBar({ filters, filterOptions }: EventsFilterBarProps
   const activeFilterCount = [
     filters.city,
     filters.sport_type,
+    filters.organizer_id,
     filters.min_price || filters.max_price,
     filters.start_date || filters.end_date,
   ].filter(Boolean).length
@@ -234,6 +236,21 @@ export function EventsFilterBar({ filters, filterOptions }: EventsFilterBarProps
           className={isMobile ? 'w-full' : ''}
         />
       </div>
+
+      {/* Organizer Filter */}
+      {filterOptions.organizers && filterOptions.organizers.length > 0 && (
+        <div className={isMobile ? 'w-full' : ''}>
+          <FilterButton
+            label="Organizador"
+            options={filterOptions.organizers}
+            value={filters.organizer_id}
+            onChange={(value) => updateFilters({ organizer_id: value as string })}
+            placeholder="Todos"
+            showCount
+            className={isMobile ? 'w-full' : ''}
+          />
+        </div>
+      )}
 
       {/* Price Filter */}
       <div className={isMobile ? 'w-full' : 'relative inline-block'}>

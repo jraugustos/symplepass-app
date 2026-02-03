@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { GripVertical, Trash2, Upload, X, AlertCircle, Loader2, CheckSquare, Square, XSquare } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { photoUploadService } from '@/lib/photos/upload-service'
+import { ConfirmDialog } from '@/components/ui/modal'
 import type { EventPhoto } from '@/types/database.types'
 import type { CreatePhotoData } from '@/lib/data/admin-photos'
 
@@ -36,6 +37,11 @@ export function PhotosUpload({
   const [selectedPhotos, setSelectedPhotos] = useState<Set<string>>(new Set())
   const [isDeleting, setIsDeleting] = useState(false)
   const [selectionMode, setSelectionMode] = useState(false)
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean
+    description: string
+    onConfirm: () => void
+  }>({ open: false, description: '', onConfirm: () => {} })
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Local state for optimistic UI during drag operations
@@ -108,18 +114,22 @@ export function PhotosUpload({
     }
   }, [eventId, onPhotoCreate])
 
-  const handleDelete = useCallback(async (photoId: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta foto?')) return
-
-    setDeletingId(photoId)
-    try {
-      await onPhotoDelete(photoId)
-    } catch (err) {
-      console.error('Delete error:', err)
-      setError(err instanceof Error ? err.message : 'Erro ao excluir foto')
-    } finally {
-      setDeletingId(null)
-    }
+  const handleDelete = useCallback((photoId: string) => {
+    setConfirmDialog({
+      open: true,
+      description: 'Tem certeza que deseja excluir esta foto? Esta ação não pode ser desfeita.',
+      onConfirm: async () => {
+        setDeletingId(photoId)
+        try {
+          await onPhotoDelete(photoId)
+        } catch (err) {
+          console.error('Delete error:', err)
+          setError(err instanceof Error ? err.message : 'Erro ao excluir foto')
+        } finally {
+          setDeletingId(null)
+        }
+      },
+    })
   }, [onPhotoDelete])
 
   const handleDragStart = (index: number) => {
@@ -197,50 +207,54 @@ export function PhotosUpload({
     setSelectionMode(false)
   }
 
-  const handleDeleteSelected = async () => {
+  const handleDeleteSelected = () => {
     if (selectedPhotos.size === 0) return
 
     const count = selectedPhotos.size
-    if (!confirm(`Tem certeza que deseja excluir ${count} foto${count > 1 ? 's' : ''}? Esta ação não pode ser desfeita.`)) {
-      return
-    }
-
-    setIsDeleting(true)
-    try {
-      const photoIds = Array.from(selectedPhotos)
-      for (const photoId of photoIds) {
-        await onPhotoDelete(photoId)
-      }
-      setSelectedPhotos(new Set())
-      setSelectionMode(false)
-    } catch (err) {
-      console.error('Error deleting photos:', err)
-      setError('Erro ao excluir algumas fotos. Tente novamente.')
-    } finally {
-      setIsDeleting(false)
-    }
+    setConfirmDialog({
+      open: true,
+      description: `Tem certeza que deseja excluir ${count} foto${count > 1 ? 's' : ''}? Esta ação não pode ser desfeita.`,
+      onConfirm: async () => {
+        setIsDeleting(true)
+        try {
+          const photoIds = Array.from(selectedPhotos)
+          for (const photoId of photoIds) {
+            await onPhotoDelete(photoId)
+          }
+          setSelectedPhotos(new Set())
+          setSelectionMode(false)
+        } catch (err) {
+          console.error('Error deleting photos:', err)
+          setError('Erro ao excluir algumas fotos. Tente novamente.')
+        } finally {
+          setIsDeleting(false)
+        }
+      },
+    })
   }
 
-  const handleDeleteAllPhotos = async () => {
+  const handleDeleteAllPhotos = () => {
     if (localPhotos.length === 0) return
 
-    if (!confirm(`Tem certeza que deseja excluir TODAS as ${localPhotos.length} fotos? Esta ação não pode ser desfeita.`)) {
-      return
-    }
-
-    setIsDeleting(true)
-    try {
-      for (const photo of localPhotos) {
-        await onPhotoDelete(photo.id)
-      }
-      setSelectedPhotos(new Set())
-      setSelectionMode(false)
-    } catch (err) {
-      console.error('Error deleting all photos:', err)
-      setError('Erro ao excluir algumas fotos. Tente novamente.')
-    } finally {
-      setIsDeleting(false)
-    }
+    setConfirmDialog({
+      open: true,
+      description: `Tem certeza que deseja excluir TODAS as ${localPhotos.length} fotos? Esta ação não pode ser desfeita.`,
+      onConfirm: async () => {
+        setIsDeleting(true)
+        try {
+          for (const photo of localPhotos) {
+            await onPhotoDelete(photo.id)
+          }
+          setSelectedPhotos(new Set())
+          setSelectionMode(false)
+        } catch (err) {
+          console.error('Error deleting all photos:', err)
+          setError('Erro ao excluir algumas fotos. Tente novamente.')
+        } finally {
+          setIsDeleting(false)
+        }
+      },
+    })
   }
 
   return (
@@ -469,6 +483,17 @@ export function PhotosUpload({
           <p className="text-sm mt-1">Faça upload das fotos do evento acima.</p>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => setConfirmDialog((prev) => ({ ...prev, open }))}
+        title="Confirmar exclusão"
+        description={confirmDialog.description}
+        confirmText="Excluir"
+        cancelText="Cancelar"
+        destructive
+        onConfirm={confirmDialog.onConfirm}
+      />
     </div>
   )
 }

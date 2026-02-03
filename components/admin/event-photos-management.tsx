@@ -9,6 +9,7 @@ import { PhotoJobsStatus } from './photo-jobs-status'
 import { PhotoPackagesForm } from './photo-packages-form'
 import { PhotoPricingTiersForm } from './photo-pricing-tiers-form'
 import { PhotoOrdersPageClient } from './photo-orders-page-client'
+import { ConfirmDialog } from '@/components/ui/modal'
 import type { EventPhoto, PhotoPackage, PhotoPricingTier } from '@/types/database.types'
 import type { AdminPhotoOrderWithDetails, CreatePhotoData, PhotoOrderFilters } from '@/lib/data/admin-photos'
 import type { PhotoPackageFormData, PhotoPricingTierFormData } from '@/types'
@@ -72,6 +73,11 @@ export function EventPhotosManagement({
   const [jobsRefreshTrigger, setJobsRefreshTrigger] = useState(0)
   const [selectedPhotos, setSelectedPhotos] = useState<Set<string>>(new Set())
   const [isDeleting, setIsDeleting] = useState(false)
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean
+    description: string
+    onConfirm: () => void
+  }>({ open: false, description: '', onConfirm: () => {} })
   const [localPhotos, setLocalPhotos] = useState<EventPhoto[]>(photos)
 
   // Sync local photos with props
@@ -113,50 +119,52 @@ export function EventPhotosManagement({
     setSelectedPhotos(new Set())
   }
 
-  const handleDeleteSelected = async () => {
+  const handleDeleteSelected = () => {
     if (selectedPhotos.size === 0) return
 
     const count = selectedPhotos.size
-    if (!confirm(`Tem certeza que deseja excluir ${count} foto${count > 1 ? 's' : ''}? Esta ação não pode ser desfeita.`)) {
-      return
-    }
-
-    setIsDeleting(true)
-    try {
-      // Delete photos one by one
-      const photoIds = Array.from(selectedPhotos)
-      for (const photoId of photoIds) {
-        await onPhotoDelete(photoId)
-      }
-      // Clear selection after successful delete
-      setSelectedPhotos(new Set())
-    } catch (err) {
-      console.error('Error deleting photos:', err)
-      alert('Erro ao excluir algumas fotos. Tente novamente.')
-    } finally {
-      setIsDeleting(false)
-    }
+    setConfirmDialog({
+      open: true,
+      description: `Tem certeza que deseja excluir ${count} foto${count > 1 ? 's' : ''}? Esta ação não pode ser desfeita.`,
+      onConfirm: async () => {
+        setIsDeleting(true)
+        try {
+          const photoIds = Array.from(selectedPhotos)
+          for (const photoId of photoIds) {
+            await onPhotoDelete(photoId)
+          }
+          setSelectedPhotos(new Set())
+        } catch (err) {
+          console.error('Error deleting photos:', err)
+          alert('Erro ao excluir algumas fotos. Tente novamente.')
+        } finally {
+          setIsDeleting(false)
+        }
+      },
+    })
   }
 
-  const handleDeleteAllPhotos = async () => {
+  const handleDeleteAllPhotos = () => {
     if (localPhotos.length === 0) return
 
-    if (!confirm(`Tem certeza que deseja excluir TODAS as ${localPhotos.length} fotos? Esta ação não pode ser desfeita.`)) {
-      return
-    }
-
-    setIsDeleting(true)
-    try {
-      for (const photo of localPhotos) {
-        await onPhotoDelete(photo.id)
-      }
-      setSelectedPhotos(new Set())
-    } catch (err) {
-      console.error('Error deleting all photos:', err)
-      alert('Erro ao excluir algumas fotos. Tente novamente.')
-    } finally {
-      setIsDeleting(false)
-    }
+    setConfirmDialog({
+      open: true,
+      description: `Tem certeza que deseja excluir TODAS as ${localPhotos.length} fotos? Esta ação não pode ser desfeita.`,
+      onConfirm: async () => {
+        setIsDeleting(true)
+        try {
+          for (const photo of localPhotos) {
+            await onPhotoDelete(photo.id)
+          }
+          setSelectedPhotos(new Set())
+        } catch (err) {
+          console.error('Error deleting all photos:', err)
+          alert('Erro ao excluir algumas fotos. Tente novamente.')
+        } finally {
+          setIsDeleting(false)
+        }
+      },
+    })
   }
 
   return (
@@ -373,6 +381,17 @@ export function EventPhotosManagement({
           />
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => setConfirmDialog((prev) => ({ ...prev, open }))}
+        title="Confirmar exclusão"
+        description={confirmDialog.description}
+        confirmText="Excluir"
+        cancelText="Cancelar"
+        destructive
+        onConfirm={confirmDialog.onConfirm}
+      />
     </div>
   )
 }

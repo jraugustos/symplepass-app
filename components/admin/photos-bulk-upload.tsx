@@ -147,7 +147,7 @@ export function PhotosBulkUpload({ eventId, onJobCreated }: PhotosBulkUploadProp
 
     setState('uploading')
     setError(null)
-    setUploadProgress(null)
+    setUploadProgress({ bytesUploaded: 0, bytesTotal: selectedFile.size, percentage: 0 })
 
     try {
       const jobId = await bulkUploadService.uploadZip(selectedFile, eventId, {

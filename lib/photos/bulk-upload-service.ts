@@ -146,14 +146,15 @@ class BulkUploadServiceClass {
     }
     console.warn('[BulkUploadService] Filename sanitized:', sanitizedFileName)
 
-    // Get current user
-    console.warn('[BulkUploadService] Getting current user...')
-    const { data: { user }, error: userError } = await this.supabase.auth.getUser()
-    if (userError || !user) {
-      console.error('[BulkUploadService] User error:', userError)
+    // Get current user from session (faster than getUser which makes a network request)
+    console.warn('[BulkUploadService] Getting current session...')
+    const { data: { session }, error: sessionError } = await this.supabase.auth.getSession()
+    if (sessionError || !session?.user) {
+      console.error('[BulkUploadService] Session error:', sessionError)
       throw new Error('Usuário não autenticado')
     }
-    console.warn('[BulkUploadService] User found:', user.id)
+    const user = session.user
+    console.warn('[BulkUploadService] User found from session:', user.id)
 
     // Create job record with sanitized filename
     console.warn('[BulkUploadService] Creating job record...')

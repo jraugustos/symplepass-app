@@ -10,6 +10,7 @@ import {
   ChevronDown,
   ChevronUp,
   RefreshCw,
+  Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -182,6 +183,43 @@ export function PhotoJobsStatus({ eventId, refreshTrigger }: PhotoJobsStatusProp
       fetchJobs()
     } catch (error) {
       console.error('Failed to retry job:', error)
+    }
+  }
+
+  const handleForceCancel = async (jobId: string) => {
+    if (!confirm('Tem certeza que deseja cancelar este upload? Esta ação não pode ser desfeita.')) {
+      return
+    }
+    try {
+      const supabase = supabaseRef.current
+      // Force update job to cancelled status
+      await supabase
+        .from('photo_upload_jobs')
+        .update({
+          status: 'cancelled',
+          error_message: 'Cancelado manualmente pelo usuário',
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', jobId)
+      fetchJobs()
+    } catch (error) {
+      console.error('Failed to cancel job:', error)
+    }
+  }
+
+  const handleDeleteJob = async (jobId: string) => {
+    if (!confirm('Tem certeza que deseja excluir este registro de upload?')) {
+      return
+    }
+    try {
+      const supabase = supabaseRef.current
+      await supabase
+        .from('photo_upload_jobs')
+        .delete()
+        .eq('id', jobId)
+      fetchJobs()
+    } catch (error) {
+      console.error('Failed to delete job:', error)
     }
   }
 
@@ -397,9 +435,10 @@ export function PhotoJobsStatus({ eventId, refreshTrigger }: PhotoJobsStatusProp
                   </details>
                 )}
 
-                {/* Retry Button */}
-                {job.status === 'failed' && job.zip_path && (
-                  <div className="mt-2">
+                {/* Action Buttons */}
+                <div className="mt-2 flex gap-2 flex-wrap">
+                  {/* Retry Button for failed jobs */}
+                  {job.status === 'failed' && job.zip_path && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -411,8 +450,40 @@ export function PhotoJobsStatus({ eventId, refreshTrigger }: PhotoJobsStatusProp
                       <RefreshCw className="h-3 w-3 mr-1" />
                       Tentar novamente
                     </Button>
-                  </div>
-                )}
+                  )}
+
+                  {/* Cancel Button for stuck/active jobs */}
+                  {['uploading', 'extracting', 'processing', 'pending'].includes(job.status) && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleForceCancel(job.id)
+                      }}
+                    >
+                      <XCircle className="h-3 w-3 mr-1" />
+                      Cancelar
+                    </Button>
+                  )}
+
+                  {/* Delete Button for finished jobs */}
+                  {['completed', 'failed', 'cancelled'].includes(job.status) && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-neutral-500 hover:text-red-600 hover:bg-red-50"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteJob(job.id)
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3 mr-1" />
+                      Excluir
+                    </Button>
+                  )}
+                </div>
               </div>
             )}
           </div>

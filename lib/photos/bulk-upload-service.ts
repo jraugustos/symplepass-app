@@ -248,28 +248,50 @@ class BulkUploadServiceClass {
     jobId: string,
     callbacks?: BulkUploadCallbacks
   ): Promise<string> {
-    // Comment 1: Use sanitized filename for storage path
     const sanitizedFileName = sanitizeFilename(file.name) || 'upload.zip'
     const fileName = `${userId}/${jobId}/${sanitizedFileName}`
-
-    // For Supabase, we'll use their resumable upload API
-    // Supabase Storage supports TUS protocol natively
 
     const { data: { session } } = await this.supabase.auth.getSession()
     if (!session?.access_token) {
       throw new Error('Sessão não encontrada')
     }
 
-    // Use Supabase's TUS endpoint
     const tusEndpoint = `${SUPABASE_URL}/storage/v1/upload/resumable`
+    const TUS_TIMEOUT_MS = 15000 // 15 seconds to receive first progress, otherwise fallback to XHR
 
     return new Promise((resolve, reject) => {
-      // Dynamic import of tus-js-client for browser
       import('tus-js-client').then((tusModule) => {
         const Upload = tusModule.Upload
+        let progressReceived = false
+        let timeoutId: ReturnType<typeof setTimeout> | null = null
+        let tusAborted = false
+
+        // Fallback function - abort TUS and use XHR instead
+        const fallbackToXhr = () => {
+          if (tusAborted) return // Already handled
+          tusAborted = true
+          console.warn('[BulkUploadService] TUS timeout - no progress in 15s, falling back to XHR')
+          try {
+            upload.abort()
+          } catch {
+            // Ignore abort errors
+          }
+          this.activeUploads.delete(jobId)
+          this.fallbackUpload(file, fileName, jobId, callbacks)
+            .then(resolve)
+            .catch(reject)
+        }
+
+        const clearTimeoutIfSet = () => {
+          if (timeoutId) {
+            clearTimeout(timeoutId)
+            timeoutId = null
+          }
+        }
+
         const upload = new Upload(file, {
           endpoint: tusEndpoint,
-          retryDelays: [0, 1000, 3000, 5000, 10000], // Retry delays in ms
+          retryDelays: [0, 1000, 3000, 5000, 10000],
           chunkSize: CHUNK_SIZE,
           metadata: {
             bucketName: 'photo-uploads-temp',
@@ -279,14 +301,14 @@ class BulkUploadServiceClass {
           },
           headers: {
             authorization: `Bearer ${session.access_token}`,
-            'x-upsert': 'true', // Overwrite if exists
+            'x-upsert': 'true',
           },
           uploadSize: file.size,
           onError: (error: Error) => {
-            // Comment 1: Clean up on error
+            clearTimeoutIfSet()
+            if (tusAborted) return // Already falling back
             this.activeUploads.delete(jobId)
             console.error('TUS upload error:', error)
-            // Comment 1: Check if this was an abort (user cancellation)
             if (error.message?.includes('abort') || error.message?.includes('cancel')) {
               reject(new UploadCancelledError())
             } else {
@@ -294,6 +316,13 @@ class BulkUploadServiceClass {
             }
           },
           onProgress: (bytesUploaded: number, bytesTotal: number) => {
+            if (tusAborted) return
+            // TUS is working - clear the timeout
+            if (!progressReceived) {
+              progressReceived = true
+              clearTimeoutIfSet()
+              console.log('[BulkUploadService] TUS progress received, upload working normally')
+            }
             const percentage = Math.round((bytesUploaded / bytesTotal) * 100)
             callbacks?.onUploadProgress?.({
               bytesUploaded,
@@ -302,29 +331,32 @@ class BulkUploadServiceClass {
             })
           },
           onSuccess: () => {
-            // Comment 1: Clean up on success
+            clearTimeoutIfSet()
+            if (tusAborted) return
             this.activeUploads.delete(jobId)
             resolve(fileName)
           },
         })
 
-        // Comment 1: Store the upload instance for potential abort
         this.activeUploads.set(jobId, { abort: () => upload.abort(), type: 'tus' })
 
-        // Check for previous uploads to resume
         upload.findPreviousUploads().then((previousUploads: Array<{ uploadUrl: string }>) => {
           if (previousUploads.length > 0) {
             console.log('Resuming previous upload...')
             upload.resumeFromPreviousUpload(previousUploads[0])
           }
+
+          // Start TUS upload with timeout fallback
+          console.log('[BulkUploadService] Starting TUS upload, will fallback to XHR if no progress in 15s')
+          timeoutId = setTimeout(fallbackToXhr, TUS_TIMEOUT_MS)
           upload.start()
         }).catch((error: unknown) => {
+          clearTimeoutIfSet()
           this.activeUploads.delete(jobId)
           reject(error instanceof Error ? error : new Error('Erro ao iniciar upload TUS'))
         })
       }).catch((error: unknown) => {
         console.error('Failed to load TUS client:', error)
-        // Comment 1: Fallback to standard upload if TUS fails, passing jobId for abort support
         this.fallbackUpload(file, fileName, jobId, callbacks)
           .then(resolve)
           .catch(reject)

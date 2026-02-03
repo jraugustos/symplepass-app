@@ -32,7 +32,8 @@ export async function getEventPhotosData(eventId: string): Promise<EventPhotosDa
         .from('event_photos')
         .select('*')
         .eq('event_id', eventId)
-        .order('display_order', { ascending: true }),
+        .order('display_order', { ascending: true })
+        .limit(10000), // Override Supabase default limit of 1000
       supabase
         .from('photo_packages')
         .select('*')

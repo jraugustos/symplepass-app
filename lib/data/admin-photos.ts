@@ -101,6 +101,7 @@ export async function getPhotosByEventId(eventId: string): Promise<EventPhoto[]>
       .select('*')
       .eq('event_id', eventId)
       .order('display_order', { ascending: true })
+      .limit(10000) // Override Supabase default limit of 1000
 
     if (error) {
       console.error('Error fetching photos:', error)

@@ -30,7 +30,6 @@ const FUNCTION_SECRET = Deno.env.get('PROCESS_PHOTO_ZIP_SECRET')
 
 // ZIP validation limits
 const MAX_FILES_IN_ZIP = 5000
-const MAX_ESTIMATED_UNCOMPRESSED_SIZE = 10 * 1024 * 1024 * 1024 // 10GB estimated
 // Comment 3: Maximum ZIP file size (5GB) - validated before loading
 const MAX_ZIP_SIZE_BYTES = 5 * 1024 * 1024 * 1024
 // Comment 3: Maximum individual photo size (50MB) - validated during processing
@@ -406,6 +405,19 @@ async function handleExtracting(
 
     // Load ZIP and count valid images
     const zip = await JSZip.loadAsync(zipBytes)
+
+    // Safety check: if download + parse consumed too much time, fail gracefully
+    // instead of letting the runtime kill the function and leaving the job stuck
+    const elapsedAfterLoad = Date.now() - startTime
+    if (elapsedAfterLoad > MAX_EXECUTION_TIME_MS - TIME_BUFFER_MS) {
+      console.error(`[ProcessPhotoZip] ZIP load took too long (${Math.round(elapsedAfterLoad / 1000)}s), failing job`)
+      await cleanupTempZip(supabase, job.zip_path)
+      await updateJobStatus(supabase, job.id, 'failed', {
+        error_message: 'Tempo limite atingido durante a extração do ZIP. Tente com um arquivo menor ou divida em múltiplos ZIPs.',
+      })
+      return { success: false, shouldContinue: false, message: 'Timeout during ZIP load', httpStatus: 408 }
+    }
+
     const allFiles = Object.keys(zip.files)
     const imageFiles = allFiles.filter((name) => {
       const file = zip.files[name]
@@ -432,33 +444,6 @@ async function handleExtracting(
         success: false,
         shouldContinue: false,
         message: `Too many files in ZIP: ${imageFiles.length} > ${MAX_FILES_IN_ZIP}`,
-        httpStatus: 400,
-      }
-    }
-
-    // Estimate uncompressed size
-    let estimatedUncompressedSize = 0
-    for (const fileName of imageFiles) {
-      const file = zip.files[fileName]
-      const uncompressedSize = (file as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize
-      estimatedUncompressedSize += uncompressedSize || (await file.async('uint8array')).length
-      if (estimatedUncompressedSize > MAX_ESTIMATED_UNCOMPRESSED_SIZE) {
-        break
-      }
-    }
-
-    if (estimatedUncompressedSize > MAX_ESTIMATED_UNCOMPRESSED_SIZE) {
-      const sizeMB = Math.round(estimatedUncompressedSize / (1024 * 1024))
-      const maxMB = Math.round(MAX_ESTIMATED_UNCOMPRESSED_SIZE / (1024 * 1024))
-      // Comment 3: Cleanup ZIP on validation failure
-      await cleanupTempZip(supabase, job.zip_path)
-      await updateJobStatus(supabase, job.id, 'failed', {
-        error_message: `Tamanho descompactado estimado (${sizeMB}MB) excede o máximo permitido (${maxMB}MB)`,
-      })
-      return {
-        success: false,
-        shouldContinue: false,
-        message: `Estimated uncompressed size too large: ${sizeMB}MB > ${maxMB}MB`,
         httpStatus: 400,
       }
     }
@@ -590,6 +575,17 @@ async function handleProcessing(
     // Comment 4: Pre-load imagescript module before processing loop
     await getImageScript()
 
+    // Query max existing display_order so new photos are appended after all existing ones,
+    // including photos from previous jobs or previous invocations of this same job.
+    const { data: maxOrderResult } = await supabase
+      .from('event_photos')
+      .select('display_order')
+      .eq('event_id', job.event_id)
+      .order('display_order', { ascending: false })
+      .limit(1)
+    const baseDisplayOrder = (maxOrderResult?.[0]?.display_order ?? -1) + 1
+    let photosInsertedThisInvocation = 0
+
     const errors: Array<{ fileName: string; error: string }> = [...(job.errors || [])]
     let totalProcessedThisInvocation = 0
     let totalFailedThisInvocation = 0
@@ -631,7 +627,6 @@ async function handleProcessing(
         }
 
         const fileName = batchFiles[i]
-        const displayOrder = startIndex + i
 
         try {
           // Comment 3: Validate individual photo size before processing
@@ -644,7 +639,9 @@ async function handleProcessing(
             throw new Error(`Foto muito grande (${sizeMB}MB). Máximo permitido: ${maxMB}MB`)
           }
 
+          const displayOrder = baseDisplayOrder + photosInsertedThisInvocation
           await processPhotoWithData(supabase, photoData, fileName, job.event_id, displayOrder)
+          photosInsertedThisInvocation++
           batchProcessed++
         } catch (error) {
           console.error(`[ProcessPhotoZip] Failed to process ${fileName}:`, error)

@@ -70,6 +70,7 @@ export function PhotosUpload({
       )
 
       // Save metadata to database for successful uploads
+      const metadataErrors: string[] = []
       for (const photo of result.successful) {
         try {
           await onPhotoCreate({
@@ -83,13 +84,17 @@ export function PhotosUpload({
           })
         } catch (err) {
           console.error('Error saving photo metadata:', err)
+          metadataErrors.push(`${photo.fileName}: ${err instanceof Error ? err.message : 'Erro ao salvar metadados'}`)
         }
       }
 
-      // Show errors if any failed
-      if (result.failed.length > 0) {
-        const errorMessages = result.failed.map(f => `${f.fileName}: ${f.error}`).join('\n')
-        setError(`Algumas fotos falharam:\n${errorMessages}`)
+      // Show errors from both storage failures and metadata save failures
+      const allErrors = [
+        ...result.failed.map(f => `${f.fileName}: ${f.error}`),
+        ...metadataErrors,
+      ]
+      if (allErrors.length > 0) {
+        setError(`Algumas fotos falharam:\n${allErrors.join('\n')}`)
       }
     } catch (err) {
       console.error('Upload error:', err)

@@ -26,14 +26,17 @@ export async function getEventPhotosData(eventId: string): Promise<EventPhotosDa
   try {
     const supabase = createClient()
 
-    // Fetch photos, packages (deprecated), and pricing tiers in parallel
-    const [photosRes, packagesRes, tiersRes] = await Promise.all([
+    // Paginate using .range() to bypass PostgREST max-rows (default 1000).
+    // First page runs in parallel with packages/tiers so there is no latency
+    // regression for events with < 1000 photos.
+    const PAGE_SIZE = 1000
+    const [firstPhotosRes, packagesRes, tiersRes] = await Promise.all([
       supabase
         .from('event_photos')
         .select('*')
         .eq('event_id', eventId)
         .order('display_order', { ascending: true })
-        .limit(10000), // Override Supabase default limit of 1000
+        .range(0, PAGE_SIZE - 1),
       supabase
         .from('photo_packages')
         .select('*')
@@ -46,8 +49,8 @@ export async function getEventPhotosData(eventId: string): Promise<EventPhotosDa
         .order('min_quantity', { ascending: true }),
     ])
 
-    if (photosRes.error) {
-      console.error('Error fetching event photos:', photosRes.error)
+    if (firstPhotosRes.error) {
+      console.error('Error fetching event photos:', firstPhotosRes.error)
       return { photos: [], packages: [], pricingTiers: [] }
     }
 
@@ -61,8 +64,34 @@ export async function getEventPhotosData(eventId: string): Promise<EventPhotosDa
       console.error('Error fetching photo pricing tiers:', tiersRes.error)
     }
 
+    // Fetch remaining pages if first page was full
+    let allPhotos = firstPhotosRes.data || []
+    if (allPhotos.length === PAGE_SIZE) {
+      let offset = PAGE_SIZE
+      while (true) {
+        const { data, error } = await supabase
+          .from('event_photos')
+          .select('*')
+          .eq('event_id', eventId)
+          .order('display_order', { ascending: true })
+          .range(offset, offset + PAGE_SIZE - 1)
+
+        if (error) {
+          console.error('Error fetching event photos page:', error)
+          break
+        }
+
+        if (!data || data.length === 0) break
+
+        allPhotos = allPhotos.concat(data)
+
+        if (data.length < PAGE_SIZE) break
+        offset += PAGE_SIZE
+      }
+    }
+
     // Generate public URLs for watermarked and thumbnail images
-    const photosWithUrls: EventPhotoWithUrls[] = (photosRes.data || []).map((photo) => {
+    const photosWithUrls: EventPhotoWithUrls[] = allPhotos.map((photo) => {
       const { data: watermarkedData } = supabase.storage
         .from('event-photos-watermarked')
         .getPublicUrl(photo.watermarked_path)

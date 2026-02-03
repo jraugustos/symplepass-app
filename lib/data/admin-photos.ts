@@ -96,19 +96,34 @@ export async function getPhotosByEventId(eventId: string): Promise<EventPhoto[]>
   try {
     const supabase = await createClient()
 
-    const { data, error } = await supabase
-      .from('event_photos')
-      .select('*')
-      .eq('event_id', eventId)
-      .order('display_order', { ascending: true })
-      .limit(10000) // Override Supabase default limit of 1000
+    // Paginate using .range() to bypass PostgREST max-rows (default 1000).
+    // .limit() alone is capped by the server-side max-rows setting.
+    const PAGE_SIZE = 1000
+    let allPhotos: EventPhoto[] = []
+    let offset = 0
 
-    if (error) {
-      console.error('Error fetching photos:', error)
-      return []
+    while (true) {
+      const { data, error } = await supabase
+        .from('event_photos')
+        .select('*')
+        .eq('event_id', eventId)
+        .order('display_order', { ascending: true })
+        .range(offset, offset + PAGE_SIZE - 1)
+
+      if (error) {
+        console.error('Error fetching photos:', error)
+        break
+      }
+
+      if (!data || data.length === 0) break
+
+      allPhotos = allPhotos.concat(data)
+
+      if (data.length < PAGE_SIZE) break
+      offset += PAGE_SIZE
     }
 
-    return data || []
+    return allPhotos
   } catch (error) {
     console.error('Error in getPhotosByEventId:', error)
     return []

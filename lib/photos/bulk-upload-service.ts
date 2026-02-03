@@ -318,6 +318,9 @@ class BulkUploadServiceClass {
             upload.resumeFromPreviousUpload(previousUploads[0])
           }
           upload.start()
+        }).catch((error: unknown) => {
+          this.activeUploads.delete(jobId)
+          reject(error instanceof Error ? error : new Error('Erro ao iniciar upload TUS'))
         })
       }).catch((error: unknown) => {
         console.error('Failed to load TUS client:', error)
@@ -343,70 +346,65 @@ class BulkUploadServiceClass {
   ): Promise<string> {
     console.log('Using fallback upload method...')
 
-    // Comment 1: Create AbortController for cancellation support
-    const abortController = new AbortController()
-
-    // Comment 1: Register the abort controller with activeUploads
-    this.activeUploads.set(jobId, {
-      abort: () => abortController.abort(),
-      type: 'fallback',
-    })
-
-    // Comment 7: Simulate progress updates during upload
-    // Since standard upload doesn't provide progress, we show indeterminate state
-    callbacks?.onUploadProgress?.({
-      bytesUploaded: 0,
-      bytesTotal: file.size,
-      percentage: 0,
-    })
-
-    try {
-      // Comment 1: Use fetch with AbortController signal for cancellable upload
-      const { data: { session } } = await this.supabase.auth.getSession()
-      if (!session?.access_token) {
-        throw new Error('Sessão não encontrada')
-      }
-
-      const uploadUrl = `${SUPABASE_URL}/storage/v1/object/photo-uploads-temp/${fileName}`
-
-      const response = await fetch(uploadUrl, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': file.type || 'application/zip',
-          'x-upsert': 'true',
-          'cache-control': '3600',
-        },
-        body: file,
-        signal: abortController.signal,
-      })
-
-      // Comment 1: Clean up on completion
-      this.activeUploads.delete(jobId)
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`Upload falhou: ${errorText}`)
-      }
-
-      // Comment 7: Update progress to 100% after successful upload
-      callbacks?.onUploadProgress?.({
-        bytesUploaded: file.size,
-        bytesTotal: file.size,
-        percentage: 100,
-      })
-
-      return fileName
-    } catch (error) {
-      // Comment 1: Clean up on error
-      this.activeUploads.delete(jobId)
-
-      // Comment 1: Throw UploadCancelledError for user-initiated aborts
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new UploadCancelledError()
-      }
-      throw error
+    const { data: { session } } = await this.supabase.auth.getSession()
+    if (!session?.access_token) {
+      throw new Error('Sessão não encontrada')
     }
+
+    const uploadUrl = `${SUPABASE_URL}/storage/v1/object/photo-uploads-temp/${fileName}`
+
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+
+      // Register XHR for abort support
+      this.activeUploads.set(jobId, {
+        abort: () => xhr.abort(),
+        type: 'fallback',
+      })
+
+      // Track real upload progress via XMLHttpRequest
+      xhr.upload.onprogress = (event: ProgressEvent) => {
+        if (event.lengthComputable) {
+          const percentage = Math.round((event.loaded / event.total) * 100)
+          callbacks?.onUploadProgress?.({
+            bytesUploaded: event.loaded,
+            bytesTotal: event.total,
+            percentage,
+          })
+        }
+      }
+
+      xhr.onload = () => {
+        this.activeUploads.delete(jobId)
+        if (xhr.status >= 200 && xhr.status < 300) {
+          callbacks?.onUploadProgress?.({
+            bytesUploaded: file.size,
+            bytesTotal: file.size,
+            percentage: 100,
+          })
+          resolve(fileName)
+        } else {
+          reject(new Error(`Upload falhou: ${xhr.statusText}`))
+        }
+      }
+
+      xhr.onerror = () => {
+        this.activeUploads.delete(jobId)
+        reject(new Error('Erro de rede durante o upload'))
+      }
+
+      xhr.onabort = () => {
+        this.activeUploads.delete(jobId)
+        reject(new UploadCancelledError())
+      }
+
+      xhr.open('POST', uploadUrl)
+      xhr.setRequestHeader('Authorization', `Bearer ${session.access_token}`)
+      xhr.setRequestHeader('Content-Type', file.type || 'application/zip')
+      xhr.setRequestHeader('x-upsert', 'true')
+      xhr.setRequestHeader('cache-control', '3600')
+      xhr.send(file)
+    })
   }
 
   /**

@@ -135,21 +135,28 @@ class BulkUploadServiceClass {
     console.warn('[BulkUploadService] uploadZip called for event:', eventId, 'file:', file.name, 'size:', file.size)
 
     // Validate file (includes magic bytes check)
+    console.warn('[BulkUploadService] Validating ZIP file...')
     await this.validateZipFile(file)
+    console.warn('[BulkUploadService] ZIP file validated successfully')
 
     // Comment 1: Sanitize filename before persisting
     const sanitizedFileName = sanitizeFilename(file.name)
     if (!sanitizedFileName) {
       throw new Error('Nome do arquivo inválido')
     }
+    console.warn('[BulkUploadService] Filename sanitized:', sanitizedFileName)
 
     // Get current user
+    console.warn('[BulkUploadService] Getting current user...')
     const { data: { user }, error: userError } = await this.supabase.auth.getUser()
     if (userError || !user) {
+      console.error('[BulkUploadService] User error:', userError)
       throw new Error('Usuário não autenticado')
     }
+    console.warn('[BulkUploadService] User found:', user.id)
 
     // Create job record with sanitized filename
+    console.warn('[BulkUploadService] Creating job record...')
     const { data: job, error: jobError } = await this.supabase
       .from('photo_upload_jobs')
       .insert({
@@ -163,17 +170,33 @@ class BulkUploadServiceClass {
       .single()
 
     if (jobError || !job) {
-      console.error('Failed to create job:', jobError)
+      console.error('[BulkUploadService] Failed to create job:', jobError)
       throw new Error('Falha ao criar job de upload')
     }
+    console.warn('[BulkUploadService] Job created:', job.id)
 
     // Comment 1: Notify caller of job creation immediately, before upload starts
     // This allows the UI to show the cancel button during upload
+    console.warn('[BulkUploadService] Notifying job created callback...')
     callbacks?.onJobCreated?.(job as PhotoUploadJob)
+    console.warn('[BulkUploadService] Starting upload process...')
 
     try {
-      // Upload ZIP using TUS protocol for resumability
-      const zipPath = await this.uploadWithTus(file, user.id, job.id, callbacks)
+      // Determine upload method based on environment
+      // TUS has CORS issues on deployed environments, so use XHR fallback for non-localhost
+      const isLocalhost = typeof window !== 'undefined' &&
+        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+
+      let zipPath: string
+      const fileName = `${user.id}/${job.id}/${sanitizedFileName}`
+
+      if (isLocalhost) {
+        console.warn('[BulkUploadService] Running on localhost, using TUS protocol')
+        zipPath = await this.uploadWithTus(file, user.id, job.id, callbacks)
+      } else {
+        console.warn('[BulkUploadService] Running on deployed environment, using XHR upload (TUS has CORS issues)')
+        zipPath = await this.fallbackUpload(file, fileName, job.id, callbacks)
+      }
 
       // Comment 1: Clean up active upload reference after completion
       this.activeUploads.delete(job.id)

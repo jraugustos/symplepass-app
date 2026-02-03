@@ -132,6 +132,8 @@ class BulkUploadServiceClass {
     eventId: string,
     callbacks?: BulkUploadCallbacks
   ): Promise<string> {
+    console.warn('[BulkUploadService] uploadZip called for event:', eventId, 'file:', file.name, 'size:', file.size)
+
     // Validate file (includes magic bytes check)
     await this.validateZipFile(file)
 
@@ -251,16 +253,21 @@ class BulkUploadServiceClass {
     const sanitizedFileName = sanitizeFilename(file.name) || 'upload.zip'
     const fileName = `${userId}/${jobId}/${sanitizedFileName}`
 
+    console.warn('[BulkUploadService] uploadWithTus called for file:', file.name, 'size:', file.size)
+
     const { data: { session } } = await this.supabase.auth.getSession()
     if (!session?.access_token) {
       throw new Error('Sessão não encontrada')
     }
 
     const tusEndpoint = `${SUPABASE_URL}/storage/v1/upload/resumable`
-    const TUS_TIMEOUT_MS = 15000 // 15 seconds to receive first progress, otherwise fallback to XHR
+    const TUS_TIMEOUT_MS = 5000 // 5 seconds to receive first progress, otherwise fallback
+
+    console.warn('[BulkUploadService] Loading TUS client...')
 
     return new Promise((resolve, reject) => {
       import('tus-js-client').then((tusModule) => {
+        console.warn('[BulkUploadService] TUS client loaded successfully')
         const Upload = tusModule.Upload
         let progressReceived = false
         let timeoutId: ReturnType<typeof setTimeout> | null = null
@@ -270,13 +277,14 @@ class BulkUploadServiceClass {
         const fallbackToXhr = () => {
           if (tusAborted) return // Already handled
           tusAborted = true
-          console.warn('[BulkUploadService] TUS timeout - no progress in 15s, falling back to XHR')
+          console.warn('[BulkUploadService] TUS timeout - no progress in 5s, falling back to XHR')
           try {
             upload.abort()
           } catch {
             // Ignore abort errors
           }
           this.activeUploads.delete(jobId)
+
           this.fallbackUpload(file, fileName, jobId, callbacks)
             .then(resolve)
             .catch(reject)
@@ -308,7 +316,7 @@ class BulkUploadServiceClass {
             clearTimeoutIfSet()
             if (tusAborted) return // Already falling back
             this.activeUploads.delete(jobId)
-            console.error('TUS upload error:', error)
+            console.error('[BulkUploadService] ❌ TUS upload error:', error.message, error)
             if (error.message?.includes('abort') || error.message?.includes('cancel')) {
               reject(new UploadCancelledError())
             } else {
@@ -321,9 +329,12 @@ class BulkUploadServiceClass {
             if (!progressReceived) {
               progressReceived = true
               clearTimeoutIfSet()
-              console.log('[BulkUploadService] TUS progress received, upload working normally')
+              console.warn('[BulkUploadService] ✅ TUS progress received! Upload working normally')
             }
             const percentage = Math.round((bytesUploaded / bytesTotal) * 100)
+            if (percentage % 10 === 0) {
+              console.warn(`[BulkUploadService] TUS progress: ${percentage}%`)
+            }
             callbacks?.onUploadProgress?.({
               bytesUploaded,
               bytesTotal,
@@ -333,6 +344,7 @@ class BulkUploadServiceClass {
           onSuccess: () => {
             clearTimeoutIfSet()
             if (tusAborted) return
+            console.warn('[BulkUploadService] ✅ TUS upload completed successfully!')
             this.activeUploads.delete(jobId)
             resolve(fileName)
           },
@@ -340,23 +352,40 @@ class BulkUploadServiceClass {
 
         this.activeUploads.set(jobId, { abort: () => upload.abort(), type: 'tus' })
 
+        console.warn('[BulkUploadService] Checking for previous uploads...')
+
+        // Add timeout for findPreviousUploads in case it hangs
+        const findPreviousTimeout = setTimeout(() => {
+          console.warn('[BulkUploadService] findPreviousUploads timed out, starting fresh upload')
+          // Start TUS upload with timeout fallback
+          console.warn('[BulkUploadService] Starting TUS upload, will fallback if no progress in 5s')
+          timeoutId = setTimeout(fallbackToXhr, TUS_TIMEOUT_MS)
+          upload.start()
+        }, 3000) // 3 second timeout for findPreviousUploads
+
         upload.findPreviousUploads().then((previousUploads: Array<{ uploadUrl: string }>) => {
+          clearTimeout(findPreviousTimeout)
+          console.warn('[BulkUploadService] findPreviousUploads completed, found:', previousUploads.length)
+
           if (previousUploads.length > 0) {
-            console.log('Resuming previous upload...')
+            console.warn('[BulkUploadService] Resuming previous upload...')
             upload.resumeFromPreviousUpload(previousUploads[0])
           }
 
           // Start TUS upload with timeout fallback
-          console.log('[BulkUploadService] Starting TUS upload, will fallback to XHR if no progress in 15s')
+          console.warn('[BulkUploadService] Starting TUS upload, will fallback if no progress in 5s')
           timeoutId = setTimeout(fallbackToXhr, TUS_TIMEOUT_MS)
           upload.start()
         }).catch((error: unknown) => {
+          clearTimeout(findPreviousTimeout)
+          console.error('[BulkUploadService] findPreviousUploads error:', error)
           clearTimeoutIfSet()
           this.activeUploads.delete(jobId)
           reject(error instanceof Error ? error : new Error('Erro ao iniciar upload TUS'))
         })
       }).catch((error: unknown) => {
-        console.error('Failed to load TUS client:', error)
+        console.error('[BulkUploadService] Failed to load TUS client:', error)
+        // Fall back to XHR upload
         this.fallbackUpload(file, fileName, jobId, callbacks)
           .then(resolve)
           .catch(reject)
@@ -376,7 +405,7 @@ class BulkUploadServiceClass {
     jobId: string,
     callbacks?: BulkUploadCallbacks
   ): Promise<string> {
-    console.log('Using fallback upload method...')
+    console.warn('[BulkUploadService] Using XHR fallback upload method for file size:', file.size)
 
     const { data: { session } } = await this.supabase.auth.getSession()
     if (!session?.access_token) {
@@ -398,6 +427,9 @@ class BulkUploadServiceClass {
       xhr.upload.onprogress = (event: ProgressEvent) => {
         if (event.lengthComputable) {
           const percentage = Math.round((event.loaded / event.total) * 100)
+          if (percentage % 10 === 0) {
+            console.warn(`[BulkUploadService] XHR fallback progress: ${percentage}%`)
+          }
           callbacks?.onUploadProgress?.({
             bytesUploaded: event.loaded,
             bytesTotal: event.total,

@@ -754,7 +754,7 @@ export async function getCompletedEventsWithPhotos(
         *,
         event_photos!inner (id)
       `, { count: 'exact' })
-      .eq('status', 'completed')
+      .in('status', ['published', 'published_no_registration', 'completed'])
       .order('end_date', { ascending: false })
       .range(from, to)
 
@@ -858,7 +858,7 @@ export async function getMuralFotosStats(): Promise<MuralFotosStats> {
         id,
         event_photos (id)
       `)
-      .eq('status', 'completed')
+      .in('status', ['published', 'published_no_registration', 'completed'])
 
     if (eventsError) {
       console.error('Error fetching events for stats:', eventsError)

@@ -19,7 +19,8 @@ export const revalidate = 1800 // Revalidate every 30 minutes
 export async function generateMetadata({ params }: MuralEventPageProps): Promise<Metadata> {
   const event = await getEventDetailBySlug(params.slug)
 
-  if (!event || event.status !== 'completed') {
+  const allowedStatuses = ['published', 'published_no_registration', 'completed']
+  if (!event || !allowedStatuses.includes(event.status)) {
     return {
       title: 'Fotos não encontradas | Symplepass',
     }
@@ -51,8 +52,9 @@ export default async function MuralEventPage({ params }: MuralEventPageProps) {
   // Fetch event details
   const event = await getEventDetailBySlug(params.slug)
 
-  // Event must exist and be completed
-  if (!event || event.status !== 'completed') {
+  // Event must exist and have an allowed status (published, published_no_registration, or completed)
+  const allowedStatuses = ['published', 'published_no_registration', 'completed']
+  if (!event || !allowedStatuses.includes(event.status)) {
     notFound()
   }
 

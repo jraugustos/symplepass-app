@@ -1,10 +1,13 @@
 /**
  * Bulk Upload Service
  * Handles ZIP file uploads for bulk photo processing
- * Uses TUS protocol for resumable uploads
+ * Extracts ZIP in the browser and uploads photos individually
  */
 
 import { createClient } from '@/lib/supabase/client'
+import { processEventPhoto, type ProcessedPhotoVersions } from './image-processor'
+import { uploadService } from '@/lib/storage/upload-service'
+import JSZip from 'jszip'
 
 // Types
 export interface PhotoUploadJob {
@@ -18,7 +21,7 @@ export interface PhotoUploadJob {
   total_photos: number
   processed_photos: number
   failed_photos: number
-  file_list: string[] | null // Comment 2: Persisted file list from extraction
+  file_list: string[] | null
   error_message: string | null
   errors: Array<{ fileName: string; error: string }>
   started_at: string | null
@@ -38,37 +41,31 @@ export interface BulkUploadCallbacks {
   onUploadComplete?: () => void
   onUploadError?: (error: Error) => void
   onProcessingStart?: () => void
-  // Comment 1: Callback to provide jobId immediately after job creation, before upload starts
   onJobCreated?: (job: PhotoUploadJob) => void
+  onPhotoProcessed?: (processed: number, total: number, fileName: string) => void
 }
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const MAX_ZIP_SIZE = 5 * 1024 * 1024 * 1024 // 5GB
-const CHUNK_SIZE = 6 * 1024 * 1024 // 6MB chunks for TUS
+const VALID_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp']
 
-// Comment 1: ZIP magic bytes signature (PK\x03\x04)
+// ZIP magic bytes signature (PK\x03\x04)
 const ZIP_MAGIC_BYTES = [0x50, 0x4b, 0x03, 0x04]
 
+// Storage bucket names
+const PHOTO_BUCKETS = {
+  ORIGINAL: 'event-photos' as const,
+  WATERMARKED: 'event-photos-watermarked' as const,
+}
+
 /**
- * Comment 1: Sanitize filename by removing control characters and enforcing safe charset
- * @param filename - The original filename
- * @param maxLength - Maximum allowed length (default 200)
- * @returns Sanitized filename or null if empty after sanitization
+ * Sanitize filename by removing control characters and enforcing safe charset
  */
 function sanitizeFilename(filename: string, maxLength = 200): string | null {
-  // Remove control characters (0x00-0x1F, 0x7F-0x9F)
   let sanitized = filename.replace(/[\x00-\x1F\x7F-\x9F]/g, '')
-
-  // Remove HTML-unsafe characters
   sanitized = sanitized.replace(/[<>:"\/\\|?*]/g, '')
-
-  // Replace multiple spaces/dots with single
   sanitized = sanitized.replace(/\s+/g, ' ').replace(/\.+/g, '.')
-
-  // Trim whitespace and dots from start/end
   sanitized = sanitized.replace(/^[\s.]+|[\s.]+$/g, '')
 
-  // Truncate to max length while preserving extension
   if (sanitized.length > maxLength) {
     const ext = sanitized.substring(sanitized.lastIndexOf('.'))
     const nameWithoutExt = sanitized.substring(0, sanitized.lastIndexOf('.'))
@@ -76,14 +73,11 @@ function sanitizeFilename(filename: string, maxLength = 200): string | null {
     sanitized = nameWithoutExt.substring(0, maxNameLength) + ext
   }
 
-  // Return null if empty after sanitization
   return sanitized.length > 0 ? sanitized : null
 }
 
 /**
- * Comment 2: Validate ZIP file magic bytes
- * @param file - The file to validate
- * @returns true if the file starts with ZIP magic bytes
+ * Validate ZIP file magic bytes
  */
 async function validateZipMagic(file: File): Promise<boolean> {
   const headerBytes = await file.slice(0, 4).arrayBuffer()
@@ -97,73 +91,94 @@ async function validateZipMagic(file: File): Promise<boolean> {
   )
 }
 
-// Comment 1: Type for abortable upload instance (TUS or fallback)
-interface AbortableUpload {
-  abort: () => void
-  type: 'tus' | 'fallback'
+/**
+ * Get MIME type from file extension
+ */
+function getMimeType(fileName: string): string {
+  const ext = fileName.toLowerCase().substring(fileName.lastIndexOf('.'))
+  const mimeTypes: Record<string, string> = {
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.webp': 'image/webp',
+  }
+  return mimeTypes[ext] || 'application/octet-stream'
 }
 
-// Comment 1: Custom error class for user-initiated cancellations
-class UploadCancelledError extends Error {
-  constructor(message = 'Upload cancelado pelo usuário') {
-    super(message)
-    this.name = 'UploadCancelledError'
-  }
+/**
+ * Get file extension from filename
+ */
+function getFileExtension(fileName: string): string {
+  const ext = fileName.substring(fileName.lastIndexOf('.'))
+  return ext || '.jpg'
 }
 
 /**
  * Bulk Upload Service class
- * Manages ZIP uploads and job tracking
+ * Manages ZIP extraction and individual photo uploads
  */
 class BulkUploadServiceClass {
   private supabase = createClient()
-  // Comment 1: Store active uploads keyed by jobId for abort functionality (supports TUS and fallback)
-  private activeUploads: Map<string, AbortableUpload> = new Map()
+  private cancelledJobs: Set<string> = new Set()
+  private lastTokenRefresh: number = 0
+  private readonly TOKEN_REFRESH_INTERVAL = 4 * 60 * 1000 // 4 minutes
+
+  /**
+   * Refresh the auth token if needed during long upload sessions
+   */
+  private async refreshTokenIfNeeded(): Promise<void> {
+    const now = Date.now()
+    if (this.lastTokenRefresh > 0 && (now - this.lastTokenRefresh) < this.TOKEN_REFRESH_INTERVAL) {
+      return
+    }
+
+    this.lastTokenRefresh = now
+
+    try {
+      const { error } = await this.supabase.auth.refreshSession()
+      if (error) {
+        console.warn('[BulkUploadService] Token refresh failed:', error.message)
+      } else {
+        console.log('[BulkUploadService] Token refreshed successfully')
+      }
+    } catch (err) {
+      console.warn('[BulkUploadService] Token refresh error:', err)
+    }
+  }
 
   /**
    * Upload a ZIP file for bulk photo processing
-   * @param file - The ZIP file to upload
-   * @param eventId - The event ID to associate photos with
-   * @param callbacks - Optional callbacks for progress tracking
-   * @returns The job ID for tracking progress
+   * Extracts in the browser and uploads photos individually
    */
   async uploadZip(
     file: File,
     eventId: string,
     callbacks?: BulkUploadCallbacks
   ): Promise<string> {
-    console.warn('[BulkUploadService] uploadZip called for event:', eventId, 'file:', file.name, 'size:', file.size)
+    console.log('[BulkUploadService] uploadZip called for event:', eventId, 'file:', file.name, 'size:', file.size)
 
-    // Validate file (includes magic bytes check)
-    console.warn('[BulkUploadService] Validating ZIP file...')
+    // Validate file
     await this.validateZipFile(file)
-    console.warn('[BulkUploadService] ZIP file validated successfully')
 
-    // Comment 1: Sanitize filename before persisting
     const sanitizedFileName = sanitizeFilename(file.name)
     if (!sanitizedFileName) {
       throw new Error('Nome do arquivo inválido')
     }
-    console.warn('[BulkUploadService] Filename sanitized:', sanitizedFileName)
 
-    // Get current user from session (faster than getUser which makes a network request)
-    console.warn('[BulkUploadService] Getting current session...')
+    // Get current user
     const { data: { session }, error: sessionError } = await this.supabase.auth.getSession()
     if (sessionError || !session?.user) {
-      console.error('[BulkUploadService] Session error:', sessionError)
       throw new Error('Usuário não autenticado')
     }
     const user = session.user
-    console.warn('[BulkUploadService] User found from session:', user.id)
 
-    // Create job record with sanitized filename
-    console.warn('[BulkUploadService] Creating job record...')
+    // Create job record with status 'extracting'
     const { data: job, error: jobError } = await this.supabase
       .from('photo_upload_jobs')
       .insert({
         event_id: eventId,
         user_id: user.id,
-        status: 'uploading',
+        status: 'extracting',
         zip_file_name: sanitizedFileName,
         zip_size_bytes: file.size,
       })
@@ -174,418 +189,309 @@ class BulkUploadServiceClass {
       console.error('[BulkUploadService] Failed to create job:', jobError)
       throw new Error('Falha ao criar job de upload')
     }
-    console.warn('[BulkUploadService] Job created:', job.id)
 
-    // Comment 1: Notify caller of job creation immediately, before upload starts
-    // This allows the UI to show the cancel button during upload
-    console.warn('[BulkUploadService] Notifying job created callback...')
+    console.log('[BulkUploadService] Job created:', job.id)
     callbacks?.onJobCreated?.(job as PhotoUploadJob)
-    console.warn('[BulkUploadService] Starting upload process...')
+
+    // Initialize token refresh timer
+    if (this.lastTokenRefresh === 0) {
+      this.lastTokenRefresh = Date.now()
+    }
 
     try {
-      // Determine upload method based on environment
-      // TUS has CORS issues on deployed environments, so use XHR fallback for non-localhost
-      const isLocalhost = typeof window !== 'undefined' &&
-        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+      // Load and extract ZIP
+      console.log('[BulkUploadService] Loading ZIP file...')
+      const zip = await JSZip.loadAsync(file)
 
-      let zipPath: string
-      const fileName = `${user.id}/${job.id}/${sanitizedFileName}`
+      // Filter valid image files
+      const imageFiles = this.filterValidImages(zip)
+      console.log('[BulkUploadService] Found', imageFiles.length, 'valid images')
 
-      if (isLocalhost) {
-        console.warn('[BulkUploadService] Running on localhost, using TUS protocol')
-        zipPath = await this.uploadWithTus(file, user.id, job.id, callbacks)
-      } else {
-        console.warn('[BulkUploadService] Running on deployed environment, using XHR upload (TUS has CORS issues)')
-        zipPath = await this.fallbackUpload(file, fileName, job.id, callbacks)
+      if (imageFiles.length === 0) {
+        throw new Error('Nenhuma imagem válida encontrada no ZIP (formatos suportados: JPG, PNG, WebP)')
       }
 
-      // Comment 1: Clean up active upload reference after completion
-      this.activeUploads.delete(job.id)
-
-      // Comment 1: Re-fetch job to check if it was cancelled during upload
-      const currentJob = await this.getJobStatus(job.id)
-      if (currentJob?.status === 'cancelled') {
-        console.log('[BulkUploadService] Job was cancelled during upload, skipping processing')
-        return job.id
-      }
-
-      // Update job with ZIP path and change status to extracting
-      const { error: updateError } = await this.supabase
+      // Update job with total count and switch to processing
+      await this.supabase
         .from('photo_upload_jobs')
         .update({
-          zip_path: zipPath,
-          status: 'extracting',
+          status: 'processing',
+          total_photos: imageFiles.length,
+          file_list: imageFiles,
+          started_at: new Date().toISOString(),
         })
         .eq('id', job.id)
 
-      if (updateError) {
-        throw new Error('Falha ao atualizar job após upload')
-      }
-
-      callbacks?.onUploadComplete?.()
       callbacks?.onProcessingStart?.()
 
-      // Trigger Edge Function to start processing
-      await this.triggerProcessing(job.id)
+      // Get max display order for this event
+      const { data: maxOrderResult } = await this.supabase
+        .from('event_photos')
+        .select('display_order')
+        .eq('event_id', eventId)
+        .order('display_order', { ascending: false })
+        .limit(1)
+
+      let displayOrder = (maxOrderResult?.[0]?.display_order ?? -1) + 1
+
+      // Process photos sequentially
+      let processedCount = 0
+      let failedCount = 0
+      const errors: Array<{ fileName: string; error: string }> = []
+
+      for (const fileName of imageFiles) {
+        // Check if cancelled
+        if (this.cancelledJobs.has(job.id)) {
+          console.log('[BulkUploadService] Job cancelled, stopping processing')
+          break
+        }
+
+        // Refresh token periodically
+        await this.refreshTokenIfNeeded()
+
+        try {
+          await this.processAndUploadPhoto(zip, fileName, eventId, displayOrder)
+          processedCount++
+          displayOrder++
+
+          // Update progress
+          callbacks?.onPhotoProcessed?.(processedCount, imageFiles.length, fileName)
+          callbacks?.onUploadProgress?.({
+            bytesUploaded: processedCount,
+            bytesTotal: imageFiles.length,
+            percentage: Math.round((processedCount / imageFiles.length) * 100),
+          })
+
+          // Update job progress in database
+          await this.supabase
+            .from('photo_upload_jobs')
+            .update({
+              processed_photos: processedCount,
+              failed_photos: failedCount,
+            })
+            .eq('id', job.id)
+
+        } catch (error) {
+          console.error(`[BulkUploadService] Failed to process ${fileName}:`, error)
+          failedCount++
+          const sanitizedErrorFileName = sanitizeFilename(fileName) || 'unknown'
+          errors.push({
+            fileName: sanitizedErrorFileName,
+            error: error instanceof Error ? error.message : 'Erro desconhecido',
+          })
+
+          // Update job with error
+          await this.supabase
+            .from('photo_upload_jobs')
+            .update({
+              processed_photos: processedCount,
+              failed_photos: failedCount,
+              errors,
+            })
+            .eq('id', job.id)
+        }
+      }
+
+      // Check if job was cancelled
+      if (this.cancelledJobs.has(job.id)) {
+        this.cancelledJobs.delete(job.id)
+        return job.id
+      }
+
+      // Finalize job
+      const finalStatus = failedCount === imageFiles.length ? 'failed' : 'completed'
+      await this.supabase
+        .from('photo_upload_jobs')
+        .update({
+          status: finalStatus,
+          processed_photos: processedCount,
+          failed_photos: failedCount,
+          errors,
+          completed_at: new Date().toISOString(),
+          error_message: failedCount > 0 ? `${failedCount} fotos falharam` : null,
+        })
+        .eq('id', job.id)
+
+      callbacks?.onUploadComplete?.()
+      console.log('[BulkUploadService] Job completed:', processedCount, 'processed,', failedCount, 'failed')
 
       return job.id
+
     } catch (error) {
-      // Comment 1: Clean up active upload reference on error
-      this.activeUploads.delete(job.id)
+      console.error('[BulkUploadService] Error during processing:', error)
 
-      // Comment 1: Check if this was a user-initiated cancellation
-      const isCancellation = error instanceof UploadCancelledError
-
-      // Comment 1: Re-fetch job to check if it was cancelled (avoid overwriting cancelled status)
+      // Check if already cancelled
       const currentJob = await this.getJobStatus(job.id)
       if (currentJob?.status === 'cancelled') {
-        console.log('[BulkUploadService] Job already cancelled, not updating to failed')
-        // Comment 1: Don't fire onUploadError for user-initiated cancellations
         return job.id
       }
 
-      // Comment 1: Don't update to failed or fire error callback for user cancellations
-      if (isCancellation) {
-        console.log('[BulkUploadService] Upload cancelled by user')
-        return job.id
-      }
-
-      // Update job as failed (only for actual errors, not cancellations)
+      // Update job as failed
       await this.supabase
         .from('photo_upload_jobs')
         .update({
           status: 'failed',
-          error_message: error instanceof Error ? error.message : 'Upload falhou',
+          error_message: error instanceof Error ? error.message : 'Erro durante processamento',
           completed_at: new Date().toISOString(),
         })
         .eq('id', job.id)
 
-      callbacks?.onUploadError?.(error instanceof Error ? error : new Error('Upload falhou'))
+      callbacks?.onUploadError?.(error instanceof Error ? error : new Error('Erro durante processamento'))
       throw error
     }
   }
 
   /**
-   * Upload file using TUS protocol for resumable uploads
+   * Filter valid image files from ZIP
    */
-  private async uploadWithTus(
-    file: File,
-    userId: string,
-    jobId: string,
-    callbacks?: BulkUploadCallbacks
-  ): Promise<string> {
-    const sanitizedFileName = sanitizeFilename(file.name) || 'upload.zip'
-    const fileName = `${userId}/${jobId}/${sanitizedFileName}`
+  private filterValidImages(zip: JSZip): string[] {
+    return Object.keys(zip.files)
+      .filter((name) => {
+        const file = zip.files[name]
+        if (file.dir) return false
 
-    console.warn('[BulkUploadService] uploadWithTus called for file:', file.name, 'size:', file.size)
+        // Skip macOS metadata and hidden files
+        if (name.includes('__MACOSX') || name.includes('/.') || name.startsWith('.')) return false
 
-    const { data: { session } } = await this.supabase.auth.getSession()
-    if (!session?.access_token) {
-      throw new Error('Sessão não encontrada')
-    }
+        // Skip system files
+        const baseName = name.split('/').pop() || ''
+        if (baseName.startsWith('.') || baseName === 'Thumbs.db' || baseName === 'desktop.ini') return false
 
-    const tusEndpoint = `${SUPABASE_URL}/storage/v1/upload/resumable`
-    const TUS_TIMEOUT_MS = 5000 // 5 seconds to receive first progress, otherwise fallback
-
-    console.warn('[BulkUploadService] Loading TUS client...')
-
-    return new Promise((resolve, reject) => {
-      import('tus-js-client').then((tusModule) => {
-        console.warn('[BulkUploadService] TUS client loaded successfully')
-        const Upload = tusModule.Upload
-        let progressReceived = false
-        let timeoutId: ReturnType<typeof setTimeout> | null = null
-        let tusAborted = false
-
-        // Fallback function - abort TUS and use XHR instead
-        const fallbackToXhr = () => {
-          if (tusAborted) return // Already handled
-          tusAborted = true
-          console.warn('[BulkUploadService] TUS timeout - no progress in 5s, falling back to XHR')
-          try {
-            upload.abort()
-          } catch {
-            // Ignore abort errors
-          }
-          this.activeUploads.delete(jobId)
-
-          this.fallbackUpload(file, fileName, jobId, callbacks)
-            .then(resolve)
-            .catch(reject)
-        }
-
-        const clearTimeoutIfSet = () => {
-          if (timeoutId) {
-            clearTimeout(timeoutId)
-            timeoutId = null
-          }
-        }
-
-        const upload = new Upload(file, {
-          endpoint: tusEndpoint,
-          retryDelays: [0, 1000, 3000, 5000, 10000],
-          chunkSize: CHUNK_SIZE,
-          metadata: {
-            bucketName: 'photo-uploads-temp',
-            objectName: fileName,
-            contentType: file.type || 'application/zip',
-            cacheControl: '3600',
-          },
-          headers: {
-            authorization: `Bearer ${session.access_token}`,
-            'x-upsert': 'true',
-          },
-          uploadSize: file.size,
-          onError: (error: Error) => {
-            clearTimeoutIfSet()
-            if (tusAborted) return // Already falling back
-            this.activeUploads.delete(jobId)
-            console.error('[BulkUploadService] ❌ TUS upload error:', error.message, error)
-            if (error.message?.includes('abort') || error.message?.includes('cancel')) {
-              reject(new UploadCancelledError())
-            } else {
-              reject(new Error(`Upload falhou: ${error.message}`))
-            }
-          },
-          onProgress: (bytesUploaded: number, bytesTotal: number) => {
-            if (tusAborted) return
-            // TUS is working - clear the timeout
-            if (!progressReceived) {
-              progressReceived = true
-              clearTimeoutIfSet()
-              console.warn('[BulkUploadService] ✅ TUS progress received! Upload working normally')
-            }
-            const percentage = Math.round((bytesUploaded / bytesTotal) * 100)
-            if (percentage % 10 === 0) {
-              console.warn(`[BulkUploadService] TUS progress: ${percentage}%`)
-            }
-            callbacks?.onUploadProgress?.({
-              bytesUploaded,
-              bytesTotal,
-              percentage,
-            })
-          },
-          onSuccess: () => {
-            clearTimeoutIfSet()
-            if (tusAborted) return
-            console.warn('[BulkUploadService] ✅ TUS upload completed successfully!')
-            this.activeUploads.delete(jobId)
-            resolve(fileName)
-          },
-        })
-
-        this.activeUploads.set(jobId, { abort: () => upload.abort(), type: 'tus' })
-
-        console.warn('[BulkUploadService] Checking for previous uploads...')
-
-        // Add timeout for findPreviousUploads in case it hangs
-        const findPreviousTimeout = setTimeout(() => {
-          console.warn('[BulkUploadService] findPreviousUploads timed out, starting fresh upload')
-          // Start TUS upload with timeout fallback
-          console.warn('[BulkUploadService] Starting TUS upload, will fallback if no progress in 5s')
-          timeoutId = setTimeout(fallbackToXhr, TUS_TIMEOUT_MS)
-          upload.start()
-        }, 3000) // 3 second timeout for findPreviousUploads
-
-        upload.findPreviousUploads().then((previousUploads: Array<{ uploadUrl: string }>) => {
-          clearTimeout(findPreviousTimeout)
-          console.warn('[BulkUploadService] findPreviousUploads completed, found:', previousUploads.length)
-
-          if (previousUploads.length > 0) {
-            console.warn('[BulkUploadService] Resuming previous upload...')
-            upload.resumeFromPreviousUpload(previousUploads[0])
-          }
-
-          // Start TUS upload with timeout fallback
-          console.warn('[BulkUploadService] Starting TUS upload, will fallback if no progress in 5s')
-          timeoutId = setTimeout(fallbackToXhr, TUS_TIMEOUT_MS)
-          upload.start()
-        }).catch((error: unknown) => {
-          clearTimeout(findPreviousTimeout)
-          console.error('[BulkUploadService] findPreviousUploads error:', error)
-          clearTimeoutIfSet()
-          this.activeUploads.delete(jobId)
-          reject(error instanceof Error ? error : new Error('Erro ao iniciar upload TUS'))
-        })
-      }).catch((error: unknown) => {
-        console.error('[BulkUploadService] Failed to load TUS client:', error)
-        // Fall back to XHR upload
-        this.fallbackUpload(file, fileName, jobId, callbacks)
-          .then(resolve)
-          .catch(reject)
+        // Check extension
+        const ext = name.toLowerCase().substring(name.lastIndexOf('.'))
+        return VALID_IMAGE_EXTENSIONS.includes(ext)
       })
-    })
+      .sort()
   }
 
   /**
-   * Fallback upload method if TUS is not available
-   * Comment 7: This method is called within uploadWithTus context, so job already exists
-   * The caller (uploadWithTus) handles the job status transitions
-   * Comment 1: Now supports AbortController for cancellation
+   * Process and upload a single photo from ZIP
    */
-  private async fallbackUpload(
-    file: File,
+  private async processAndUploadPhoto(
+    zip: JSZip,
     fileName: string,
-    jobId: string,
-    callbacks?: BulkUploadCallbacks
-  ): Promise<string> {
-    console.warn('[BulkUploadService] Using XHR fallback upload method for file size:', file.size)
+    eventId: string,
+    displayOrder: number
+  ): Promise<void> {
+    console.log('[BulkUploadService] Processing:', fileName)
 
-    const { data: { session } } = await this.supabase.auth.getSession()
-    if (!session?.access_token) {
-      throw new Error('Sessão não encontrada')
+    // Extract photo data from ZIP
+    const zipFile = zip.file(fileName)
+    if (!zipFile) {
+      throw new Error('Arquivo não encontrado no ZIP')
     }
 
-    const uploadUrl = `${SUPABASE_URL}/storage/v1/object/photo-uploads-temp/${fileName}`
+    const photoData = await zipFile.async('blob')
+    if (!photoData || photoData.size === 0) {
+      throw new Error('Arquivo vazio')
+    }
 
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest()
+    // Validate file size (max 50MB per photo)
+    if (photoData.size > 50 * 1024 * 1024) {
+      throw new Error('Foto muito grande (máximo 50MB)')
+    }
 
-      // Register XHR for abort support
-      this.activeUploads.set(jobId, {
-        abort: () => xhr.abort(),
-        type: 'fallback',
+    // Convert to File object
+    const baseName = fileName.split('/').pop() || fileName
+    const sanitizedName = sanitizeFilename(baseName) || 'photo.jpg'
+    const mimeType = getMimeType(fileName)
+    const file = new File([photoData], sanitizedName, { type: mimeType })
+
+    // Process image (watermark + thumbnail)
+    const processed = await processEventPhoto(file)
+
+    // Generate unique photo ID
+    const photoId = crypto.randomUUID()
+    const extension = getFileExtension(sanitizedName)
+
+    // Define paths
+    const paths = {
+      original: `${eventId}/photo-${photoId}${extension}`,
+      watermarked: `${eventId}/watermarked/photo-${photoId}.jpg`,
+      thumbnail: `${eventId}/thumbnails/photo-${photoId}.jpg`,
+    }
+
+    // Upload all three versions
+    const uploadedFiles: { bucket: string; path: string }[] = []
+
+    try {
+      // Upload original
+      await uploadService.uploadFile(processed.original, {
+        bucket: PHOTO_BUCKETS.ORIGINAL,
+        folder: eventId,
+        fileName: `photo-${photoId}${extension}`,
       })
+      uploadedFiles.push({ bucket: PHOTO_BUCKETS.ORIGINAL, path: paths.original })
 
-      // Track real upload progress via XMLHttpRequest
-      xhr.upload.onprogress = (event: ProgressEvent) => {
-        if (event.lengthComputable) {
-          const percentage = Math.round((event.loaded / event.total) * 100)
-          if (percentage % 10 === 0) {
-            console.warn(`[BulkUploadService] XHR fallback progress: ${percentage}%`)
-          }
-          callbacks?.onUploadProgress?.({
-            bytesUploaded: event.loaded,
-            bytesTotal: event.total,
-            percentage,
-          })
-        }
-      }
+      // Upload watermarked
+      await uploadService.uploadFile(processed.watermarked, {
+        bucket: PHOTO_BUCKETS.WATERMARKED,
+        folder: eventId,
+        fileName: `watermarked/photo-${photoId}.jpg`,
+      })
+      uploadedFiles.push({ bucket: PHOTO_BUCKETS.WATERMARKED, path: paths.watermarked })
 
-      xhr.onload = () => {
-        this.activeUploads.delete(jobId)
-        if (xhr.status >= 200 && xhr.status < 300) {
-          callbacks?.onUploadProgress?.({
-            bytesUploaded: file.size,
-            bytesTotal: file.size,
-            percentage: 100,
-          })
-          resolve(fileName)
-        } else {
-          reject(new Error(`Upload falhou: ${xhr.statusText}`))
-        }
-      }
+      // Upload thumbnail
+      await uploadService.uploadFile(processed.thumbnail, {
+        bucket: PHOTO_BUCKETS.WATERMARKED,
+        folder: eventId,
+        fileName: `thumbnails/photo-${photoId}.jpg`,
+      })
+      uploadedFiles.push({ bucket: PHOTO_BUCKETS.WATERMARKED, path: paths.thumbnail })
 
-      xhr.onerror = () => {
-        this.activeUploads.delete(jobId)
-        reject(new Error('Erro de rede durante o upload'))
-      }
-
-      xhr.onabort = () => {
-        this.activeUploads.delete(jobId)
-        reject(new UploadCancelledError())
-      }
-
-      xhr.open('POST', uploadUrl)
-      xhr.setRequestHeader('Authorization', `Bearer ${session.access_token}`)
-      xhr.setRequestHeader('Content-Type', file.type || 'application/zip')
-      xhr.setRequestHeader('x-upsert', 'true')
-      xhr.setRequestHeader('cache-control', '3600')
-      xhr.send(file)
-    })
-  }
-
-  /**
-   * Trigger the Edge Function to start processing
-   * Comment 2: Now with bounded retries and backoff for transient failures
-   */
-  private async triggerProcessing(jobId: string): Promise<void> {
-    const { data: { session } } = await this.supabase.auth.getSession()
-    if (!session?.access_token) {
-      throw new Error('Sessão não encontrada')
-    }
-
-    const functionUrl = `${SUPABASE_URL}/functions/v1/process-photo-zip`
-    const maxRetries = 3
-    const backoffDelays = [1000, 2000, 4000] // 1s, 2s, 4s
-
-    let lastError: string | null = null
-
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      try {
-        const response = await fetch(functionUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({ jobId }),
+      // Insert photo record in database
+      const { error: insertError } = await this.supabase
+        .from('event_photos')
+        .insert({
+          event_id: eventId,
+          original_path: paths.original,
+          watermarked_path: paths.watermarked,
+          thumbnail_path: paths.thumbnail,
+          file_name: sanitizedName,
+          file_size: file.size,
+          width: processed.dimensions.width,
+          height: processed.dimensions.height,
+          display_order: displayOrder,
         })
 
-        if (response.ok) {
-          console.log(`[BulkUploadService] Edge Function triggered successfully for job: ${jobId}`)
-          return // Success, exit
+      if (insertError) {
+        throw new Error(`Falha ao salvar registro: ${insertError.message}`)
+      }
+
+      console.log('[BulkUploadService] Successfully processed:', fileName)
+
+    } catch (error) {
+      // Rollback uploaded files on error
+      for (const uploaded of uploadedFiles) {
+        try {
+          await uploadService.deleteFile(uploaded.bucket as 'event-photos' | 'event-photos-watermarked', uploaded.path)
+        } catch {
+          // Ignore rollback errors
         }
-
-        lastError = await response.text()
-        console.error(`[BulkUploadService] Edge Function attempt ${attempt + 1} failed:`, lastError)
-      } catch (error) {
-        lastError = error instanceof Error ? error.message : 'Network error'
-        console.error(`[BulkUploadService] Edge Function attempt ${attempt + 1} error:`, lastError)
       }
-
-      // Comment 2: Wait before retry (except on last attempt)
-      if (attempt < maxRetries - 1) {
-        await new Promise(resolve => setTimeout(resolve, backoffDelays[attempt]))
-      }
+      throw error
     }
-
-    // Comment 2: All retries exhausted - but first check if job already completed
-    // The Edge Function may have succeeded but the response was lost due to timeout/network issues
-    console.error(`[BulkUploadService] All ${maxRetries} attempts to trigger Edge Function failed for job: ${jobId}`)
-
-    const currentJob = await this.getJobStatus(jobId)
-    if (currentJob && ['completed', 'processing', 'extracting'].includes(currentJob.status)) {
-      // Job is already being processed or completed - don't mark as failed
-      console.log(`[BulkUploadService] Job ${jobId} is already ${currentJob.status}, not marking as failed`)
-      return
-    }
-
-    await this.supabase
-      .from('photo_upload_jobs')
-      .update({
-        status: 'failed',
-        error_message: `Falha ao iniciar processamento após ${maxRetries} tentativas: ${lastError}`,
-        completed_at: new Date().toISOString(),
-      })
-      .eq('id', jobId)
   }
 
   /**
-   * Validate ZIP file before upload
-   * Comment 2: Now validates magic bytes in addition to extension/MIME
+   * Validate ZIP file before processing
    */
   private async validateZipFile(file: File): Promise<void> {
-    // Check file type by extension (MIME types are unreliable)
     const isZipByExtension = file.name.toLowerCase().endsWith('.zip')
-
     if (!isZipByExtension) {
       throw new Error('Arquivo deve ser um ZIP')
     }
 
-    // Check file size
     if (file.size > MAX_ZIP_SIZE) {
       const sizeMB = Math.round(file.size / (1024 * 1024))
       const maxMB = Math.round(MAX_ZIP_SIZE / (1024 * 1024))
       throw new Error(`Arquivo muito grande (${sizeMB}MB). Máximo: ${maxMB}MB`)
     }
 
-    // Check if file is empty
     if (file.size === 0) {
       throw new Error('Arquivo ZIP está vazio')
     }
 
-    // Comment 2: Validate ZIP magic bytes (PK\x03\x04)
     const isValidZip = await validateZipMagic(file)
     if (!isValidZip) {
       throw new Error('Arquivo não é um ZIP válido (assinatura inválida)')
@@ -630,44 +536,21 @@ class BulkUploadServiceClass {
   }
 
   /**
-   * Comment 1: Abort an active upload by job ID (supports both TUS and fallback)
-   * This stops the in-flight upload immediately
-   */
-  abortUpload(jobId: string): boolean {
-    const upload = this.activeUploads.get(jobId)
-    if (upload) {
-      console.log(`[BulkUploadService] Aborting active ${upload.type} upload for job:`, jobId)
-      upload.abort()
-      this.activeUploads.delete(jobId)
-      return true
-    }
-    return false
-  }
-
-  /**
-   * Cancel a pending or uploading job
+   * Cancel a job in progress
    */
   async cancelJob(jobId: string): Promise<boolean> {
     const job = await this.getJobStatus(jobId)
-
     if (!job) {
       return false
     }
 
-    // Only allow cancelling pending or uploading jobs
-    if (!['pending', 'uploading'].includes(job.status)) {
-      throw new Error('Não é possível cancelar um job em processamento')
+    // Allow cancelling jobs that are processing or extracting
+    if (!['pending', 'uploading', 'extracting', 'processing'].includes(job.status)) {
+      throw new Error('Não é possível cancelar um job finalizado')
     }
 
-    // Comment 1: Abort any active upload for this job (TUS or fallback)
-    this.abortUpload(jobId)
-
-    // Delete ZIP if it exists
-    if (job.zip_path) {
-      await this.supabase.storage
-        .from('photo-uploads-temp')
-        .remove([job.zip_path])
-    }
+    // Mark as cancelled for the processing loop
+    this.cancelledJobs.add(jobId)
 
     // Update job status
     const { error } = await this.supabase
@@ -680,6 +563,7 @@ class BulkUploadServiceClass {
 
     if (error) {
       console.error('Failed to cancel job:', error)
+      this.cancelledJobs.delete(jobId)
       return false
     }
 
@@ -687,39 +571,13 @@ class BulkUploadServiceClass {
   }
 
   /**
-   * Retry a failed job
+   * Retry a failed job (not supported in client-side extraction mode)
+   * The user needs to re-upload the ZIP file
    */
   async retryJob(jobId: string): Promise<boolean> {
-    const job = await this.getJobStatus(jobId)
-
-    if (!job) {
-      return false
-    }
-
-    // Only allow retrying failed jobs that still have a ZIP
-    if (job.status !== 'failed' || !job.zip_path) {
-      throw new Error('Não é possível tentar novamente este job')
-    }
-
-    // Reset job status to extracting
-    const { error } = await this.supabase
-      .from('photo_upload_jobs')
-      .update({
-        status: 'extracting',
-        error_message: null,
-        completed_at: null,
-      })
-      .eq('id', jobId)
-
-    if (error) {
-      console.error('Failed to retry job:', error)
-      return false
-    }
-
-    // Trigger processing again
-    await this.triggerProcessing(jobId)
-
-    return true
+    // In client-side extraction mode, we can't retry because we don't store the ZIP
+    // The user needs to re-upload the file
+    throw new Error('Para tentar novamente, faça um novo upload do arquivo ZIP')
   }
 
   /**
@@ -745,7 +603,6 @@ class BulkUploadServiceClass {
       )
       .subscribe()
 
-    // Return unsubscribe function
     return () => {
       this.supabase.removeChannel(channel)
     }

@@ -373,7 +373,7 @@ export function PhotosBulkUpload({ eventId, onJobCreated }: PhotosBulkUploadProp
           <div className="flex items-center gap-3">
             <Loader2 className="h-6 w-6 text-primary-500 animate-spin" />
             <div>
-              <p className="font-medium text-neutral-900">Enviando arquivo ZIP...</p>
+              <p className="font-medium text-neutral-900">Carregando arquivo ZIP...</p>
               <p className="text-sm text-neutral-500">{selectedFile?.name}</p>
             </div>
           </div>
@@ -398,7 +398,7 @@ export function PhotosBulkUpload({ eventId, onJobCreated }: PhotosBulkUploadProp
         )}
 
         <p className="text-xs text-neutral-500">
-          O upload é resumível. Se a conexão cair, você pode continuar de onde parou.
+          Preparando arquivo para processamento local...
         </p>
       </div>
     )
@@ -408,12 +408,20 @@ export function PhotosBulkUpload({ eventId, onJobCreated }: PhotosBulkUploadProp
   if (state === 'extracting') {
     return (
       <div className="space-y-4 p-6 bg-neutral-50 rounded-lg border border-neutral-200">
-        <div className="flex items-center gap-3">
-          <Loader2 className="h-6 w-6 text-primary-500 animate-spin" />
-          <div>
-            <p className="font-medium text-neutral-900">Extraindo arquivos...</p>
-            <p className="text-sm text-neutral-500">Analisando conteúdo do ZIP e preparando fotos para processamento</p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Loader2 className="h-6 w-6 text-primary-500 animate-spin" />
+            <div>
+              <p className="font-medium text-neutral-900">Extraindo arquivos...</p>
+              <p className="text-sm text-neutral-500">Analisando conteúdo do ZIP e preparando fotos para processamento</p>
+            </div>
           </div>
+          {currentJob && (
+            <Button variant="ghost" size="sm" onClick={handleCancel}>
+              <X className="h-4 w-4 mr-1" />
+              Cancelar
+            </Button>
+          )}
         </div>
 
         <p className="text-xs text-neutral-500">
@@ -430,12 +438,20 @@ export function PhotosBulkUpload({ eventId, onJobCreated }: PhotosBulkUploadProp
 
     return (
       <div className="space-y-4 p-6 bg-neutral-50 rounded-lg border border-neutral-200">
-        <div className="flex items-center gap-3">
-          <Loader2 className="h-6 w-6 text-primary-500 animate-spin" />
-          <div>
-            <p className="font-medium text-neutral-900">Processando fotos...</p>
-            <p className="text-sm text-neutral-500">Aplicando marca d'água e gerando thumbnails</p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Loader2 className="h-6 w-6 text-primary-500 animate-spin" />
+            <div>
+              <p className="font-medium text-neutral-900">Processando fotos...</p>
+              <p className="text-sm text-neutral-500">Aplicando marca d'água e fazendo upload</p>
+            </div>
           </div>
+          {currentJob && (
+            <Button variant="ghost" size="sm" onClick={handleCancel}>
+              <X className="h-4 w-4 mr-1" />
+              Cancelar
+            </Button>
+          )}
         </div>
 
         {currentJob && currentJob.total_photos > 0 && (
@@ -517,27 +533,15 @@ export function PhotosBulkUpload({ eventId, onJobCreated }: PhotosBulkUploadProp
           </div>
         </div>
 
-        <div className="flex gap-2">
-          {currentJob && currentJob.zip_path && (
-            <Button
-              onClick={async () => {
-                try {
-                  await bulkUploadService.retryJob(currentJob.id)
-                  setState('processing')
-                  setError(null)
-                } catch (err) {
-                  setError(err instanceof Error ? err.message : 'Erro ao tentar novamente')
-                }
-              }}
-              variant="outline"
-            >
-              Tentar novamente
-            </Button>
-          )}
-          <Button onClick={handleReset} variant="ghost">
-            Cancelar
-          </Button>
-        </div>
+        {currentJob && currentJob.processed_photos > 0 && (
+          <p className="text-sm text-neutral-600">
+            {currentJob.processed_photos} fotos foram processadas antes do erro.
+          </p>
+        )}
+
+        <Button onClick={handleReset} variant="outline">
+          Fazer novo upload
+        </Button>
       </div>
     )
   }

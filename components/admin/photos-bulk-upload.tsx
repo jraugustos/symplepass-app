@@ -155,6 +155,8 @@ export function PhotosBulkUpload({ eventId, onJobCreated }: PhotosBulkUploadProp
         // This enables the cancel button to work during the upload phase
         onJobCreated: (job) => {
           setCurrentJob(job)
+          // Update state to match job status (extracting)
+          handleJobUpdate(job)
           onJobCreated?.(job.id)
         },
         onUploadProgress: (progress) => {
@@ -406,14 +408,18 @@ export function PhotosBulkUpload({ eventId, onJobCreated }: PhotosBulkUploadProp
 
   // Comment 6: Handle 'extracting' state separately
   if (state === 'extracting') {
+    const fileSizeGB = selectedFile ? (selectedFile.size / (1024 * 1024 * 1024)).toFixed(1) : '?'
+
     return (
       <div className="space-y-4 p-6 bg-neutral-50 rounded-lg border border-neutral-200">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Loader2 className="h-6 w-6 text-primary-500 animate-spin" />
             <div>
-              <p className="font-medium text-neutral-900">Extraindo arquivos...</p>
-              <p className="text-sm text-neutral-500">Analisando conteúdo do ZIP e preparando fotos para processamento</p>
+              <p className="font-medium text-neutral-900">Carregando e extraindo arquivos...</p>
+              <p className="text-sm text-neutral-500">
+                Lendo {fileSizeGB}GB e listando fotos do ZIP
+              </p>
             </div>
           </div>
           {currentJob && (
@@ -424,8 +430,12 @@ export function PhotosBulkUpload({ eventId, onJobCreated }: PhotosBulkUploadProp
           )}
         </div>
 
+        <div className="w-full bg-neutral-200 rounded-full h-2 overflow-hidden">
+          <div className="bg-primary-500 h-2 rounded-full animate-pulse" style={{ width: '100%' }} />
+        </div>
+
         <p className="text-xs text-neutral-500">
-          Isso pode levar alguns instantes dependendo do tamanho do arquivo.
+          Para arquivos grandes, isso pode levar alguns minutos. Por favor, não feche esta aba.
         </p>
       </div>
     )

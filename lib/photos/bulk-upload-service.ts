@@ -7,7 +7,13 @@
 import { createClient } from '@/lib/supabase/client'
 import { processEventPhoto, type ProcessedPhotoVersions } from './image-processor'
 import { uploadService } from '@/lib/storage/upload-service'
-import JSZip from 'jszip'
+import type JSZipType from 'jszip'
+
+// Dynamic import to avoid SSR issues
+async function loadJSZip(): Promise<typeof JSZipType> {
+  const module = await import('jszip')
+  return module.default
+}
 
 // Types
 export interface PhotoUploadJob {
@@ -158,7 +164,9 @@ class BulkUploadServiceClass {
     console.log('[BulkUploadService] uploadZip called for event:', eventId, 'file:', file.name, 'size:', file.size)
 
     // Validate file
+    console.log('[BulkUploadService] Validating ZIP file...')
     await this.validateZipFile(file)
+    console.log('[BulkUploadService] ZIP file validated')
 
     const sanitizedFileName = sanitizeFilename(file.name)
     if (!sanitizedFileName) {
@@ -200,8 +208,11 @@ class BulkUploadServiceClass {
 
     try {
       // Load and extract ZIP
-      console.log('[BulkUploadService] Loading ZIP file...')
+      console.log('[BulkUploadService] Loading JSZip library...')
+      const JSZip = await loadJSZip()
+      console.log('[BulkUploadService] JSZip loaded, parsing ZIP file...')
       const zip = await JSZip.loadAsync(file)
+      console.log('[BulkUploadService] ZIP file parsed successfully')
 
       // Filter valid image files
       const imageFiles = this.filterValidImages(zip)
@@ -344,7 +355,7 @@ class BulkUploadServiceClass {
   /**
    * Filter valid image files from ZIP
    */
-  private filterValidImages(zip: JSZip): string[] {
+  private filterValidImages(zip: JSZipType): string[] {
     return Object.keys(zip.files)
       .filter((name) => {
         const file = zip.files[name]
@@ -368,7 +379,7 @@ class BulkUploadServiceClass {
    * Process and upload a single photo from ZIP
    */
   private async processAndUploadPhoto(
-    zip: JSZip,
+    zip: JSZipType,
     fileName: string,
     eventId: string,
     displayOrder: number

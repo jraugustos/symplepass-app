@@ -60,12 +60,13 @@ export default function EventPhotos({ eventId, photos, packages, pricingTiers, f
     return photos.filter(photo => matchedIds.has(photo.id))
   }, [photos, isFilterActive, faceFilterMatches])
 
-  // Get similarity for a photo (for display purposes)
-  const getPhotoSimilarity = useCallback((photoId: string): number | null => {
-    if (!faceFilterMatches) return null
-    const match = faceFilterMatches.find(m => m.photoId === photoId)
-    return match?.similarity ?? null
-  }, [faceFilterMatches])
+  // Create a Map of photo IDs to similarity scores for the PhotoGrid
+  const similarityScores = useMemo(() => {
+    if (!isFilterActive || !faceFilterMatches) {
+      return undefined
+    }
+    return new Map(faceFilterMatches.map(m => [m.photoId, m.similarity]))
+  }, [isFilterActive, faceFilterMatches])
 
   const handlePhotoClick = useCallback((photo: EventPhotoWithUrls) => {
     setLightboxPhoto(photo)
@@ -314,6 +315,7 @@ export default function EventPhotos({ eventId, photos, packages, pricingTiers, f
             selectedIds={selectedIds}
             onPhotoToggle={togglePhoto}
             onPhotoClick={handlePhotoClick}
+            similarityScores={similarityScores}
           />
         )}
 

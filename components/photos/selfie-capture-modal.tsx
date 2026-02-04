@@ -87,8 +87,8 @@ export function SelfieCaptureModal({
           body: JSON.stringify({
             eventId,
             embedding: faceResult.embedding,
-            threshold: 0.7, // Higher threshold to reduce false positives
-            limit: 100,
+            threshold: 0.85, // Very high threshold for validation
+            limit: 50,
           }),
         })
 

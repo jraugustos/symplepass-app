@@ -10,6 +10,8 @@ interface PhotoGridProps {
   selectedIds: string[]
   onPhotoToggle: (photoId: string) => void
   onPhotoClick: (photo: EventPhotoWithUrls) => void
+  /** Optional map of photo IDs to similarity scores (0-1) for face search results */
+  similarityScores?: Map<string, number>
 }
 
 interface PhotoItemProps {
@@ -18,9 +20,36 @@ interface PhotoItemProps {
   onToggle: () => void
   onClick: () => void
   index: number
+  similarity?: number
 }
 
-function PhotoItem({ photo, isSelected, onToggle, onClick, index }: PhotoItemProps) {
+function SimilarityBadge({ similarity }: { similarity: number }) {
+  const percentage = Math.round(similarity * 100)
+
+  // Determine color based on similarity level
+  const getColorClasses = () => {
+    if (similarity >= 0.85) return 'bg-green-500 text-white'
+    if (similarity >= 0.75) return 'bg-yellow-500 text-white'
+    return 'bg-orange-400 text-white'
+  }
+
+  const getLabel = () => {
+    if (similarity >= 0.85) return 'Alta'
+    if (similarity >= 0.75) return 'Media'
+    return 'Baixa'
+  }
+
+  return (
+    <div className={cn(
+      'absolute top-2 right-2 px-2 py-1 rounded-lg text-xs font-semibold shadow-sm',
+      getColorClasses()
+    )}>
+      {percentage}%
+    </div>
+  )
+}
+
+function PhotoItem({ photo, isSelected, onToggle, onClick, index, similarity }: PhotoItemProps) {
   const [isLoaded, setIsLoaded] = useState(false)
   const [hasError, setHasError] = useState(false)
   const [isVisible, setIsVisible] = useState(false)
@@ -118,10 +147,15 @@ function PhotoItem({ photo, isSelected, onToggle, onClick, index }: PhotoItemPro
             ? 'bg-orange-500 text-white shadow-sm'
             : 'bg-white/90 border border-neutral-300 text-transparent hover:border-orange-400 hover:bg-white'
         )}
-        aria-label={isSelected ? 'Remover da seleção' : 'Adicionar à seleção'}
+        aria-label={isSelected ? 'Remover da selecao' : 'Adicionar a selecao'}
       >
         <Check className="w-4 h-4" strokeWidth={3} />
       </button>
+
+      {/* Similarity badge - shows when we have similarity data */}
+      {similarity !== undefined && (
+        <SimilarityBadge similarity={similarity} />
+      )}
 
       {/* Selected badge */}
       {isSelected && (
@@ -138,12 +172,13 @@ export default function PhotoGrid({
   selectedIds,
   onPhotoToggle,
   onPhotoClick,
+  similarityScores,
 }: PhotoGridProps) {
   if (photos.length === 0) {
     return (
       <div className="text-center py-12">
         <ImageIcon className="w-12 h-12 text-neutral-300 mx-auto mb-4" />
-        <p className="text-neutral-600">Nenhuma foto disponível</p>
+        <p className="text-neutral-600">Nenhuma foto disponivel</p>
       </div>
     )
   }
@@ -158,6 +193,7 @@ export default function PhotoGrid({
           onToggle={() => onPhotoToggle(photo.id)}
           onClick={() => onPhotoClick(photo)}
           index={index}
+          similarity={similarityScores?.get(photo.id)}
         />
       ))}
     </div>

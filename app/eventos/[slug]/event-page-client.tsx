@@ -34,6 +34,7 @@ interface EventPageClientProps {
   userEmail?: string
   userRole?: UserRole
   photosData?: EventPhotosData
+  faceSearchAvailable?: boolean
 }
 
 export default function EventPageClient({
@@ -46,6 +47,7 @@ export default function EventPageClient({
   userEmail,
   userRole = 'user',
   photosData = { photos: [], packages: [], pricingTiers: [] },
+  faceSearchAvailable = false,
 }: EventPageClientProps) {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<EventCategory | null>(null)
@@ -190,6 +192,7 @@ export default function EventPageClient({
                   photos={photosData.photos}
                   packages={photosData.packages}
                   pricingTiers={photosData.pricingTiers}
+                  faceSearchAvailable={faceSearchAvailable}
                 />
               </EventSectionWrapper>
             )}

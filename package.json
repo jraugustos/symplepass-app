@@ -17,9 +17,11 @@
     "db:migrate": "echo 'Run migrations in Supabase Dashboard SQL Editor. See DEPLOYMENT.md'",
     "db:seed": "echo 'Run seed.sql in Supabase Dashboard SQL Editor. See DEPLOYMENT.md'",
     "postbuild": "echo 'Build complete. Run npm run start to test production build locally.'",
-    "stripe:setup-club": "npx tsx scripts/setup-stripe-club-product.ts"
+    "stripe:setup-club": "npx tsx scripts/setup-stripe-club-product.ts",
+    "face:download-models": "npx tsx scripts/download-face-models.ts"
   },
   "dependencies": {
+    "@vladmandic/face-api": "^1.7.14",
     "@hookform/resolvers": "^3.3.0",
     "@radix-ui/react-progress": "^1.1.8",
     "@radix-ui/react-scroll-area": "^1.2.10",

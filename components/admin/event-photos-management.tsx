@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { PhotosUpload } from './photos-upload'
 import { PhotosBulkUpload } from './photos-bulk-upload'
 import { PhotoJobsStatus } from './photo-jobs-status'
+import { FaceProcessingButton } from './face-processing-button'
 import { PhotoPackagesForm } from './photo-packages-form'
 import { PhotoPricingTiersForm } from './photo-pricing-tiers-form'
 import { PhotoOrdersPageClient } from './photo-orders-page-client'
@@ -234,6 +235,13 @@ export function EventPhotosManagement({
                   eventId={eventId}
                   refreshTrigger={jobsRefreshTrigger}
                 />
+                {/* Face Processing */}
+                {localPhotos.length > 0 && (
+                  <FaceProcessingButton
+                    eventId={eventId}
+                    photoCount={localPhotos.length}
+                  />
+                )}
               </div>
             )}
 

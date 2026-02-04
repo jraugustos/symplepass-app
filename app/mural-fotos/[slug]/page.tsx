@@ -5,6 +5,7 @@ import { Footer } from '@/components/layout/footer'
 import EventPhotos from '@/components/evento/event-photos'
 import { getEventDetailBySlug } from '@/lib/data/events'
 import { getEventPhotosData } from '@/lib/data/event-photos'
+import { eventHasProcessedFaces } from '@/lib/data/face-embeddings'
 import { truncateText, formatEventDate, extractLocationString } from '@/lib/utils'
 import { getSportLabel } from '@/lib/constants/sports'
 import { MapPin, Calendar, Activity, Images } from 'lucide-react'
@@ -56,7 +57,10 @@ export default async function MuralEventPage({ params }: MuralEventPageProps) {
   }
 
   // Fetch photos and packages
-  const photosData = await getEventPhotosData(event.id)
+  const [photosData, faceSearchAvailable] = await Promise.all([
+    getEventPhotosData(event.id),
+    eventHasProcessedFaces(event.id),
+  ])
 
   // Must have at least one photo
   if (photosData.photos.length === 0) {
@@ -132,6 +136,7 @@ export default async function MuralEventPage({ params }: MuralEventPageProps) {
             photos={photosData.photos}
             packages={photosData.packages}
             pricingTiers={photosData.pricingTiers}
+            faceSearchAvailable={faceSearchAvailable}
           />
         </section>
       </main>

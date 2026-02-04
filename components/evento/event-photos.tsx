@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useCallback } from 'react'
-import { Camera, ImageIcon, TrendingDown, Check } from 'lucide-react'
+import { useState, useCallback, useEffect } from 'react'
+import { Camera, ImageIcon, TrendingDown, Check, Search } from 'lucide-react'
 import { PhotoGrid, PhotoLightbox, PhotoCart } from '@/components/photos'
+import { PhotoFaceSearch } from '@/components/photos/photo-face-search'
 import { usePhotoCart } from '@/lib/hooks/use-photo-cart'
 import { EVENT_PAGE_CONTENT_CLASS } from './layout-constants'
 import { cn, formatCurrency } from '@/lib/utils'
@@ -15,11 +16,14 @@ interface EventPhotosProps {
   /** @deprecated Use pricingTiers instead */
   packages: PhotoPackage[]
   pricingTiers: PhotoPricingTier[]
+  /** Whether face search is available for this event */
+  faceSearchAvailable?: boolean
 }
 
-export default function EventPhotos({ eventId, photos, packages, pricingTiers }: EventPhotosProps) {
+export default function EventPhotos({ eventId, photos, packages, pricingTiers, faceSearchAvailable = false }: EventPhotosProps) {
   const [lightboxPhoto, setLightboxPhoto] = useState<EventPhotoWithUrls | null>(null)
   const [isLightboxOpen, setIsLightboxOpen] = useState(false)
+  const [isFaceSearchOpen, setIsFaceSearchOpen] = useState(false)
 
   const {
     selectedIds,
@@ -111,14 +115,37 @@ export default function EventPhotos({ eventId, photos, packages, pricingTiers }:
               Selecione as fotos que deseja adquirir
             </p>
           </div>
-          {selectedCount > 0 && (
-            <div className="hidden sm:block text-right">
-              <p className="text-sm text-neutral-500">
-                {selectedCount} {selectedCount === 1 ? 'foto selecionada' : 'fotos selecionadas'}
-              </p>
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            {selectedCount > 0 && (
+              <div className="hidden sm:block text-right">
+                <p className="text-sm text-neutral-500">
+                  {selectedCount} {selectedCount === 1 ? 'foto selecionada' : 'fotos selecionadas'}
+                </p>
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* Face search button */}
+        {faceSearchAvailable && (
+          <div className="mb-6">
+            <button
+              onClick={() => setIsFaceSearchOpen(true)}
+              className={cn(
+                'w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 rounded-xl',
+                'bg-gradient-to-r from-orange-500 to-amber-500 text-white font-medium',
+                'hover:from-orange-600 hover:to-amber-600 transition-all',
+                'shadow-md hover:shadow-lg'
+              )}
+            >
+              <Search className="w-5 h-5" />
+              Encontrar suas fotos
+            </button>
+            <p className="text-xs text-neutral-500 mt-2">
+              Use reconhecimento facial para encontrar suas fotos automaticamente
+            </p>
+          </div>
+        )}
 
         {/* Pricing tiers cards */}
         {formattedTiers.length > 0 && (
@@ -225,6 +252,15 @@ export default function EventPhotos({ eventId, photos, packages, pricingTiers }:
         onRemovePhoto={removePhoto}
         onClearCart={clearCart}
         onCheckout={handleCheckout}
+      />
+
+      {/* Face search modal */}
+      <PhotoFaceSearch
+        eventId={eventId}
+        isOpen={isFaceSearchOpen}
+        onClose={() => setIsFaceSearchOpen(false)}
+        onPhotoSelect={togglePhoto}
+        selectedPhotoIds={selectedIds}
       />
     </div>
   )

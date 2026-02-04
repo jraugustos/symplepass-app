@@ -64,6 +64,3 @@ next-env.d.ts
 
 # Cache
 .cache/
-
-# Face-api.js models (download with: npm run face:download-models)
-/public/models/

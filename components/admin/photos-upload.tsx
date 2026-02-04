@@ -56,58 +56,57 @@ export function PhotosUpload({
   const handleFilesSelect = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return
 
-    // No limit on number of files - process all selected photos
-    console.log(`[PhotosUpload] Starting upload of ${files.length} photos`)
+    const fileArray = Array.from(files)
+    console.log(`[PhotosUpload] Starting upload of ${fileArray.length} photos`)
 
     setUploading(true)
     setError(null)
-    setProgress({ current: 0, total: files.length, fileName: '' })
+    setProgress({ current: 0, total: fileArray.length, fileName: '' })
 
-    try {
-      const result = await photoUploadService.uploadMultipleEventPhotos(
-        Array.from(files),
-        eventId,
-        (current, total, fileName) => {
-          setProgress({ current, total, fileName })
-        }
-      )
+    const errors: string[] = []
+    let successCount = 0
 
-      // Save metadata to database for successful uploads
-      const metadataErrors: string[] = []
-      for (const photo of result.successful) {
-        try {
-          await onPhotoCreate({
-            original_path: photo.originalPath,
-            watermarked_path: photo.watermarkedPath,
-            thumbnail_path: photo.thumbnailPath,
-            file_name: photo.fileName,
-            file_size: photo.fileSize,
-            width: photo.dimensions.width,
-            height: photo.dimensions.height,
-          })
-        } catch (err) {
-          console.error('Error saving photo metadata:', err)
-          metadataErrors.push(`${photo.fileName}: ${err instanceof Error ? err.message : 'Erro ao salvar metadados'}`)
-        }
-      }
+    // Process each photo individually - upload + save to DB immediately
+    for (let i = 0; i < fileArray.length; i++) {
+      const file = fileArray[i]
+      setProgress({ current: i + 1, total: fileArray.length, fileName: file.name })
 
-      // Show errors from both storage failures and metadata save failures
-      const allErrors = [
-        ...result.failed.map(f => `${f.fileName}: ${f.error}`),
-        ...metadataErrors,
-      ]
-      if (allErrors.length > 0) {
-        setError(`Algumas fotos falharam:\n${allErrors.join('\n')}`)
+      try {
+        // Upload and process the photo
+        const result = await photoUploadService.uploadEventPhoto(file, eventId)
+
+        // Save to database immediately after upload
+        await onPhotoCreate({
+          original_path: result.originalPath,
+          watermarked_path: result.watermarkedPath,
+          thumbnail_path: result.thumbnailPath,
+          file_name: result.fileName,
+          file_size: result.fileSize,
+          width: result.dimensions.width,
+          height: result.dimensions.height,
+        })
+
+        successCount++
+        console.log(`[PhotosUpload] Photo ${i + 1}/${fileArray.length} uploaded: ${file.name}`)
+      } catch (err) {
+        console.error(`[PhotosUpload] Failed to upload ${file.name}:`, err)
+        errors.push(`${file.name}: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
+        // Continue with next photo instead of stopping
       }
-    } catch (err) {
-      console.error('Upload error:', err)
-      setError(err instanceof Error ? err.message : 'Erro ao fazer upload das fotos')
-    } finally {
-      setUploading(false)
-      setProgress(null)
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
+    }
+
+    // Show summary
+    if (errors.length > 0) {
+      const errorSummary = errors.length > 10
+        ? `${errors.slice(0, 10).join('\n')}\n... e mais ${errors.length - 10} erros`
+        : errors.join('\n')
+      setError(`${successCount} fotos enviadas. ${errors.length} falharam:\n${errorSummary}`)
+    }
+
+    setUploading(false)
+    setProgress(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
     }
   }, [eventId, onPhotoCreate])
 

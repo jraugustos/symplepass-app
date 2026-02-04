@@ -406,6 +406,37 @@ export interface EventWithPhotos extends Event {
   pricing_tiers: PhotoPricingTier[]
 }
 
+// Face recognition types
+export type FaceProcessingStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'no_faces'
+
+export interface PhotoFaceEmbedding {
+  id: string
+  photo_id: string
+  event_id: string
+  /** Face embedding vector (128 dimensions) - stored as string in format [n1,n2,...] */
+  embedding: string
+  /** Bounding box of the face in pixels */
+  bounding_box: {
+    x: number
+    y: number
+    width: number
+    height: number
+  } | null
+  /** Detection confidence score (0-1) */
+  detection_confidence: number | null
+  created_at: string
+}
+
+export interface PhotoFaceProcessing {
+  photo_id: string
+  status: FaceProcessingStatus
+  faces_found: number
+  processed_at: string | null
+  error_message: string | null
+  created_at: string
+  updated_at: string
+}
+
 // Database schema type
 export interface Database {
   public: {
@@ -489,6 +520,16 @@ export interface Database {
         Row: OrganizerInviteToken
         Insert: Omit<OrganizerInviteToken, 'id' | 'created_at'>
         Update: Partial<Omit<OrganizerInviteToken, 'id' | 'created_at'>>
+      }
+      photo_face_embeddings: {
+        Row: PhotoFaceEmbedding
+        Insert: Omit<PhotoFaceEmbedding, 'id' | 'created_at'>
+        Update: Partial<Omit<PhotoFaceEmbedding, 'id' | 'created_at'>>
+      }
+      photo_face_processing: {
+        Row: PhotoFaceProcessing
+        Insert: Omit<PhotoFaceProcessing, 'created_at' | 'updated_at'>
+        Update: Partial<Omit<PhotoFaceProcessing, 'created_at' | 'updated_at'>>
       }
     }
   }

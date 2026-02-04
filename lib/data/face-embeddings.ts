@@ -23,7 +23,7 @@ export interface FaceEmbedding {
   created_at: string
 }
 
-export interface FaceProcessingStatus {
+export interface PhotoFaceProcessingRecord {
   photo_id: string
   status: 'pending' | 'processing' | 'completed' | 'failed' | 'no_faces'
   faces_found: number
@@ -97,8 +97,8 @@ export async function saveFaceEmbeddings(
       detection_confidence: e.confidence || null,
     }))
 
-    // Insert embeddings
-    const { error: insertError } = await supabase
+    // Insert embeddings (cast to any to bypass type checking for ungenerated table types)
+    const { error: insertError } = await (supabase as any)
       .from('photo_face_embeddings')
       .insert(records)
 
@@ -107,8 +107,8 @@ export async function saveFaceEmbeddings(
       return { success: false, error: insertError.message }
     }
 
-    // Update processing status
-    const { error: statusError } = await supabase
+    // Update processing status (cast to any to bypass type checking for ungenerated table types)
+    const { error: statusError } = await (supabase as any)
       .from('photo_face_processing')
       .upsert({
         photo_id: photoId,
@@ -138,14 +138,15 @@ export async function saveFaceEmbeddings(
  */
 export async function updateProcessingStatus(
   photoId: string,
-  status: FaceProcessingStatus['status'],
+  status: PhotoFaceProcessingRecord['status'],
   facesFound?: number,
   errorMessage?: string
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = createAdminClient()
 
   try {
-    const { error } = await supabase.from('photo_face_processing').upsert({
+    // Cast to any to bypass type checking for ungenerated table types
+    const { error } = await (supabase as any).from('photo_face_processing').upsert({
       photo_id: photoId,
       status,
       faces_found: facesFound ?? 0,
@@ -179,8 +180,8 @@ export async function deleteFaceEmbeddings(
   const supabase = createAdminClient()
 
   try {
-    // Delete embeddings
-    const { error: embeddingError } = await supabase
+    // Delete embeddings (cast to any to bypass type checking for ungenerated table types)
+    const { error: embeddingError } = await (supabase as any)
       .from('photo_face_embeddings')
       .delete()
       .eq('photo_id', photoId)
@@ -190,8 +191,8 @@ export async function deleteFaceEmbeddings(
       return { success: false, error: embeddingError.message }
     }
 
-    // Delete processing status
-    const { error: statusError } = await supabase
+    // Delete processing status (cast to any to bypass type checking for ungenerated table types)
+    const { error: statusError } = await (supabase as any)
       .from('photo_face_processing')
       .delete()
       .eq('photo_id', photoId)
@@ -233,8 +234,8 @@ export async function searchFacesByEmbedding(
   const threshold = options?.threshold ?? 0.6
 
   try {
-    // Call the RPC function for vector similarity search
-    const { data, error } = await supabase.rpc('search_faces_by_embedding', {
+    // Call the RPC function for vector similarity search (cast to any for ungenerated RPC types)
+    const { data, error } = await (supabase as any).rpc('search_faces_by_embedding', {
       p_event_id: eventId,
       p_embedding: `[${embedding.join(',')}]`,
       p_limit: limit,
@@ -265,11 +266,12 @@ export async function searchFacesByEmbedding(
  */
 export async function getProcessingStatus(
   photoId: string
-): Promise<{ data: FaceProcessingStatus | null; error?: string }> {
+): Promise<{ data: PhotoFaceProcessingRecord | null; error?: string }> {
   const supabase = createClient()
 
   try {
-    const { data, error } = await supabase
+    // Cast to any to bypass type checking for ungenerated table types
+    const { data, error } = await (supabase as any)
       .from('photo_face_processing')
       .select('*')
       .eq('photo_id', photoId)
@@ -281,7 +283,7 @@ export async function getProcessingStatus(
       return { data: null, error: error.message }
     }
 
-    return { data: data as FaceProcessingStatus | null }
+    return { data: data as PhotoFaceProcessingRecord | null }
   } catch (error) {
     console.error('[FaceEmbeddings] Error:', error)
     return {
@@ -300,7 +302,8 @@ export async function getEventProcessingStats(
   const supabase = createClient()
 
   try {
-    const { data, error } = await supabase.rpc('get_event_face_processing_stats', {
+    // Cast to any to bypass type checking for ungenerated RPC types
+    const { data, error } = await (supabase as any).rpc('get_event_face_processing_stats', {
       p_event_id: eventId,
     })
 
@@ -332,34 +335,48 @@ export async function getPendingPhotosForProcessing(
   const supabase = createClient()
 
   try {
-    // Get photos that don't have a processing status record yet
-    // or have status 'pending'
-    const { data, error } = await supabase
+    // First get all photos for the event
+    const { data: photos, error: photosError } = await supabase
       .from('event_photos')
-      .select(`
-        id,
-        thumbnail_path,
-        photo_face_processing (status)
-      `)
+      .select('id, thumbnail_path')
       .eq('event_id', eventId)
-      .or('photo_face_processing.is.null,photo_face_processing.status.eq.pending')
-      .limit(limit)
+      .order('display_order', { ascending: true })
 
-    if (error) {
-      console.error('[FaceEmbeddings] Error getting pending photos:', error)
-      return { data: null, error: error.message }
+    if (photosError) {
+      console.error('[FaceEmbeddings] Error getting photos:', photosError)
+      return { data: null, error: photosError.message }
+    }
+
+    if (!photos || photos.length === 0) {
+      return { data: [] }
+    }
+
+    // Get processing status for these photos (cast to any for ungenerated table types)
+    const photoIds = photos.map((p) => p.id)
+    const { data: processingStatus, error: statusError } = await (supabase as any)
+      .from('photo_face_processing')
+      .select('photo_id, status')
+      .in('photo_id', photoIds)
+
+    if (statusError) {
+      console.error('[FaceEmbeddings] Error getting processing status:', statusError)
+      // If we can't get status, assume all photos are pending
+      return { data: photos.slice(0, limit) }
+    }
+
+    // Create a map of photo_id -> status
+    const statusMap = new Map<string, string>()
+    for (const item of processingStatus || []) {
+      statusMap.set(item.photo_id, item.status)
     }
 
     // Filter to only photos without processing status or with pending status
-    const pendingPhotos = (data || [])
-      .filter((photo: any) => {
-        const status = photo.photo_face_processing?.[0]?.status
+    const pendingPhotos = photos
+      .filter((photo) => {
+        const status = statusMap.get(photo.id)
         return !status || status === 'pending'
       })
-      .map((photo: any) => ({
-        id: photo.id,
-        thumbnail_path: photo.thumbnail_path,
-      }))
+      .slice(0, limit)
 
     return { data: pendingPhotos }
   } catch (error) {
@@ -378,7 +395,8 @@ export async function eventHasProcessedFaces(eventId: string): Promise<boolean> 
   const supabase = createClient()
 
   try {
-    const { count, error } = await supabase
+    // Cast to any to bypass type checking for ungenerated table types
+    const { count, error } = await (supabase as any)
       .from('photo_face_embeddings')
       .select('id', { count: 'exact', head: true })
       .eq('event_id', eventId)

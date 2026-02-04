@@ -20,20 +20,19 @@ const BASE_URL =
   'https://raw.githubusercontent.com/vladmandic/face-api/master/model';
 
 // Models to download with their files
+// Note: vladmandic/face-api uses single .bin files instead of sharded files
 const MODELS = {
   ssd_mobilenetv1: [
     'ssd_mobilenetv1_model-weights_manifest.json',
-    'ssd_mobilenetv1_model-shard1',
-    'ssd_mobilenetv1_model-shard2',
+    'ssd_mobilenetv1_model.bin',
   ],
   face_landmark_68: [
     'face_landmark_68_model-weights_manifest.json',
-    'face_landmark_68_model-shard1',
+    'face_landmark_68_model.bin',
   ],
   face_recognition: [
     'face_recognition_model-weights_manifest.json',
-    'face_recognition_model-shard1',
-    'face_recognition_model-shard2',
+    'face_recognition_model.bin',
   ],
 };
 

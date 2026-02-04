@@ -3,7 +3,8 @@
  * Uses face-api.js for client-side face detection and embedding extraction
  */
 
-import * as faceapi from '@vladmandic/face-api';
+import * as faceapi from '@vladmandic/face-api'
+import type { FaceDetectionWithLandmarksAndDescriptor } from '@vladmandic/face-api'
 
 // ============================================================
 // Types
@@ -194,7 +195,7 @@ export async function detectFaces(input: File | Blob | string): Promise<FaceDete
       .withFaceDescriptors();
 
     // Transform to our format
-    return detections.map((detection) => ({
+    return detections.map((detection: FaceDetectionWithLandmarksAndDescriptor) => ({
       embedding: Array.from(detection.descriptor),
       boundingBox: {
         x: Math.round(detection.detection.box.x),

@@ -51,7 +51,7 @@ export interface BulkUploadCallbacks {
   onPhotoProcessed?: (processed: number, total: number, fileName: string) => void
 }
 
-const MAX_ZIP_SIZE = 5 * 1024 * 1024 * 1024 // 5GB
+const MAX_ZIP_SIZE = 300 * 1024 * 1024 // 300MB - larger files should use direct photo upload
 const VALID_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp']
 
 // ZIP magic bytes signature (PK\x03\x04)
@@ -496,7 +496,7 @@ class BulkUploadServiceClass {
     if (file.size > MAX_ZIP_SIZE) {
       const sizeMB = Math.round(file.size / (1024 * 1024))
       const maxMB = Math.round(MAX_ZIP_SIZE / (1024 * 1024))
-      throw new Error(`Arquivo muito grande (${sizeMB}MB). Máximo: ${maxMB}MB`)
+      throw new Error(`ZIP muito grande (${sizeMB}MB). Para arquivos maiores que ${maxMB}MB, use o "Upload Individual" que permite selecionar múltiplas fotos diretamente.`)
     }
 
     if (file.size === 0) {

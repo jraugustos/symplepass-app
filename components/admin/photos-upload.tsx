@@ -56,11 +56,8 @@ export function PhotosUpload({
   const handleFilesSelect = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return
 
-    // Validate max files
-    if (files.length > 50) {
-      setError('Máximo de 50 fotos por upload')
-      return
-    }
+    // No limit on number of files - process all selected photos
+    console.log(`[PhotosUpload] Starting upload of ${files.length} photos`)
 
     setUploading(true)
     setError(null)
@@ -303,7 +300,7 @@ export function PhotosUpload({
               </label>
             </div>
             <p className="text-xs text-neutral-500 mt-2">
-              JPG, PNG ou WebP. Máximo 50MB por foto. Até 50 fotos por vez.
+              JPG, PNG ou WebP. Máximo 50MB por foto. Selecione quantas fotos quiser.
             </p>
           </>
         )}

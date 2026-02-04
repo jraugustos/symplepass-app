@@ -131,10 +131,11 @@ export function PhotosBulkUpload({ eventId, onJobCreated }: PhotosBulkUploadProp
       return
     }
 
-    // Validate file size (5GB max)
-    const maxSize = 5 * 1024 * 1024 * 1024
+    // Validate file size (300MB max for ZIP)
+    const maxSize = 300 * 1024 * 1024 // 300MB
     if (file.size > maxSize) {
-      setError('Arquivo muito grande. Máximo: 5GB')
+      const sizeMB = Math.round(file.size / (1024 * 1024))
+      setError(`ZIP muito grande (${sizeMB}MB). Para arquivos maiores que 300MB, use o "Upload Individual".`)
       return
     }
 
@@ -285,7 +286,7 @@ export function PhotosBulkUpload({ eventId, onJobCreated }: PhotosBulkUploadProp
             <span className="text-neutral-600"> ou arraste um arquivo ZIP</span>
           </div>
           <p className="text-sm text-neutral-500 mt-2">
-            Máximo 5GB. O ZIP deve conter apenas imagens (JPG, PNG, WebP)
+            Máximo 300MB. Para mais fotos, use o Upload Individual
           </p>
           <input
             ref={fileInputRef}

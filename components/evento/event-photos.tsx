@@ -1,14 +1,19 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
-import { Camera, ImageIcon, TrendingDown, Check, Search } from 'lucide-react'
+import { useState, useCallback, useMemo } from 'react'
+import { Camera, ImageIcon, TrendingDown, Check, Search, X, User } from 'lucide-react'
 import { PhotoGrid, PhotoLightbox, PhotoCart } from '@/components/photos'
-import { PhotoFaceSearch } from '@/components/photos/photo-face-search'
+import { SelfieCaptureModal } from '@/components/photos/selfie-capture-modal'
 import { usePhotoCart } from '@/lib/hooks/use-photo-cart'
 import { EVENT_PAGE_CONTENT_CLASS } from './layout-constants'
 import { cn, formatCurrency } from '@/lib/utils'
 import type { PhotoPackage, PhotoPricingTier } from '@/types/database.types'
 import type { EventPhotoWithUrls } from '@/lib/photos/photo-utils'
+
+interface FaceFilterMatch {
+  photoId: string
+  similarity: number
+}
 
 interface EventPhotosProps {
   eventId: string
@@ -23,7 +28,11 @@ interface EventPhotosProps {
 export default function EventPhotos({ eventId, photos, packages, pricingTiers, faceSearchAvailable = false }: EventPhotosProps) {
   const [lightboxPhoto, setLightboxPhoto] = useState<EventPhotoWithUrls | null>(null)
   const [isLightboxOpen, setIsLightboxOpen] = useState(false)
-  const [isFaceSearchOpen, setIsFaceSearchOpen] = useState(false)
+  const [isCaptureModalOpen, setIsCaptureModalOpen] = useState(false)
+
+  // Face filter state
+  const [faceFilterMatches, setFaceFilterMatches] = useState<FaceFilterMatch[] | null>(null)
+  const [isFilterActive, setIsFilterActive] = useState(false)
 
   const {
     selectedIds,
@@ -41,6 +50,23 @@ export default function EventPhotos({ eventId, photos, packages, pricingTiers, f
     savings,
   } = usePhotoCart(eventId, packages, pricingTiers)
 
+  // Filter photos based on face search results
+  const displayedPhotos = useMemo(() => {
+    if (!isFilterActive || !faceFilterMatches) {
+      return photos
+    }
+
+    const matchedIds = new Set(faceFilterMatches.map(m => m.photoId))
+    return photos.filter(photo => matchedIds.has(photo.id))
+  }, [photos, isFilterActive, faceFilterMatches])
+
+  // Get similarity for a photo (for display purposes)
+  const getPhotoSimilarity = useCallback((photoId: string): number | null => {
+    if (!faceFilterMatches) return null
+    const match = faceFilterMatches.find(m => m.photoId === photoId)
+    return match?.similarity ?? null
+  }, [faceFilterMatches])
+
   const handlePhotoClick = useCallback((photo: EventPhotoWithUrls) => {
     setLightboxPhoto(photo)
     setIsLightboxOpen(true)
@@ -53,19 +79,19 @@ export default function EventPhotos({ eventId, photos, packages, pricingTiers, f
 
   const handleLightboxNext = useCallback(() => {
     if (!lightboxPhoto) return
-    const currentIndex = photos.findIndex((p) => p.id === lightboxPhoto.id)
-    if (currentIndex < photos.length - 1) {
-      setLightboxPhoto(photos[currentIndex + 1])
+    const currentIndex = displayedPhotos.findIndex((p) => p.id === lightboxPhoto.id)
+    if (currentIndex < displayedPhotos.length - 1) {
+      setLightboxPhoto(displayedPhotos[currentIndex + 1])
     }
-  }, [lightboxPhoto, photos])
+  }, [lightboxPhoto, displayedPhotos])
 
   const handleLightboxPrevious = useCallback(() => {
     if (!lightboxPhoto) return
-    const currentIndex = photos.findIndex((p) => p.id === lightboxPhoto.id)
+    const currentIndex = displayedPhotos.findIndex((p) => p.id === lightboxPhoto.id)
     if (currentIndex > 0) {
-      setLightboxPhoto(photos[currentIndex - 1])
+      setLightboxPhoto(displayedPhotos[currentIndex - 1])
     }
-  }, [lightboxPhoto, photos])
+  }, [lightboxPhoto, displayedPhotos])
 
   const handleLightboxToggleSelection = useCallback(() => {
     if (lightboxPhoto) {
@@ -77,6 +103,19 @@ export default function EventPhotos({ eventId, photos, packages, pricingTiers, f
     const photoIdsParam = selectedIds.join(',')
     window.location.href = `/fotos/checkout?eventId=${eventId}&photoIds=${photoIdsParam}`
   }, [eventId, selectedIds])
+
+  // Handle face search results - filter the gallery
+  const handleFaceSearchResults = useCallback((matches: FaceFilterMatch[]) => {
+    setFaceFilterMatches(matches)
+    setIsFilterActive(true)
+    setIsCaptureModalOpen(false)
+  }, [])
+
+  // Clear face filter and show all photos
+  const handleClearFaceFilter = useCallback(() => {
+    setIsFilterActive(false)
+    setFaceFilterMatches(null)
+  }, [])
 
   // Empty state
   if (photos.length === 0) {
@@ -126,11 +165,42 @@ export default function EventPhotos({ eventId, photos, packages, pricingTiers, f
           </div>
         </div>
 
-        {/* Face search button */}
-        {faceSearchAvailable && (
+        {/* Face filter active banner */}
+        {isFilterActive && faceFilterMatches && (
+          <div className="mb-6 p-4 bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
+                  <User className="w-5 h-5 text-orange-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-orange-900">
+                    {displayedPhotos.length === 0
+                      ? 'Nenhuma foto encontrada'
+                      : `${displayedPhotos.length} ${displayedPhotos.length === 1 ? 'foto encontrada' : 'fotos encontradas'}`
+                    }
+                  </p>
+                  <p className="text-sm text-orange-700">
+                    Mostrando apenas fotos em que você aparece
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleClearFaceFilter}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-orange-700 hover:text-orange-900 hover:bg-orange-100 rounded-lg transition-colors"
+              >
+                <X className="w-4 h-4" />
+                Ver todas ({photos.length})
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Face search button - only show when filter is NOT active */}
+        {faceSearchAvailable && !isFilterActive && (
           <div className="mb-6">
             <button
-              onClick={() => setIsFaceSearchOpen(true)}
+              onClick={() => setIsCaptureModalOpen(true)}
               className={cn(
                 'w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 rounded-xl',
                 'bg-gradient-to-r from-orange-500 to-amber-500 text-white font-medium',
@@ -212,18 +282,48 @@ export default function EventPhotos({ eventId, photos, packages, pricingTiers, f
           </div>
         )}
 
+        {/* No results after filter */}
+        {isFilterActive && displayedPhotos.length === 0 && (
+          <div className="text-center py-16 bg-neutral-50 rounded-2xl border border-neutral-200">
+            <User className="w-16 h-16 text-neutral-300 mx-auto mb-4" />
+            <p className="text-neutral-600 text-lg mb-2">Nenhuma foto encontrada</p>
+            <p className="text-neutral-500 text-sm mb-6">
+              Não encontramos fotos suas neste evento. Tente novamente ou veja todas as fotos.
+            </p>
+            <div className="flex justify-center gap-3">
+              <button
+                onClick={() => setIsCaptureModalOpen(true)}
+                className="px-4 py-2 text-sm font-medium text-orange-600 hover:text-orange-700 border border-orange-200 hover:border-orange-300 rounded-lg transition-colors"
+              >
+                Tentar novamente
+              </button>
+              <button
+                onClick={handleClearFaceFilter}
+                className="px-4 py-2 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors"
+              >
+                Ver todas as fotos
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Photo grid */}
-        <PhotoGrid
-          photos={photos}
-          selectedIds={selectedIds}
-          onPhotoToggle={togglePhoto}
-          onPhotoClick={handlePhotoClick}
-        />
+        {displayedPhotos.length > 0 && (
+          <PhotoGrid
+            photos={displayedPhotos}
+            selectedIds={selectedIds}
+            onPhotoToggle={togglePhoto}
+            onPhotoClick={handlePhotoClick}
+          />
+        )}
 
         {/* Photo count info */}
         <div className="mt-6 text-center">
           <p className="text-sm text-neutral-500">
-            {photos.length} {photos.length === 1 ? 'foto disponível' : 'fotos disponíveis'}
+            {isFilterActive
+              ? `${displayedPhotos.length} de ${photos.length} fotos`
+              : `${photos.length} ${photos.length === 1 ? 'foto disponível' : 'fotos disponíveis'}`
+            }
           </p>
         </div>
       </div>
@@ -232,7 +332,7 @@ export default function EventPhotos({ eventId, photos, packages, pricingTiers, f
       <PhotoLightbox
         isOpen={isLightboxOpen}
         photo={lightboxPhoto}
-        photos={photos}
+        photos={displayedPhotos}
         isSelected={lightboxPhoto ? isSelected(lightboxPhoto.id) : false}
         onClose={handleLightboxClose}
         onNext={handleLightboxNext}
@@ -254,13 +354,12 @@ export default function EventPhotos({ eventId, photos, packages, pricingTiers, f
         onCheckout={handleCheckout}
       />
 
-      {/* Face search modal */}
-      <PhotoFaceSearch
+      {/* Selfie capture modal for face search */}
+      <SelfieCaptureModal
         eventId={eventId}
-        isOpen={isFaceSearchOpen}
-        onClose={() => setIsFaceSearchOpen(false)}
-        onPhotoSelect={togglePhoto}
-        selectedPhotoIds={selectedIds}
+        isOpen={isCaptureModalOpen}
+        onClose={() => setIsCaptureModalOpen(false)}
+        onSearchResults={handleFaceSearchResults}
       />
     </div>
   )

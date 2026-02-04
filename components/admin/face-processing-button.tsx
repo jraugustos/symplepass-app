@@ -105,7 +105,20 @@ export function FaceProcessingButton({ eventId, photoCount, className }: FacePro
           })
 
           // Detect faces in the photo
+          console.log(`[FaceProcessing] Processing photo ${photo.id}, URL: ${photo.thumbnailUrl}`)
           const faces = await detectFaces(photo.thumbnailUrl)
+          console.log(`[FaceProcessing] Detected ${faces.length} faces in photo ${photo.id}`)
+
+          // Validate embeddings have real values (not all zeros or similar)
+          for (const face of faces) {
+            const sum = face.embedding.reduce((a, b) => a + Math.abs(b), 0)
+            const variance = face.embedding.reduce((a, b) => a + b * b, 0) / 128
+            console.log(`[FaceProcessing] Embedding stats - sum: ${sum.toFixed(4)}, variance: ${variance.toFixed(6)}, confidence: ${face.confidence}`)
+
+            if (sum < 1 || variance < 0.001) {
+              console.error(`[FaceProcessing] WARNING: Invalid embedding detected for photo ${photo.id} - likely corrupted`)
+            }
+          }
 
           // Save embeddings
           await fetch('/api/photos/embeddings', {

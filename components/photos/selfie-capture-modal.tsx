@@ -193,7 +193,7 @@ export function SelfieCaptureModal({
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-100">
           <div className="flex items-center gap-2">
-            <ImageIcon className="w-5 h-5 text-purple-600" />
+            <ImageIcon className="w-5 h-5 text-orange-500" />
             <h2 className="font-semibold text-neutral-900">Encontrar suas fotos</h2>
           </div>
           <button
@@ -209,7 +209,7 @@ export function SelfieCaptureModal({
           {/* Loading models overlay */}
           {isLoadingModels && step === 'upload' && (
             <div className="absolute inset-0 bg-white/80 flex flex-col items-center justify-center z-10">
-              <Loader2 className="w-8 h-8 text-purple-600 animate-spin mb-3" />
+              <Loader2 className="w-8 h-8 text-orange-500 animate-spin mb-3" />
               <p className="text-sm text-neutral-600">Preparando busca facial...</p>
             </div>
           )}
@@ -225,14 +225,14 @@ export function SelfieCaptureModal({
               {/* Tips - compact */}
               <div className="flex gap-4 mb-8 text-center">
                 <div className="flex flex-col items-center">
-                  <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center mb-2">
-                    <Sun className="w-5 h-5 text-purple-600" />
+                  <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center mb-2">
+                    <Sun className="w-5 h-5 text-orange-500" />
                   </div>
                   <span className="text-xs text-neutral-500">Boa iluminacao</span>
                 </div>
                 <div className="flex flex-col items-center">
-                  <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center mb-2">
-                    <User className="w-5 h-5 text-purple-600" />
+                  <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center mb-2">
+                    <User className="w-5 h-5 text-orange-500" />
                   </div>
                   <span className="text-xs text-neutral-500">Rosto visivel</span>
                 </div>
@@ -243,17 +243,17 @@ export function SelfieCaptureModal({
                 onClick={() => fileInputRef.current?.click()}
                 className={cn(
                   'w-full max-w-xs aspect-square rounded-2xl border-2 border-dashed',
-                  'border-purple-300 bg-purple-50 hover:bg-purple-100 hover:border-purple-400',
+                  'border-orange-300 bg-orange-50 hover:bg-orange-100 hover:border-orange-400',
                   'flex flex-col items-center justify-center gap-3',
                   'transition-colors cursor-pointer'
                 )}
               >
-                <div className="w-14 h-14 rounded-full bg-purple-100 flex items-center justify-center">
-                  <Upload className="w-7 h-7 text-purple-600" />
+                <div className="w-14 h-14 rounded-full bg-orange-100 flex items-center justify-center">
+                  <Upload className="w-7 h-7 text-orange-500" />
                 </div>
                 <div className="text-center">
-                  <p className="text-sm font-medium text-purple-700">Selecionar foto</p>
-                  <p className="text-xs text-purple-500 mt-1">JPG, PNG ate 10MB</p>
+                  <p className="text-sm font-medium text-orange-600">Selecionar foto</p>
+                  <p className="text-xs text-orange-500 mt-1">JPG, PNG ate 10MB</p>
                 </div>
               </button>
 
@@ -302,7 +302,7 @@ export function SelfieCaptureModal({
 
                 <Button
                   onClick={handleSearch}
-                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
+                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white"
                 >
                   <Check className="w-4 h-4 mr-2" />
                   Buscar
@@ -314,7 +314,7 @@ export function SelfieCaptureModal({
           {/* Step: Processing */}
           {step === 'processing' && (
             <div className="flex flex-col items-center justify-center py-16 px-6">
-              <Loader2 className="w-12 h-12 text-purple-600 animate-spin mb-4" />
+              <Loader2 className="w-12 h-12 text-orange-500 animate-spin mb-4" />
               <h3 className="text-lg font-semibold text-neutral-900 mb-2">
                 Procurando suas fotos...
               </h3>
@@ -344,7 +344,7 @@ export function SelfieCaptureModal({
                 </Button>
                 <Button
                   onClick={handleRetry}
-                  className="bg-purple-600 hover:bg-purple-700 text-white"
+                  className="bg-orange-500 hover:bg-orange-600 text-white"
                 >
                   Tentar novamente
                 </Button>

@@ -197,24 +197,35 @@ export default function EventPhotos({ eventId, photos, packages, pricingTiers, f
           </div>
         )}
 
-        {/* Face search button - only show when filter is NOT active */}
+        {/* Face search card - only show when filter is NOT active */}
         {faceSearchAvailable && !isFilterActive && (
           <div className="mb-6">
-            <button
-              onClick={() => setIsCaptureModalOpen(true)}
-              className={cn(
-                'w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 rounded-xl',
-                'bg-gradient-to-r from-orange-500 to-amber-500 text-white font-medium',
-                'hover:from-orange-600 hover:to-amber-600 transition-all',
-                'shadow-md hover:shadow-lg'
-              )}
-            >
-              <Search className="w-5 h-5" />
-              Encontrar suas fotos
-            </button>
-            <p className="text-xs text-neutral-500 mt-2">
-              Use reconhecimento facial para encontrar suas fotos automaticamente
-            </p>
+            <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-neutral-200 shadow-sm">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-full bg-orange-50 flex items-center justify-center flex-shrink-0">
+                  <Search className="w-7 h-7 text-orange-500" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-neutral-900">
+                    Encontre suas fotos com reconhecimento facial!
+                  </h3>
+                  <p className="text-sm text-neutral-500">
+                    Envie uma foto sua para encontrar automaticamente
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsCaptureModalOpen(true)}
+                className={cn(
+                  'px-6 py-2.5 rounded-lg font-medium',
+                  'bg-orange-500 text-white',
+                  'hover:bg-orange-600 transition-colors',
+                  'flex-shrink-0'
+                )}
+              >
+                Encontrar
+              </button>
+            </div>
           </div>
         )}
 

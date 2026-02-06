@@ -200,8 +200,8 @@ export default function EventPhotos({ eventId, photos, packages, pricingTiers, f
         {/* Face search card - only show when filter is NOT active */}
         {faceSearchAvailable && !isFilterActive && (
           <div className="mb-6">
-            <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-neutral-200 shadow-sm">
-              <div className="flex items-center gap-4">
+            <div className="flex flex-col sm:flex-row items-center sm:justify-between gap-4 p-4 bg-white rounded-xl border border-neutral-200 shadow-sm text-center sm:text-left">
+              <div className="flex flex-col sm:flex-row items-center gap-4">
                 <div className="w-14 h-14 rounded-full bg-orange-50 flex items-center justify-center flex-shrink-0">
                   <Search className="w-7 h-7 text-orange-500" />
                 </div>
@@ -217,7 +217,7 @@ export default function EventPhotos({ eventId, photos, packages, pricingTiers, f
               <button
                 onClick={() => setIsCaptureModalOpen(true)}
                 className={cn(
-                  'px-6 py-2.5 rounded-lg font-medium',
+                  'w-full sm:w-auto px-6 py-2.5 rounded-lg font-medium',
                   'bg-orange-500 text-white',
                   'hover:bg-orange-600 transition-colors',
                   'flex-shrink-0'

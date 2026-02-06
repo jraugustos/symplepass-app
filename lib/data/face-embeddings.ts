@@ -329,8 +329,7 @@ export async function getEventProcessingStats(
  * Get photos pending face processing for an event
  */
 export async function getPendingPhotosForProcessing(
-  eventId: string,
-  limit: number = 50
+  eventId: string
 ): Promise<{ data: Array<{ id: string; thumbnail_path: string }> | null; error?: string }> {
   const supabase = createClient()
 
@@ -361,7 +360,7 @@ export async function getPendingPhotosForProcessing(
     if (statusError) {
       console.error('[FaceEmbeddings] Error getting processing status:', statusError)
       // If we can't get status, assume all photos are pending
-      return { data: photos.slice(0, limit) }
+      return { data: photos }
     }
 
     // Create a map of photo_id -> status
@@ -371,12 +370,10 @@ export async function getPendingPhotosForProcessing(
     }
 
     // Filter to only photos without processing status or with pending status
-    const pendingPhotos = photos
-      .filter((photo) => {
-        const status = statusMap.get(photo.id)
-        return !status || status === 'pending'
-      })
-      .slice(0, limit)
+    const pendingPhotos = photos.filter((photo) => {
+      const status = statusMap.get(photo.id)
+      return !status || status === 'pending'
+    })
 
     return { data: pendingPhotos }
   } catch (error) {

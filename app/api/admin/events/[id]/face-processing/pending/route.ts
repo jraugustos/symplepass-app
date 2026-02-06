@@ -25,8 +25,6 @@ export async function GET(
     }
 
     const eventId = params.id
-    const { searchParams } = new URL(request.url)
-    const limit = parseInt(searchParams.get('limit') || '100', 10)
 
     // Verify event exists and user has access
     const event = await getEventByIdForAdmin(eventId)
@@ -40,7 +38,7 @@ export async function GET(
     }
 
     // Get pending photos
-    const pendingResult = await getPendingPhotosForProcessing(eventId, limit)
+    const pendingResult = await getPendingPhotosForProcessing(eventId)
 
     if (pendingResult.error) {
       return NextResponse.json(

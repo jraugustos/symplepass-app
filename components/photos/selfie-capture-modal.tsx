@@ -1,17 +1,16 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
-import { X, Search, Loader2, AlertCircle, Camera } from 'lucide-react'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { X, Loader2, AlertCircle, Upload, Sun, User, ImageIcon, RefreshCw, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { SelfieGuidelines } from './selfie-guidelines'
-import { SelfieCapture } from './selfie-capture'
+import { Button } from '@/components/ui/button'
 import {
   loadFaceDetectionModels,
   detectSingleFace,
   getModelLoadingStatus,
 } from '@/lib/photos/face-detection'
 
-type CaptureStep = 'guidelines' | 'capture' | 'processing' | 'error'
+type ModalStep = 'upload' | 'preview' | 'processing' | 'error'
 
 interface FaceSearchMatch {
   photoId: string
@@ -31,16 +30,22 @@ export function SelfieCaptureModal({
   onClose,
   onSearchResults,
 }: SelfieCaptureModalProps) {
-  const [step, setStep] = useState<CaptureStep>('guidelines')
+  const [step, setStep] = useState<ModalStep>('upload')
   const [isProcessing, setIsProcessing] = useState(false)
   const [isLoadingModels, setIsLoadingModels] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [selectedImage, setSelectedImage] = useState<string | null>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
-      setStep('guidelines')
+      setStep('upload')
       setError(null)
+      setSelectedImage(null)
+      setSelectedFile(null)
     }
   }, [isOpen])
 
@@ -60,70 +65,112 @@ export function SelfieCaptureModal({
     }
   }, [isOpen])
 
-  // Handle selfie capture
-  const handleCapture = useCallback(
-    async (file: File) => {
-      setIsProcessing(true)
-      setStep('processing')
-      setError(null)
+  // Handle file selection
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
 
-      try {
-        // Ensure models are loaded
-        await loadFaceDetectionModels()
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setError('Por favor, selecione um arquivo de imagem valido.')
+      return
+    }
 
-        // Detect face in selfie
-        const faceResult = await detectSingleFace(file)
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      setError('A imagem deve ter no maximo 10MB.')
+      return
+    }
 
-        if (!faceResult) {
-          setError('Nao foi possivel detectar um rosto na sua foto. Por favor, tente novamente com uma foto diferente.')
-          setStep('error')
-          return
-        }
+    setSelectedFile(file)
+    setSelectedImage(URL.createObjectURL(file))
+    setStep('preview')
+    setError(null)
+  }, [])
 
-        // Search for matching faces in the event with higher threshold
-        const response = await fetch('/api/photos/search/face', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            eventId,
-            embedding: faceResult.embedding,
-            threshold: 0.85, // Very high threshold for validation
-            limit: 50,
-          }),
-        })
+  // Handle search
+  const handleSearch = useCallback(async () => {
+    if (!selectedFile) return
 
-        if (!response.ok) {
-          throw new Error('Erro ao buscar fotos')
-        }
+    setIsProcessing(true)
+    setStep('processing')
+    setError(null)
 
-        const data = await response.json()
-        const matches: FaceSearchMatch[] = (data.matches || []).map((m: any) => ({
-          photoId: m.photoId,
-          similarity: m.similarity,
-        }))
+    try {
+      // Ensure models are loaded
+      await loadFaceDetectionModels()
 
-        // Return results to parent - it will filter the gallery
-        onSearchResults(matches)
-      } catch (err) {
-        console.error('[SelfieCaptureModal] Search error:', err)
-        setError(
-          err instanceof Error
-            ? err.message
-            : 'Ocorreu um erro ao processar sua foto. Por favor, tente novamente.'
-        )
+      // Detect face in photo
+      const faceResult = await detectSingleFace(selectedFile)
+
+      if (!faceResult) {
+        setError('Nao foi possivel detectar um rosto na sua foto. Por favor, tente novamente com uma foto diferente.')
         setStep('error')
-      } finally {
-        setIsProcessing(false)
+        return
       }
-    },
-    [eventId, onSearchResults]
-  )
 
-  // Handle retry from error
+      // Search for matching faces in the event
+      const response = await fetch('/api/photos/search/face', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventId,
+          embedding: faceResult.embedding,
+          threshold: 0.85,
+          limit: 50,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Erro ao buscar fotos')
+      }
+
+      const data = await response.json()
+      const matches: FaceSearchMatch[] = (data.matches || []).map((m: any) => ({
+        photoId: m.photoId,
+        similarity: m.similarity,
+      }))
+
+      // Return results to parent
+      onSearchResults(matches)
+    } catch (err) {
+      console.error('[SelfieCaptureModal] Search error:', err)
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Ocorreu um erro ao processar sua foto. Por favor, tente novamente.'
+      )
+      setStep('error')
+    } finally {
+      setIsProcessing(false)
+    }
+  }, [eventId, selectedFile, onSearchResults])
+
+  // Handle retry
   const handleRetry = useCallback(() => {
     setError(null)
-    setStep('capture')
+    setSelectedImage(null)
+    setSelectedFile(null)
+    setStep('upload')
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
   }, [])
+
+  // Handle choose different photo
+  const handleChooseDifferent = useCallback(() => {
+    if (selectedImage) {
+      URL.revokeObjectURL(selectedImage)
+    }
+    setSelectedImage(null)
+    setSelectedFile(null)
+    setStep('upload')
+    // Reset and trigger file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }, [selectedImage])
 
   if (!isOpen) return null
 
@@ -138,7 +185,7 @@ export function SelfieCaptureModal({
       {/* Modal */}
       <div
         className={cn(
-          'relative w-full max-w-lg max-h-[90vh] bg-white rounded-2xl shadow-xl overflow-hidden',
+          'relative w-full max-w-md max-h-[90vh] bg-white rounded-2xl shadow-xl overflow-hidden',
           'flex flex-col',
           'mx-4 sm:mx-0'
         )}
@@ -146,7 +193,7 @@ export function SelfieCaptureModal({
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-100">
           <div className="flex items-center gap-2">
-            <Camera className="w-5 h-5 text-orange-500" />
+            <ImageIcon className="w-5 h-5 text-purple-600" />
             <h2 className="font-semibold text-neutral-900">Encontrar suas fotos</h2>
           </div>
           <button
@@ -160,43 +207,126 @@ export function SelfieCaptureModal({
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
           {/* Loading models overlay */}
-          {isLoadingModels && step === 'guidelines' && (
+          {isLoadingModels && step === 'upload' && (
             <div className="absolute inset-0 bg-white/80 flex flex-col items-center justify-center z-10">
-              <Loader2 className="w-8 h-8 text-orange-500 animate-spin mb-3" />
-              <p className="text-sm text-neutral-600">Carregando modelos de deteccao...</p>
+              <Loader2 className="w-8 h-8 text-purple-600 animate-spin mb-3" />
+              <p className="text-sm text-neutral-600">Preparando busca facial...</p>
             </div>
           )}
 
-          {/* Step: Guidelines */}
-          {step === 'guidelines' && (
-            <SelfieGuidelines onContinue={() => setStep('capture')} />
+          {/* Step: Upload */}
+          {step === 'upload' && (
+            <div className="flex flex-col items-center px-6 py-8">
+              {/* Instructions */}
+              <p className="text-sm text-neutral-600 text-center mb-6">
+                Envie uma foto sua para encontrarmos as fotos do evento em que voce aparece.
+              </p>
+
+              {/* Tips - compact */}
+              <div className="flex gap-4 mb-8 text-center">
+                <div className="flex flex-col items-center">
+                  <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center mb-2">
+                    <Sun className="w-5 h-5 text-purple-600" />
+                  </div>
+                  <span className="text-xs text-neutral-500">Boa iluminacao</span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center mb-2">
+                    <User className="w-5 h-5 text-purple-600" />
+                  </div>
+                  <span className="text-xs text-neutral-500">Rosto visivel</span>
+                </div>
+              </div>
+
+              {/* Upload area */}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className={cn(
+                  'w-full max-w-xs aspect-square rounded-2xl border-2 border-dashed',
+                  'border-purple-300 bg-purple-50 hover:bg-purple-100 hover:border-purple-400',
+                  'flex flex-col items-center justify-center gap-3',
+                  'transition-colors cursor-pointer'
+                )}
+              >
+                <div className="w-14 h-14 rounded-full bg-purple-100 flex items-center justify-center">
+                  <Upload className="w-7 h-7 text-purple-600" />
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-medium text-purple-700">Selecionar foto</p>
+                  <p className="text-xs text-purple-500 mt-1">JPG, PNG ate 10MB</p>
+                </div>
+              </button>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileSelect}
+              />
+
+              {error && (
+                <div className="mt-4 p-3 rounded-lg bg-red-50 border border-red-200">
+                  <p className="text-sm text-red-600">{error}</p>
+                </div>
+              )}
+            </div>
           )}
 
-          {/* Step: Capture */}
-          {step === 'capture' && (
-            <SelfieCapture
-              onCapture={handleCapture}
-              onCancel={() => setStep('guidelines')}
-              isProcessing={isProcessing}
-            />
+          {/* Step: Preview */}
+          {step === 'preview' && (
+            <div className="flex flex-col items-center px-6 py-6">
+              <p className="text-sm text-neutral-600 mb-4">Sua foto esta boa?</p>
+
+              {/* Image preview */}
+              <div className="relative w-full max-w-xs aspect-square rounded-xl overflow-hidden bg-neutral-100 mb-6">
+                {selectedImage && (
+                  <img
+                    src={selectedImage}
+                    alt="Foto selecionada"
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                )}
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex gap-3 w-full max-w-xs">
+                <Button
+                  onClick={handleChooseDifferent}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Trocar
+                </Button>
+
+                <Button
+                  onClick={handleSearch}
+                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
+                >
+                  <Check className="w-4 h-4 mr-2" />
+                  Buscar
+                </Button>
+              </div>
+            </div>
           )}
 
           {/* Step: Processing */}
           {step === 'processing' && (
-            <div className="flex flex-col items-center justify-center py-16">
-              <Loader2 className="w-12 h-12 text-orange-500 animate-spin mb-4" />
+            <div className="flex flex-col items-center justify-center py-16 px-6">
+              <Loader2 className="w-12 h-12 text-purple-600 animate-spin mb-4" />
               <h3 className="text-lg font-semibold text-neutral-900 mb-2">
                 Procurando suas fotos...
               </h3>
-              <p className="text-sm text-neutral-500 text-center px-4">
-                Analisando {'>'}1000 fotos do evento. Isso pode levar alguns segundos.
+              <p className="text-sm text-neutral-500 text-center">
+                Analisando as fotos do evento. Isso pode levar alguns segundos.
               </p>
             </div>
           )}
 
           {/* Step: Error */}
           {step === 'error' && (
-            <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
+            <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
               <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
                 <AlertCircle className="w-8 h-8 text-red-500" />
               </div>
@@ -205,18 +335,19 @@ export function SelfieCaptureModal({
               </h3>
               <p className="text-sm text-neutral-500 mb-6 max-w-xs">{error}</p>
               <div className="flex gap-3">
-                <button
+                <Button
                   onClick={onClose}
-                  className="px-4 py-2 text-sm text-neutral-600 hover:text-neutral-900"
+                  variant="ghost"
+                  className="text-neutral-600"
                 >
                   Cancelar
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={handleRetry}
-                  className="px-4 py-2 text-sm bg-orange-500 text-white rounded-lg hover:bg-orange-600"
+                  className="bg-purple-600 hover:bg-purple-700 text-white"
                 >
                   Tentar novamente
-                </button>
+                </Button>
               </div>
             </div>
           )}

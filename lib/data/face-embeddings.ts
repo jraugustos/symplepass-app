@@ -327,6 +327,7 @@ export async function getEventProcessingStats(
 
 /**
  * Get photos pending face processing for an event
+ * Uses RPC function for efficient querying with large photo counts
  */
 export async function getPendingPhotosForProcessing(
   eventId: string
@@ -334,48 +335,17 @@ export async function getPendingPhotosForProcessing(
   const supabase = createClient()
 
   try {
-    // First get all photos for the event
-    const { data: photos, error: photosError } = await supabase
-      .from('event_photos')
-      .select('id, thumbnail_path')
-      .eq('event_id', eventId)
-      .order('display_order', { ascending: true })
-
-    if (photosError) {
-      console.error('[FaceEmbeddings] Error getting photos:', photosError)
-      return { data: null, error: photosError.message }
-    }
-
-    if (!photos || photos.length === 0) {
-      return { data: [] }
-    }
-
-    // Get processing status for these photos (cast to any for ungenerated table types)
-    const photoIds = photos.map((p) => p.id)
-    const { data: processingStatus, error: statusError } = await (supabase as any)
-      .from('photo_face_processing')
-      .select('photo_id, status')
-      .in('photo_id', photoIds)
-
-    if (statusError) {
-      console.error('[FaceEmbeddings] Error getting processing status:', statusError)
-      // If we can't get status, assume all photos are pending
-      return { data: photos }
-    }
-
-    // Create a map of photo_id -> status
-    const statusMap = new Map<string, string>()
-    for (const item of processingStatus || []) {
-      statusMap.set(item.photo_id, item.status)
-    }
-
-    // Filter to only photos without processing status or with pending status
-    const pendingPhotos = photos.filter((photo) => {
-      const status = statusMap.get(photo.id)
-      return !status || status === 'pending'
+    // Use RPC function for efficient LEFT JOIN query
+    const { data, error } = await (supabase as any).rpc('get_pending_photos_for_processing', {
+      p_event_id: eventId,
     })
 
-    return { data: pendingPhotos }
+    if (error) {
+      console.error('[FaceEmbeddings] Error getting pending photos:', error)
+      return { data: null, error: error.message }
+    }
+
+    return { data: data as Array<{ id: string; thumbnail_path: string }> }
   } catch (error) {
     console.error('[FaceEmbeddings] Error:', error)
     return {

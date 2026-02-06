@@ -97,11 +97,24 @@ export function SelfieCaptureModal({
     setError(null)
 
     try {
-      // Ensure models are loaded
-      await loadFaceDetectionModels()
+      // Step 1: Load models
+      console.log('[SelfieCaptureModal] Loading models...')
+      try {
+        await loadFaceDetectionModels()
+      } catch (modelErr) {
+        console.error('[SelfieCaptureModal] Model loading failed:', modelErr)
+        throw new Error('Erro ao carregar modelos de reconhecimento. Verifique sua conexao e tente novamente.')
+      }
 
-      // Detect face in photo
-      const faceResult = await detectSingleFace(selectedFile)
+      // Step 2: Detect face
+      console.log('[SelfieCaptureModal] Detecting face...')
+      let faceResult
+      try {
+        faceResult = await detectSingleFace(selectedFile)
+      } catch (detectErr) {
+        console.error('[SelfieCaptureModal] Face detection failed:', detectErr)
+        throw new Error('Erro ao processar sua foto. Tente com uma foto diferente.')
+      }
 
       if (!faceResult) {
         setError('Nao foi possivel detectar um rosto na sua foto. Por favor, tente novamente com uma foto diferente.')
@@ -109,7 +122,8 @@ export function SelfieCaptureModal({
         return
       }
 
-      // Search for matching faces in the event
+      // Step 3: Search API
+      console.log('[SelfieCaptureModal] Searching faces...')
       const response = await fetch('/api/photos/search/face', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -121,8 +135,16 @@ export function SelfieCaptureModal({
         }),
       })
 
+      // Check content type to ensure we got JSON
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        console.error('[SelfieCaptureModal] Invalid response type:', contentType, 'Status:', response.status)
+        throw new Error('Erro de comunicacao com o servidor. Tente novamente.')
+      }
+
       if (!response.ok) {
-        throw new Error('Erro ao buscar fotos')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Erro ao buscar fotos')
       }
 
       const data = await response.json()
@@ -131,6 +153,7 @@ export function SelfieCaptureModal({
         similarity: m.similarity,
       }))
 
+      console.log('[SelfieCaptureModal] Found', matches.length, 'matches')
       // Return results to parent
       onSearchResults(matches)
     } catch (err) {

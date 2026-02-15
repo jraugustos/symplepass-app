@@ -83,6 +83,8 @@ const nextConfig = {
       },
     ],
   },
+  // Prevent server-only packages from being bundled into the client
+  serverExternalPackages: ['mercadopago'],
   experimental: {
     // Keep server actions enabled for existing mutations.
     serverActions: {

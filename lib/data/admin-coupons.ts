@@ -120,17 +120,21 @@ export async function validateCoupon(
       return { valid: false, error: 'Cupom inativo ou expirado' }
     }
 
-    // Check validity dates
+    // Check validity dates if set
     const now = new Date()
-    const validFrom = new Date(coupon.valid_from)
-    const validUntil = new Date(coupon.valid_until)
 
-    if (now < validFrom) {
-      return { valid: false, error: 'Cupom ainda não está válido' }
+    if (coupon.valid_from) {
+      const validFrom = new Date(coupon.valid_from)
+      if (now < validFrom) {
+        return { valid: false, error: 'Cupom ainda não está válido' }
+      }
     }
 
-    if (now > validUntil) {
-      return { valid: false, error: 'Cupom expirado' }
+    if (coupon.valid_until) {
+      const validUntil = new Date(coupon.valid_until)
+      if (now > validUntil) {
+        return { valid: false, error: 'Cupom expirado' }
+      }
     }
 
     // Check if coupon is event-specific

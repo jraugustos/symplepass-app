@@ -1,6 +1,7 @@
-import { BadgeCheck, Calendar, MapPin, CreditCard, Users } from 'lucide-react'
+import { BadgeCheck, Calendar, MapPin, CreditCard, Users, FileText } from 'lucide-react'
 import { formatCurrency, formatCPF, formatPhone } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
+import { EventCustomField } from '@/types/database.types'
 
 interface RegistrationSummaryProps {
   eventTitle: string
@@ -17,6 +18,8 @@ interface RegistrationSummaryProps {
     phone: string
     shirtSize: string
   } | null
+  customFields?: EventCustomField[]
+  customFieldValues?: Record<string, any>
 }
 
 export function RegistrationSummary({
@@ -28,6 +31,8 @@ export function RegistrationSummary({
   paymentStatus,
   transactionId,
   partnerData,
+  customFields,
+  customFieldValues,
 }: RegistrationSummaryProps) {
   return (
     <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm" data-animate>
@@ -100,6 +105,30 @@ export function RegistrationSummary({
               <p className="text-xs font-medium uppercase tracking-widest text-slate-400">Tamanho da camiseta</p>
               <p className="text-sm font-medium text-slate-900">{partnerData.shirtSize}</p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {customFields && customFields.length > 0 && customFieldValues && (
+        <div className="mt-6 border-t border-slate-100 pt-6">
+          <div className="flex items-center gap-2 mb-4">
+            <FileText className="h-5 w-5 text-blue-600" />
+            <h4 className="text-lg font-semibold text-slate-900">Informações Adicionais</h4>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {customFields.map((field) => {
+              const value = customFieldValues[field.name];
+              if (!value) return null;
+
+              return (
+                <div key={field.id}>
+                  <p className="text-xs font-medium uppercase tracking-widest text-slate-400">{field.label}</p>
+                  <p className="text-sm font-medium text-slate-900">
+                    {Array.isArray(value) ? value.join(', ') : String(value)}
+                  </p>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

@@ -8,6 +8,7 @@ import {
   getRegistrationsByEventId,
   getRegistrationStats,
 } from '@/lib/data/admin-registrations'
+import { getCustomFieldsByEventId } from '@/lib/data/admin-custom-fields'
 import { RegistrationsPageClient } from '@/components/admin/registrations-page-client'
 import { Card } from '@/components/ui/card'
 import { formatCurrency } from '@/lib/utils'
@@ -51,6 +52,7 @@ export default async function InscricoesEventoPage({
   }
 
   const categories = await getCategoriesByEventId(params.id)
+  const { data: customFields } = await getCustomFieldsByEventId(params.id)
 
   const filters: RegistrationFilters = {
     payment_status: searchParams.payment_status as any,
@@ -156,6 +158,7 @@ export default async function InscricoesEventoPage({
           searchParams={searchParams}
           allowsPairRegistration={event.allows_pair_registration ?? false}
           shirtSizesConfig={event.shirt_sizes_config}
+          customFields={customFields || []}
         />
       </div>
     </div>

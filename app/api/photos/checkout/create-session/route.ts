@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
-import { stripe } from '@/lib/stripe/client'
 import { createClient } from '@/lib/supabase/server'
 import { getEnv } from '@/lib/env'
-import { createPhotoOrder, updatePhotoOrderStripeSession } from '@/lib/data/photo-orders'
+import { createPhotoOrder, updatePhotoOrderMpPreference } from '@/lib/data/photo-orders'
+import { createPhotoOrderPreference } from '@/lib/mercadopago/checkout'
 import { getBestPackageForQuantity, calculatePriceForQuantity } from '@/lib/photos/photo-utils'
 import type { PhotoCheckoutRequest, PhotoPricingTier, PhotoPackage } from '@/types'
 
@@ -185,57 +185,31 @@ export async function POST(request: Request) {
 
     const env = getEnv()
 
-    // Create Stripe checkout session
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      customer_email: user.email,
-      payment_intent_data: {
-        metadata: {
-          orderId: orderResult.data.id,
-          type: 'photo_order',
-        },
-      },
-      line_items: [
-        {
-          quantity: 1,
-          price_data: {
-            currency: 'brl',
-            unit_amount: Math.round(serverTotalPrice * 100),
-            product_data: {
-              name: `Fotos - ${event.title}`,
-              description: `${photoIds.length} ${photoIds.length === 1 ? 'foto' : 'fotos'} do evento`,
-            },
-          },
-        },
-      ],
-      metadata: {
-        orderId: orderResult.data.id,
-        eventId: event.id,
-        userId: user.id,
-        photoIds: JSON.stringify(photoIds),
-        packageId: finalPackageId || '',
-        appliedTierId: serverAppliedTierId || '',
-        pricePerPhoto: serverPricePerPhoto?.toString() || '',
-        type: 'photo_order',
-      },
-      success_url: `${env.app.baseUrl}/fotos/download/${orderResult.data.id}?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${env.app.baseUrl}/eventos/${event.slug}#fotos`,
+    // Create Mercado Pago Checkout Pro preference
+    const mpPreference = await createPhotoOrderPreference({
+      orderId: orderResult.data.id,
+      eventTitle: event.title,
+      photoCount: photoIds.length,
+      totalAmount: serverTotalPrice, // BRL (reais), NOT centavos
+      payerEmail: user.email!,
+      eventId: event.id,
+      userId: user.id,
     })
 
-    if (!session.url) {
-      console.error('Stripe session created without URL')
+    if (!mpPreference.initPoint) {
+      console.error('Mercado Pago preference created without URL')
       return NextResponse.json(
         { error: 'Não foi possível iniciar o pagamento. Tente novamente.' },
         { status: 500 }
       )
     }
 
-    // Update order with Stripe session ID
-    await updatePhotoOrderStripeSession(orderResult.data.id, session.id, supabase)
+    // Update order with MP preference ID
+    await updatePhotoOrderMpPreference(orderResult.data.id, mpPreference.id, supabase)
 
     return NextResponse.json({
-      sessionId: session.id,
-      url: session.url,
+      preferenceId: mpPreference.id,
+      url: mpPreference.initPoint,
       orderId: orderResult.data.id,
     })
   } catch (error) {

@@ -49,6 +49,14 @@ export default function CategorySelectionModal({
   const shirtSizesConfig: ShirtSizesByGender | null =
     event.shirt_sizes_config || null
 
+  // Check if there's an INCLUDED (free) shirt item in the kit
+  // Only show shirt size selection in modal if shirt is included (price === 0)
+  // If shirt is paid/optional, selection will be done in the review page
+  const hasShirtInKit = useMemo(() => {
+    if (!category?.kit_items || category.kit_items.length === 0) return false
+    return category.kit_items.some(item => item.icon === 'shirt')
+  }, [category?.kit_items])
+
   // Check if category has specific gender restrictions (array)
   const categoryGenders = category?.shirt_genders || null
 
@@ -189,13 +197,13 @@ export default function CategorySelectionModal({
   const isFreeEvent = event.event_type === 'free' || event.event_type === 'solidarity'
   const requiresPartnerInfo = registrationType === 'dupla'
   const requiresTeamInfo = registrationType === 'equipe'
-  const hasPartnerShirtSelection = requiresPartnerInfo && genderOptions.length > 0 && partnerAvailableSizes.length > 0
+  const hasPartnerShirtSelection = requiresPartnerInfo && hasShirtInKit && genderOptions.length > 0 && partnerAvailableSizes.length > 0
 
-  const isButtonDisabled = !hasShirtSizes ||
-    !selectedSize ||
-    !selectedGender ||
+  // Shirt size validation - only required if there's a shirt item in the kit
+  const shirtSizeRequired = hasShirtInKit && hasShirtSizes
+  const isButtonDisabled = (shirtSizeRequired && (!selectedSize || !selectedGender)) ||
     (requiresPartnerInfo && !partnerName.trim()) ||
-    (requiresTeamInfo && teamMembers.some(m => !m.name.trim() || !m.size))
+    (requiresTeamInfo && teamMembers.some(m => !m.name.trim() || (hasShirtInKit && !m.size)))
 
   const handleConfirm = () => {
     if (isNavigating) return
@@ -385,74 +393,76 @@ export default function CategorySelectionModal({
               </div>
             )}
 
-            {/* Shirt Size Selector */}
-            <div>
-              <label className="block text-sm font-medium text-neutral-900 mb-2 font-geist">
-                Tamanho da camiseta
-              </label>
-              {hasShirtSizes ? (
-                <div className="space-y-3">
-                  {/* Gender Selector */}
-                  <div className="grid grid-cols-3 gap-2">
-                    {genderOptions.map((gender) => (
-                      <label
-                        key={gender}
-                        className={cn(
-                          'cursor-pointer rounded-lg border px-3 py-2 text-center text-xs font-medium transition-all font-geist',
-                          selectedGender === gender
-                            ? 'border-orange-500 bg-orange-50 text-orange-900'
-                            : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
-                        )}
-                      >
-                        <input
-                          type="radio"
-                          name="gender"
-                          value={gender}
-                          checked={selectedGender === gender}
-                          onChange={(e) => setSelectedGender(e.target.value as ShirtGender)}
-                          className="sr-only"
-                        />
-                        {GENDER_LABELS[gender]}
-                      </label>
-                    ))}
-                  </div>
+            {/* Shirt Size Selector - only show if there's a shirt item in the kit */}
+            {hasShirtInKit && (
+              <div>
+                <label className="block text-sm font-medium text-neutral-900 mb-2 font-geist">
+                  Tamanho da camiseta
+                </label>
+                {hasShirtSizes ? (
+                  <div className="space-y-3">
+                    {/* Gender Selector */}
+                    <div className="grid grid-cols-3 gap-2">
+                      {genderOptions.map((gender) => (
+                        <label
+                          key={gender}
+                          className={cn(
+                            'cursor-pointer rounded-lg border px-3 py-2 text-center text-xs font-medium transition-all font-geist',
+                            selectedGender === gender
+                              ? 'border-orange-500 bg-orange-50 text-orange-900'
+                              : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
+                          )}
+                        >
+                          <input
+                            type="radio"
+                            name="gender"
+                            value={gender}
+                            checked={selectedGender === gender}
+                            onChange={(e) => setSelectedGender(e.target.value as ShirtGender)}
+                            className="sr-only"
+                          />
+                          {GENDER_LABELS[gender]}
+                        </label>
+                      ))}
+                    </div>
 
-                  {/* Size Grid */}
-                  <div className="flex flex-wrap gap-2">
-                    {availableSizes?.map((size) => (
-                      <label
-                        key={size}
-                        className={cn(
-                          'inline-flex items-center justify-center cursor-pointer rounded-lg border px-4 py-2 text-sm font-medium transition-all font-geist whitespace-nowrap',
-                          selectedSize === size
-                            ? 'border-orange-500 bg-orange-50 text-orange-900'
-                            : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
-                        )}
-                      >
-                        <input
-                          type="radio"
-                          name="shirt"
-                          value={size}
-                          checked={selectedSize === size}
-                          onChange={(e) => setSelectedSize(e.target.value)}
-                          className="sr-only"
-                        />
-                        {size}
-                      </label>
-                    ))}
+                    {/* Size Grid */}
+                    <div className="flex flex-wrap gap-2">
+                      {availableSizes?.map((size) => (
+                        <label
+                          key={size}
+                          className={cn(
+                            'inline-flex items-center justify-center cursor-pointer rounded-lg border px-4 py-2 text-sm font-medium transition-all font-geist whitespace-nowrap',
+                            selectedSize === size
+                              ? 'border-orange-500 bg-orange-50 text-orange-900'
+                              : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
+                          )}
+                        >
+                          <input
+                            type="radio"
+                            name="shirt"
+                            value={size}
+                            checked={selectedSize === size}
+                            onChange={(e) => setSelectedSize(e.target.value)}
+                            className="sr-only"
+                          />
+                          {size}
+                        </label>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div className="rounded-lg border-2 border-red-200 bg-red-50 p-3">
-                  <p className="text-sm font-medium text-red-900 font-geist">
-                    ⚠️ Nenhum tamanho de camiseta configurado para este evento
-                  </p>
-                  <p className="mt-1 text-xs text-red-800 font-geist">
-                    Entre em contato com o organizador do evento.
-                  </p>
-                </div>
-              )}
-            </div>
+                ) : (
+                  <div className="rounded-lg border-2 border-red-200 bg-red-50 p-3">
+                    <p className="text-sm font-medium text-red-900 font-geist">
+                      ⚠️ Nenhum tamanho de camiseta configurado para este evento
+                    </p>
+                    <p className="mt-1 text-xs text-red-800 font-geist">
+                      Entre em contato com o organizador do evento.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Partner Name Input (conditional) */}
             {requiresPartnerInfo && (
@@ -563,65 +573,70 @@ export default function CategorySelectionModal({
                         />
                       </div>
 
-                      {/* Gender selector */}
-                      <div className="grid grid-cols-3 gap-2">
-                        {genderOptions.map((gender) => (
-                          <label
-                            key={gender}
-                            className={cn(
-                              'cursor-pointer rounded-lg border px-2 py-1.5 text-center text-xs font-medium transition-all font-geist',
-                              member.gender === gender
-                                ? 'border-orange-500 bg-orange-50 text-orange-900'
-                                : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
-                            )}
-                          >
-                            <input
-                              type="radio"
-                              name={`team-member-${index}-gender`}
-                              value={gender}
-                              checked={member.gender === gender}
-                              onChange={(e) => {
-                                const updated = [...teamMembers]
-                                updated[index].gender = e.target.value as ShirtGender
-                                const newSizes = getSizesForGender(e.target.value as ShirtGender)
-                                updated[index].size = (newSizes[0] || '') as ShirtSize
-                                setTeamMembers(updated)
-                              }}
-                              className="sr-only"
-                            />
-                            {GENDER_LABELS[gender]}
-                          </label>
-                        ))}
-                      </div>
+                      {/* Gender and Size selector - only if there's a shirt item in kit */}
+                      {hasShirtInKit && (
+                        <>
+                          {/* Gender selector */}
+                          <div className="grid grid-cols-3 gap-2">
+                            {genderOptions.map((gender) => (
+                              <label
+                                key={gender}
+                                className={cn(
+                                  'cursor-pointer rounded-lg border px-2 py-1.5 text-center text-xs font-medium transition-all font-geist',
+                                  member.gender === gender
+                                    ? 'border-orange-500 bg-orange-50 text-orange-900'
+                                    : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
+                                )}
+                              >
+                                <input
+                                  type="radio"
+                                  name={`team-member-${index}-gender`}
+                                  value={gender}
+                                  checked={member.gender === gender}
+                                  onChange={(e) => {
+                                    const updated = [...teamMembers]
+                                    updated[index].gender = e.target.value as ShirtGender
+                                    const newSizes = getSizesForGender(e.target.value as ShirtGender)
+                                    updated[index].size = (newSizes[0] || '') as ShirtSize
+                                    setTeamMembers(updated)
+                                  }}
+                                  className="sr-only"
+                                />
+                                {GENDER_LABELS[gender]}
+                              </label>
+                            ))}
+                          </div>
 
-                      {/* Size selector */}
-                      <div className="flex flex-wrap gap-1.5">
-                        {memberGenderSizes.map((size) => (
-                          <label
-                            key={size}
-                            className={cn(
-                              'inline-flex items-center justify-center cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-medium transition-all font-geist whitespace-nowrap',
-                              member.size === size
-                                ? 'border-orange-500 bg-orange-50 text-orange-900'
-                                : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
-                            )}
-                          >
-                            <input
-                              type="radio"
-                              name={`team-member-${index}-size`}
-                              value={size}
-                              checked={member.size === size}
-                              onChange={(e) => {
-                                const updated = [...teamMembers]
-                                updated[index].size = e.target.value as ShirtSize
-                                setTeamMembers(updated)
-                              }}
-                              className="sr-only"
-                            />
-                            {size}
-                          </label>
-                        ))}
-                      </div>
+                          {/* Size selector */}
+                          <div className="flex flex-wrap gap-1.5">
+                            {memberGenderSizes.map((size) => (
+                              <label
+                                key={size}
+                                className={cn(
+                                  'inline-flex items-center justify-center cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-medium transition-all font-geist whitespace-nowrap',
+                                  member.size === size
+                                    ? 'border-orange-500 bg-orange-50 text-orange-900'
+                                    : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
+                                )}
+                              >
+                                <input
+                                  type="radio"
+                                  name={`team-member-${index}-size`}
+                                  value={size}
+                                  checked={member.size === size}
+                                  onChange={(e) => {
+                                    const updated = [...teamMembers]
+                                    updated[index].size = e.target.value as ShirtSize
+                                    setTeamMembers(updated)
+                                  }}
+                                  className="sr-only"
+                                />
+                                {size}
+                              </label>
+                            ))}
+                          </div>
+                        </>
+                      )}
                     </div>
                   )
                 })}
@@ -639,7 +654,7 @@ export default function CategorySelectionModal({
             </button>
             <button
               className="inline-flex items-center gap-2 text-sm font-medium rounded-full px-4 py-2 text-white font-geist disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ backgroundImage: hasShirtSizes ? 'linear-gradient(to right, rgb(249, 115, 22), rgb(245, 158, 11))' : 'linear-gradient(to right, rgb(163, 163, 163), rgb(115, 115, 115))' }}
+              style={{ backgroundImage: (!hasShirtInKit || hasShirtSizes) ? 'linear-gradient(to right, rgb(249, 115, 22), rgb(245, 158, 11))' : 'linear-gradient(to right, rgb(163, 163, 163), rgb(115, 115, 115))' }}
               onClick={handleConfirm}
               disabled={isButtonDisabled || isNavigating}
             >

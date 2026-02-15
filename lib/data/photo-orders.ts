@@ -400,6 +400,189 @@ export async function getPhotoOrderByStripeSessionWithDetails(
   }
 }
 
+// ============================================================
+// MERCADO PAGO — Data Layer Functions
+// ============================================================
+
+/**
+ * Updates the Mercado Pago Preference ID for an existing photo order.
+ * Called after creating a Checkout Pro preference.
+ * @returns Updated order or error description
+ */
+export async function updatePhotoOrderMpPreference(
+  orderId: string,
+  mpPreferenceId: string,
+  supabaseClient?: SupabaseServerClient
+): Promise<PhotoOrderResult<PhotoOrder>> {
+  try {
+    const supabase = getClient(supabaseClient)
+
+    const { data, error } = await (supabase
+      .from('photo_orders') as any)
+      .update({
+        mp_preference_id: mpPreferenceId,
+        payment_provider: 'mercadopago',
+      })
+      .eq('id', orderId)
+      .select('*')
+      .single()
+
+    if (error) {
+      console.error('Error updating photo order MP preference:', error)
+      return { data: null, error: error.message }
+    }
+
+    return { data, error: null }
+  } catch (error) {
+    console.error('Unexpected error updating photo order MP preference:', error)
+    return { data: null, error: 'Não foi possível atualizar o pedido.' }
+  }
+}
+
+/**
+ * Retrieves a photo order by its Mercado Pago Preference ID.
+ * Used to look up order when MP redirects back after checkout.
+ * Uses admin client to bypass RLS.
+ * @returns Order linked to preference or null if not found
+ */
+export async function getPhotoOrderByMpPreference(
+  mpPreferenceId: string,
+  supabaseClient?: SupabaseServerClient
+): Promise<PhotoOrderResult<PhotoOrder>> {
+  try {
+    const supabase = supabaseClient ?? createAdminClient()
+
+    const { data, error } = await supabase
+      .from('photo_orders')
+      .select('*')
+      .eq('mp_preference_id', mpPreferenceId)
+      .maybeSingle()
+
+    if (error) {
+      console.error('Error fetching photo order by MP preference:', error)
+      return { data: null, error: error.message }
+    }
+
+    return { data, error: null }
+  } catch (error) {
+    console.error('Unexpected error fetching photo order by MP preference:', error)
+    return { data: null, error: 'Não foi possível buscar o pedido.' }
+  }
+}
+
+/**
+ * Retrieves a photo order by its Mercado Pago Payment ID.
+ * Used in the MP webhook handler.
+ * Uses admin client to bypass RLS — webhooks don't have user context.
+ * @returns Order linked to payment or null if not found
+ */
+export async function getPhotoOrderByMpPayment(
+  mpPaymentId: number,
+  supabaseClient?: SupabaseServerClient
+): Promise<PhotoOrderResult<PhotoOrder>> {
+  try {
+    const supabase = supabaseClient ?? createAdminClient()
+
+    const { data, error } = await supabase
+      .from('photo_orders')
+      .select('*')
+      .eq('mp_payment_id', mpPaymentId)
+      .maybeSingle()
+
+    if (error) {
+      console.error('Error fetching photo order by MP payment:', error)
+      return { data: null, error: error.message }
+    }
+
+    return { data, error: null }
+  } catch (error) {
+    console.error('Unexpected error fetching photo order by MP payment:', error)
+    return { data: null, error: 'Não foi possível buscar o pedido.' }
+  }
+}
+
+/**
+ * Updates photo order payment status with Mercado Pago payment ID.
+ * Called from the MP webhook handler after payment confirmation.
+ * Uses admin client to bypass RLS since webhooks don't have user context.
+ * @returns Updated order or error description
+ */
+export async function updatePhotoOrderMpPaymentStatus(
+  orderId: string,
+  status: 'pending' | 'confirmed' | 'cancelled',
+  paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded',
+  mpPaymentId: number,
+  supabaseClient?: SupabaseServerClient
+): Promise<PhotoOrderResult<PhotoOrder>> {
+  try {
+    const supabase = supabaseClient ?? createAdminClient()
+
+    const { data, error } = await (supabase
+      .from('photo_orders') as any)
+      .update({
+        status,
+        payment_status: paymentStatus,
+        mp_payment_id: mpPaymentId,
+      })
+      .eq('id', orderId)
+      .select('*')
+      .single()
+
+    if (error) {
+      console.error('Error updating photo order MP payment status:', error)
+      return { data: null, error: error.message }
+    }
+
+    return { data, error: null }
+  } catch (error) {
+    console.error('Unexpected error updating photo order MP payment status:', error)
+    return { data: null, error: 'Não foi possível atualizar o pedido.' }
+  }
+}
+
+/**
+ * Retrieves a photo order by its Mercado Pago Preference ID with full details.
+ * Used for the confirmation page after MP Checkout Pro redirect.
+ * Uses admin client to bypass RLS.
+ */
+export async function getPhotoOrderByMpPreferenceWithDetails(
+  mpPreferenceId: string,
+  supabaseClient?: SupabaseServerClient
+): Promise<PhotoOrderResult<PhotoOrderWithDetails>> {
+  try {
+    const supabase = supabaseClient ?? createAdminClient()
+
+    const { data, error } = await supabase
+      .from('photo_orders')
+      .select(
+        `
+        *,
+        event:events(id, title, slug, banner_url, start_date, location),
+        user:profiles(id, full_name, email),
+        package:photo_packages(id, name, quantity, price),
+        appliedTier:photo_pricing_tiers(id, min_quantity, price_per_photo),
+        items:photo_order_items(
+          id,
+          photo_id,
+          photo:event_photos(id, file_name, original_path, watermarked_path, thumbnail_path)
+        )
+      `
+      )
+      .eq('mp_preference_id', mpPreferenceId)
+      .maybeSingle()
+
+    if (error) {
+      console.error('Error fetching photo order by MP preference with details:', error)
+      return { data: null, error: error.message }
+    }
+
+    return { data: data as PhotoOrderWithDetails | null, error: null }
+  } catch (error) {
+    console.error('Unexpected error fetching photo order by MP preference with details:', error)
+    return { data: null, error: 'Não foi possível buscar o pedido.' }
+  }
+}
+
 /**
  * Lists photo orders for a user with event and package details.
  * @returns Array of orders with related data or error description

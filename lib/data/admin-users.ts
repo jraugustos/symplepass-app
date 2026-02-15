@@ -140,6 +140,8 @@ export async function getUserPaymentHistory(userId: string) {
         payment_status: payment.status,
         payment_date: payment.created_at,
         stripe_payment_intent_id: payment.stripe_payment_intent_id,
+        mp_payment_id: null,
+        payment_provider: 'stripe' as const,
       }
     })
 

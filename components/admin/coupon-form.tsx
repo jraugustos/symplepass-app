@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CouponFormData } from '@/types'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 
 const couponFormSchema = z.object({
   code: z.string().min(1, 'Código é obrigatório').max(20, 'Máximo 20 caracteres'),
@@ -15,8 +16,14 @@ const couponFormSchema = z.object({
     z.number().positive('Valor deve ser positivo')
   ),
   event_id: z.string().nullable().optional(),
-  valid_from: z.string().min(1, 'Data inicial é obrigatória'),
-  valid_until: z.string().min(1, 'Data final é obrigatória'),
+  valid_from: z.preprocess(
+    (val) => (val === '' ? null : val),
+    z.string().nullable().optional()
+  ),
+  valid_until: z.preprocess(
+    (val) => (val === '' ? null : val),
+    z.string().nullable().optional()
+  ),
   max_uses: z.preprocess(
     (val) => (val === '' || val === null || val === undefined ? null : Number(val)),
     z.number().int().positive().nullable().optional()
@@ -41,6 +48,7 @@ export function CouponForm({
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<CouponFormData>({
     resolver: zodResolver(couponFormSchema),
@@ -51,6 +59,9 @@ export function CouponForm({
   })
 
   const discountType = watch('discount_type')
+  const eventId = watch('event_id')
+
+  const eventOptions = events.map(e => ({ value: e.id, label: e.title }))
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -105,23 +116,18 @@ export function CouponForm({
           <label className="block text-sm font-medium text-neutral-700 mb-1">
             Evento (Opcional)
           </label>
-          <select
-            {...register('event_id')}
-            className="w-full px-4 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-          >
-            <option value="">Todos os eventos</option>
-            {events.map((event) => (
-              <option key={event.id} value={event.id}>
-                {event.title}
-              </option>
-            ))}
-          </select>
+          <SearchableSelect
+            options={eventOptions}
+            value={eventId}
+            onChange={(value) => setValue('event_id', value)}
+            placeholder="Todos os eventos"
+          />
         </div>
 
         {/* Valid From */}
         <div>
           <label className="block text-sm font-medium text-neutral-700 mb-1">
-            Válido de *
+            Válido de (Opcional)
           </label>
           <Input type="datetime-local" {...register('valid_from')} />
           {errors.valid_from && (
@@ -132,7 +138,7 @@ export function CouponForm({
         {/* Valid Until */}
         <div>
           <label className="block text-sm font-medium text-neutral-700 mb-1">
-            Válido até *
+            Válido até (Opcional)
           </label>
           <Input type="datetime-local" {...register('valid_until')} />
           {errors.valid_until && (

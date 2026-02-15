@@ -9,6 +9,8 @@ export * from './database.types'
 import type {
   Event,
   EventCategory,
+  EventCustomField,
+  EventKitItem,
   RegistrationWithDetails,
   User,
   SportType,
@@ -89,6 +91,9 @@ export interface PaymentHistoryItem {
   payment_status: PaymentStatus
   payment_date: string
   stripe_payment_intent_id: string | null
+  // Mercado Pago fields
+  mp_payment_id: number | null
+  payment_provider: 'stripe' | 'mercadopago' | 'free'
 }
 
 export interface UserPanelStats {
@@ -162,6 +167,8 @@ export interface ReviewPageData {
   teamMembers?: ParticipantData[]
   user?: ReviewPageUser
   isAuthenticated: boolean
+  customFields?: EventCustomField[]
+  kitItems?: EventKitItem[]
 }
 
 export interface CheckoutSessionRequest {
@@ -175,11 +182,14 @@ export interface CheckoutSessionRequest {
   partnerName?: string | null
   partnerData?: PartnerData | null
   teamMembers?: ParticipantData[] | null
+  customFieldValues?: Record<string, string> | null
+  selectedKitItems?: string[]
   subtotal: number
   clubDiscount?: number
   couponCode?: string | null
   serviceFee: number
   total: number
+  kitItemsTotal?: number
 }
 
 export interface CheckoutSessionResponse {
@@ -194,6 +204,7 @@ export interface PriceBreakdown {
   couponDiscount?: number
   serviceFee: number
   total: number
+  kitItemsTotal?: number
 }
 
 export interface ConfirmationPageData {
@@ -537,6 +548,8 @@ export interface EventFormDataAdmin {
   show_course_info: boolean
   show_championship_format: boolean
   allow_page_access: boolean
+  has_kit: boolean
+  has_kit_pickup_info: boolean
 }
 
 export interface CategoryFormData {
@@ -545,6 +558,7 @@ export interface CategoryFormData {
   price: number
   max_participants?: number | null
   shirt_genders?: ('masculino' | 'feminino' | 'infantil')[] | null
+  kit_item_ids?: string[]
 }
 
 export interface RegistrationFilters {
@@ -693,8 +707,8 @@ export interface CouponFormData {
   discount_type: 'percentage' | 'fixed'
   discount_value: number
   event_id?: string | null
-  valid_from: string
-  valid_until: string
+  valid_from?: string | null
+  valid_until?: string | null
   max_uses?: number | null
   status: 'active' | 'expired' | 'disabled'
 }
@@ -705,8 +719,8 @@ export interface Coupon {
   discount_type: 'percentage' | 'fixed'
   discount_value: number
   event_id: string | null
-  valid_from: string
-  valid_until: string
+  valid_from: string | null
+  valid_until: string | null
   max_uses: number | null
   current_uses: number
   status: 'active' | 'expired' | 'disabled'
@@ -772,6 +786,7 @@ export interface KitItemFormData {
   description: string
   icon: string
   image_url?: string | null
+  price: number
 }
 
 export interface CourseInfoFormData {
@@ -795,6 +810,15 @@ export interface FAQFormData {
 export interface RegulationFormData {
   title: string
   content: string
+}
+
+export interface EventCustomFieldFormData {
+  name: string
+  label: string
+  field_type: 'text' | 'number' | 'select' | 'checkbox'
+  is_required: boolean
+  options?: string[] | null
+  placeholder?: string | null
 }
 
 export interface OrganizerFormData {

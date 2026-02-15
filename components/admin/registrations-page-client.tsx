@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { RegistrationsTable } from './registrations-table'
 import { EditRegistrationModal } from './edit-registration-modal'
-import { EventCategory } from '@/types/database.types'
+import { EventCategory, EventCustomField } from '@/types/database.types'
 import { RegistrationFilters, RegistrationExportData, ShirtSizesByGender } from '@/types'
 import { UpdateRegistrationData } from '@/lib/data/admin-registrations'
 import { arrayToCSV, downloadCSV } from '@/lib/utils'
@@ -17,6 +17,7 @@ interface RegistrationsPageClientProps {
   searchParams: any
   allowsPairRegistration: boolean
   shirtSizesConfig?: ShirtSizesByGender | null
+  customFields?: EventCustomField[]
 }
 
 export function RegistrationsPageClient({
@@ -27,6 +28,7 @@ export function RegistrationsPageClient({
   searchParams,
   allowsPairRegistration,
   shirtSizesConfig,
+  customFields,
 }: RegistrationsPageClientProps) {
   const router = useRouter()
   const [registrations, setRegistrations] = useState(initialRegistrations)
@@ -126,6 +128,7 @@ export function RegistrationsPageClient({
         onExport={handleExport}
         onDelete={handleDelete}
         onEdit={handleEdit}
+        customFields={customFields}
       />
 
       <EditRegistrationModal

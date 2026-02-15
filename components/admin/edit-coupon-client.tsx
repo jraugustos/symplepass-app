@@ -39,8 +39,8 @@ export function EditCouponClient({ coupon, events }: EditCouponClientProps) {
     discount_type: coupon.discount_type,
     discount_value: coupon.discount_value,
     event_id: coupon.event_id,
-    valid_from: coupon.valid_from.substring(0, 16),
-    valid_until: coupon.valid_until.substring(0, 16),
+    valid_from: coupon.valid_from ? coupon.valid_from.substring(0, 16) : '',
+    valid_until: coupon.valid_until ? coupon.valid_until.substring(0, 16) : '',
     max_uses: coupon.max_uses,
     status: coupon.status,
   }

@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-import { stripe } from '@/lib/stripe/client'
 import { createClient } from '@/lib/supabase/server'
 import { Header } from '@/components/layout/header'
 import { Footer } from '@/components/layout/footer'
@@ -12,7 +11,11 @@ import {
   NextSteps,
   ExploreCTA,
 } from '@/components/confirmacao'
-import { getRegistrationByStripeSessionWithDetails, getRegistrationByIdWithDetails } from '@/lib/data/registrations'
+import {
+  getRegistrationByMpPreferenceWithDetails,
+  getRegistrationByIdWithDetails,
+} from '@/lib/data/registrations'
+import { getCustomFieldsByEventId } from '@/lib/data/admin-custom-fields'
 import {
   extractLocationString,
   formatDateTimeLong,
@@ -34,11 +37,17 @@ interface ConfirmationPageProps {
 }
 
 export default async function ConfirmationPage({ searchParams }: ConfirmationPageProps) {
-  const sessionId = typeof searchParams.session_id === 'string' ? searchParams.session_id : null
+  // Support both MP query params and direct registration access
+  // MP auto_return sends: ?collection_id=...&preference_id=...&collection_status=approved&external_reference=...
+  const preferenceId = typeof searchParams.preference_id === 'string' ? searchParams.preference_id : null
+  const externalReference = typeof searchParams.external_reference === 'string' ? searchParams.external_reference : null
   const registrationId = typeof searchParams.registration === 'string' ? searchParams.registration : null
 
-  // Must have either session_id (paid events) or registration (free/solidarity events)
-  if (!sessionId && !registrationId) {
+  // Legacy Stripe support (for existing confirmed registrations accessed via old links)
+  const sessionId = typeof searchParams.session_id === 'string' ? searchParams.session_id : null
+
+  // Must have at least one identifier
+  if (!preferenceId && !externalReference && !registrationId && !sessionId) {
     redirect('/eventos')
   }
 
@@ -48,9 +57,10 @@ export default async function ConfirmationPage({ searchParams }: ConfirmationPag
 
   let registrationDetails: RegistrationWithDetails | null = null
 
-  if (registrationId) {
-    // Free/solidarity event - fetch by registration ID
-    const { data } = await getRegistrationByIdWithDetails(registrationId)
+  if (registrationId || externalReference) {
+    // Free/solidarity event (registration param) or MP external_reference (which is the registration ID)
+    const lookupId = registrationId || externalReference!
+    const { data } = await getRegistrationByIdWithDetails(lookupId)
     registrationDetails = data
 
     if (!registrationDetails) {
@@ -58,11 +68,9 @@ export default async function ConfirmationPage({ searchParams }: ConfirmationPag
     }
 
     // SECURITY: Verify user owns this registration or is admin/organizer
-    // For free events accessed by registration ID, we require authentication
     if (user) {
       const isOwner = registrationDetails.user_id === user.id
 
-      // Check if user is admin or organizer of this event
       let hasPrivilegedAccess = false
       if (!isOwner) {
         const { data: profile } = await supabase
@@ -74,7 +82,6 @@ export default async function ConfirmationPage({ searchParams }: ConfirmationPag
         if (profile?.role === 'admin') {
           hasPrivilegedAccess = true
         } else if (profile?.role === 'organizer') {
-          // Check if organizer owns this event
           const { data: event } = await supabase
             .from('events')
             .select('organizer_id')
@@ -86,34 +93,29 @@ export default async function ConfirmationPage({ searchParams }: ConfirmationPag
       }
 
       if (!isOwner && !hasPrivilegedAccess) {
-        // User is logged in but doesn't own this registration
         redirect('/conta')
       }
     }
-    // Note: For non-authenticated users accessing via direct link (e.g., email link),
-    // we allow access as this mimics the Stripe session_id flow behavior.
-    // The registration ID is a UUID and not easily guessable.
 
-    // For free events, verify it's confirmed
+    // For free events or direct access, verify status
     if (registrationDetails.status !== 'confirmed') {
-      redirect('/eventos')
+      // If payment is pending (MP webhook hasn't fired yet), show a pending state
+      // For now, redirect — webhook will confirm soon
+      if (registrationDetails.payment_status !== 'paid') {
+        redirect('/eventos')
+      }
     }
-  } else if (sessionId) {
-    // Paid event - fetch by Stripe session ID
-    const { data } = await getRegistrationByStripeSessionWithDetails(sessionId)
+  } else if (preferenceId) {
+    // Paid event via MP preference_id
+    const { data } = await getRegistrationByMpPreferenceWithDetails(preferenceId)
     registrationDetails = data
 
     if (!registrationDetails) {
-      const session = await stripe.checkout.sessions.retrieve(sessionId)
-      if (!session || session.payment_status !== 'paid') {
-        redirect('/eventos')
-      }
       redirect('/eventos')
     }
 
-    // SECURITY: For session-based access, verify ownership if user is logged in
+    // SECURITY: For preference-based access, verify ownership if user is logged in
     if (user && registrationDetails.user_id !== user.id) {
-      // Check for privileged access
       const { data: profile } = await supabase
         .from('profiles')
         .select('role')
@@ -138,14 +140,16 @@ export default async function ConfirmationPage({ searchParams }: ConfirmationPag
       }
     }
 
-    if (
-      registrationDetails.payment_status !== 'paid' ||
-      registrationDetails.status !== 'confirmed'
-    ) {
-      const session = await stripe.checkout.sessions.retrieve(sessionId)
-      if (!session || session.payment_status !== 'paid') {
-        redirect('/eventos')
-      }
+    // If payment not yet confirmed (webhook may still be processing), allow access
+    // The page will show the current state
+  } else if (sessionId) {
+    // Legacy: Stripe session_id for old registrations
+    const { getRegistrationByStripeSessionWithDetails } = await import('@/lib/data/registrations')
+    const { data } = await getRegistrationByStripeSessionWithDetails(sessionId)
+    registrationDetails = data
+
+    if (!registrationDetails) {
+      redirect('/eventos')
     }
   }
 
@@ -198,6 +202,17 @@ export default async function ConfirmationPage({ searchParams }: ConfirmationPag
   const isFreeEvent = registrationDetails.event?.event_type === 'free' || registrationDetails.event?.event_type === 'solidarity'
   const paymentStatusLabel = isFreeEvent ? 'Gratuito' : 'Pago'
 
+  // Transaction ID: prefer MP payment ID, fallback to Stripe for legacy
+  const transactionId = isFreeEvent
+    ? null
+    : (registrationDetails as any).mp_payment_id?.toString()
+    || registrationDetails.stripe_payment_intent_id
+    || null
+
+  // Fetch custom fields for the event
+  const { data: customFields } = await getCustomFieldsByEventId(registrationDetails.event_id)
+  const customFieldValues = registrationDetails.registration_data?.custom_fields || {}
+
   return (
     <>
       <Header variant="gradient" sticky />
@@ -232,10 +247,10 @@ export default async function ConfirmationPage({ searchParams }: ConfirmationPag
             categoryName={registrationDetails.category?.name || 'Categoria'}
             amountPaid={pageData.amountPaid}
             paymentStatus={paymentStatusLabel}
-            transactionId={
-              isFreeEvent ? null : (registrationDetails.stripe_payment_intent_id || null)
-            }
+            transactionId={transactionId}
             partnerData={partnerData}
+            customFields={customFields || []}
+            customFieldValues={customFieldValues}
           />
           <ActionButtons
             eventTitle={eventTitle}

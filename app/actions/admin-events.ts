@@ -43,6 +43,8 @@ export async function updateEventAction(eventId: string, data: EventFormDataAdmi
       show_course_info: data.show_course_info,
       show_championship_format: data.show_championship_format,
       allow_page_access: data.allow_page_access,
+      has_kit: data.has_kit,
+      has_kit_pickup_info: data.has_kit_pickup_info,
     },
     result.user.id,
     result.profile.role
@@ -64,6 +66,7 @@ export async function createCategoryAction(eventId: string, data: CategoryFormDa
     description: data.description,
     max_participants: data.max_participants,
     shirt_genders: data.shirt_genders,
+    kit_item_ids: data.kit_item_ids,
   })
 
   if (result.error) {

@@ -4,35 +4,30 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Image, ExternalLink } from 'lucide-react'
 import { Card } from '@/components/ui/card'
-import { KitItemsForm } from './kit-items-form'
 import { CourseInfoForm } from './course-info-form'
 import { FAQsForm } from './faqs-form'
 import { RegulationsForm } from './regulations-form'
+import { CustomFieldsSection } from './custom-fields-section'
+import type { EventCustomField } from '@/types/database.types'
 import type {
-    EventKitItem,
     EventCourseInfo,
     EventFAQ,
     EventRegulation,
-    KitItemFormData,
     CourseInfoFormData,
     FAQFormData,
     RegulationFormData,
+    EventCustomFieldFormData,
 } from '@/types'
 
-type TabId = 'kit' | 'course' | 'regulations' | 'faq' | 'photos'
+type TabId = 'course' | 'regulations' | 'faq' | 'photos' | 'custom-fields'
 
 interface EventDetailsTabsProps {
     eventId: string
-    kitItems: EventKitItem[]
     courseInfo: EventCourseInfo | null
     faqs: EventFAQ[]
     regulations: EventRegulation[]
-    kitPickupInfo: any
     regulationPdfUrl: string | null
-    onKitItemCreate: (data: KitItemFormData) => Promise<void>
-    onKitItemUpdate: (id: string, data: KitItemFormData) => Promise<void>
-    onKitItemDelete: (id: string) => Promise<void>
-    onKitItemsReorder: (items: { id: string; display_order: number }[]) => Promise<void>
+    customFields: EventCustomField[]
     onCourseInfoUpdate: (data: CourseInfoFormData) => Promise<void>
     onFAQCreate: (data: FAQFormData) => Promise<void>
     onFAQUpdate: (id: string, data: FAQFormData) => Promise<void>
@@ -42,22 +37,19 @@ interface EventDetailsTabsProps {
     onRegulationUpdate: (id: string, data: RegulationFormData) => Promise<void>
     onRegulationDelete: (id: string) => Promise<void>
     onRegulationsReorder: (items: { id: string; display_order: number }[]) => Promise<void>
-    onKitPickupInfoUpdate: (data: any) => Promise<void>
     onRegulationPdfUpdate: (url: string) => Promise<void>
+    onCustomFieldCreate: (data: EventCustomFieldFormData) => Promise<void>
+    onCustomFieldUpdate: (id: string, data: EventCustomFieldFormData) => Promise<void>
+    onCustomFieldDelete: (id: string) => Promise<void>
 }
 
 export function EventDetailsTabs({
     eventId,
-    kitItems,
     courseInfo,
     faqs,
     regulations,
-    kitPickupInfo,
     regulationPdfUrl,
-    onKitItemCreate,
-    onKitItemUpdate,
-    onKitItemDelete,
-    onKitItemsReorder,
+    customFields,
     onCourseInfoUpdate,
     onFAQCreate,
     onFAQUpdate,
@@ -67,16 +59,18 @@ export function EventDetailsTabs({
     onRegulationUpdate,
     onRegulationDelete,
     onRegulationsReorder,
-    onKitPickupInfoUpdate,
     onRegulationPdfUpdate,
+    onCustomFieldCreate,
+    onCustomFieldUpdate,
+    onCustomFieldDelete,
 }: EventDetailsTabsProps) {
-    const [activeTab, setActiveTab] = useState<TabId>('kit')
+    const [activeTab, setActiveTab] = useState<TabId>('course')
 
     const tabs = [
-        { id: 'kit' as TabId, label: 'Kit do Atleta' },
         { id: 'course' as TabId, label: 'Especificações' },
         { id: 'regulations' as TabId, label: 'Regulamento' },
         { id: 'faq' as TabId, label: 'FAQ' },
+        { id: 'custom-fields' as TabId, label: 'Campos Personalizados' },
         { id: 'photos' as TabId, label: 'Fotos' },
     ]
 
@@ -102,20 +96,7 @@ export function EventDetailsTabs({
                 </nav>
             </div>
 
-            {/* Tab Content */}
             <div className="mt-6">
-                {activeTab === 'kit' && (
-                    <KitItemsForm
-                        eventId={eventId}
-                        items={kitItems}
-                        pickupInfo={kitPickupInfo}
-                        onCreate={onKitItemCreate}
-                        onUpdate={onKitItemUpdate}
-                        onDelete={onKitItemDelete}
-                        onReorder={onKitItemsReorder}
-                        onPickupInfoUpdate={onKitPickupInfoUpdate}
-                    />
-                )}
 
                 {activeTab === 'course' && (
                     <CourseInfoForm
@@ -146,6 +127,16 @@ export function EventDetailsTabs({
                         onUpdate={onFAQUpdate}
                         onDelete={onFAQDelete}
                         onReorder={onFAQsReorder}
+                    />
+                )}
+
+                {activeTab === 'custom-fields' && (
+                    <CustomFieldsSection
+                        eventId={eventId}
+                        customFields={customFields}
+                        onCreate={onCustomFieldCreate}
+                        onUpdate={onCustomFieldUpdate}
+                        onDelete={onCustomFieldDelete}
                     />
                 )}
 

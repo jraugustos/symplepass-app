@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { ShieldCheck, ArrowRight, Users, Crown } from 'lucide-react'
+import { ShieldCheck, ArrowRight, Users, Crown, Ticket } from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { NavigationHeader } from '@/components/molecules/navigation-header'
 import { EventSummaryCard, PriceBreakdown as PriceBreakdownCard } from '@/components/inscricao'
@@ -30,6 +31,8 @@ export function ReviewClient({
   isAuthenticated,
   priceBreakdown,
   isClubMember = false,
+  customFields,
+  kitItems,
 }: ReviewClientProps) {
   const [name, setName] = useState(user?.full_name ?? '')
   const [email, setEmail] = useState(user?.email ?? '')
@@ -51,6 +54,25 @@ export function ReviewClient({
   const [error, setError] = useState<string | null>(null)
   const [couponCode, setCouponCode] = useState<string | null>(null)
   const [couponDiscount, setCouponDiscount] = useState(0)
+  const [couponInput, setCouponInput] = useState('')
+  const [couponLoading, setCouponLoading] = useState(false)
+  const [couponError, setCouponError] = useState<string | null>(null)
+  const [couponSuccess, setCouponSuccess] = useState<string | null>(null)
+
+  // Kit items logic - items are now defined by category, not selected by user
+  // We use category.kit_items if available, otherwise fallback to kitItems prop (event-wide items)
+  // BUT the new requirement says items are defined by category.
+  const categoryKitItems = useMemo(() => {
+    return category.kit_items || []
+  }, [category])
+
+  // We no longer allow selecting kit items, they are included in category
+  // So we don't need selectedKitItems state for user input, but we might pass it to API for backward compatibility if needed?
+  // Actually, the API might key off category_id now.
+  // Let's keep existing API structure but effectively select all "included" items.
+  const selectedKitItems = useMemo(() => {
+    return categoryKitItems.map(item => item.id)
+  }, [categoryKitItems])
 
   // Partner data states
   const [partnerEmail, setPartnerEmail] = useState('')
@@ -61,6 +83,9 @@ export function ReviewClient({
     return 'masculino'
   })
   const [partnerShirtSize, setPartnerShirtSize] = useState(initialPartnerShirtSize ?? '')
+
+  // Custom fields state
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({})
 
   // Team members state
   const [teamMembersData, setTeamMembersData] = useState<Array<{
@@ -82,9 +107,11 @@ export function ReviewClient({
     }))
   })
 
+  // ... (rest of logic remains same until we hit price calculation) ...
+
   const isTeamRegistration = teamMembersData.length > 0
 
-  // Duplicate data validation for duo/team registrations
+  // Validation logic...
   const duplicateErrors = useMemo(() => {
     const errors: {
       partnerCpf?: string
@@ -213,24 +240,44 @@ export function ReviewClient({
   }, [clubDiscount, couponDiscount])
 
   // Calculate prices with the applied discount
-  const adjustedPriceBreakdown = useMemo(() => {
-    if (appliedDiscount.amount <= 0) return priceBreakdown
+  // Kit items are now INCLUDED in category price, so additional cost is 0
+  const kitItemsTotal = 0
 
-    const subtotal = categoryPrice - appliedDiscount.amount
+  // Calculate prices with the applied discount and kit items
+  const adjustedPriceBreakdown = useMemo(() => {
+    // Base subtotal is category price (minus discount) + kit items
+    // Discount applies only to category price
+    const discountedCategoryPrice = Math.max(0, categoryPrice - appliedDiscount.amount)
+
+    // We treat kit items as additional cost that might or might not be subject to service fee
+    // usually service fee is on the transaction total
+    const subtotal = discountedCategoryPrice + kitItemsTotal
     const serviceFee = calculateServiceFee(subtotal)
     const total = calculateTotal(subtotal, serviceFee)
 
     return {
-      subtotal,
+      subtotal, // This is the total transaction base amount
       clubDiscount: appliedDiscount.type === 'club' ? appliedDiscount.amount : undefined,
       couponDiscount: appliedDiscount.type === 'coupon' ? appliedDiscount.amount : undefined,
       serviceFee,
       total,
+      kitItemsTotal,
     }
-  }, [priceBreakdown, appliedDiscount, categoryPrice])
+  }, [priceBreakdown, appliedDiscount, categoryPrice, kitItemsTotal])
 
   // Parse shirt sizes config from event
   const shirtSizesConfig: ShirtSizesByGender | null = event.shirt_sizes_config || null
+
+  // Check if there's a shirt item in the kit
+  const hasShirtInKit = useMemo(() => {
+    if (!event.has_kit) return false
+    if (!categoryKitItems || categoryKitItems.length === 0) return false
+    return categoryKitItems.some(item =>
+      item.icon === 'shirt' ||
+      item.name.toLowerCase().includes('camiseta') ||
+      item.name.toLowerCase().includes('camisa')
+    )
+  }, [categoryKitItems, event.has_kit])
 
   const userAvailableSizes = shirtSizesConfig?.[userShirtGender]?.length
     ? shirtSizesConfig[userShirtGender]
@@ -265,7 +312,8 @@ export function ReviewClient({
     const digits = userPhone.replace(/\D/g, '')
     return digits.length === 10 || digits.length === 11
   }, [userPhone])
-  const isUserShirtSizeValid = userShirtSize.length > 0
+  // Shirt size is only required if there's a shirt item in the kit
+  const isUserShirtSizeValid = !hasShirtInKit || userShirtSize.length > 0
   const isUserDataValid = isNameValid &&
     isEmailValid &&
     userCpf.length > 0 &&
@@ -282,7 +330,8 @@ export function ReviewClient({
     const digits = partnerPhone.replace(/\D/g, '')
     return digits.length === 10 || digits.length === 11
   }, [partnerName, partnerPhone])
-  const isPartnerShirtSizeValid = !partnerName || partnerShirtSize.length > 0
+  // Partner shirt size is only required if there's a shirt item in the kit
+  const isPartnerShirtSizeValid = !partnerName || !hasShirtInKit || partnerShirtSize.length > 0
   const isPartnerDataValid = !partnerName || (
     partnerEmail.length > 0 && isPartnerEmailValid &&
     partnerCpf.length > 0 && isPartnerCpfValid &&
@@ -299,12 +348,23 @@ export function ReviewClient({
       const isCpfValid = validateCPF(member.cpf)
       const phoneDigits = member.phone.replace(/\D/g, '')
       const isPhoneValid = phoneDigits.length === 10 || phoneDigits.length === 11
-      const isSizeValid = member.shirtSize.length > 0
+      // Shirt size is only required if there's a shirt item in the kit
+      const isSizeValid = !hasShirtInKit || member.shirtSize.length > 0
       return isNameValid && isEmailValid && isCpfValid && isPhoneValid && isSizeValid
     })
-  }, [isTeamRegistration, teamMembersData])
+  }, [isTeamRegistration, teamMembersData, hasShirtInKit])
 
-  const isFormValid = isUserDataValid && termsAccepted && isPartnerDataValid && isTeamDataValid && !hasDuplicateErrors
+  const isCustomFieldsValid = useMemo(() => {
+    if (!customFields || customFields.length === 0) return true
+    return customFields.every((field) => {
+      if (!field.is_required) return true
+      const value = customFieldValues[field.name]
+      if (field.field_type === 'checkbox') return true // Checkbox required usually means "must be checked" but for now let's assume it's boolean
+      return value !== undefined && value !== null && value !== ''
+    })
+  }, [customFields, customFieldValues])
+
+  const isFormValid = isUserDataValid && termsAccepted && isPartnerDataValid && isTeamDataValid && !hasDuplicateErrors && isCustomFieldsValid
 
   // Get current search params for login redirect
   const searchParams = useSearchParams()
@@ -316,9 +376,12 @@ export function ReviewClient({
   }, [searchParams])
 
   const isFreeEvent = event.event_type === 'free' || event.event_type === 'solidarity'
+  // Payment is required if total > 0 (even if event is free, kits might have cost)
+  const isPaymentRequired = adjustedPriceBreakdown.total > 0
+
   const buttonLabel = isSubmitting
     ? 'Processando...'
-    : isFreeEvent
+    : !isPaymentRequired
       ? 'Confirmar Inscrição'
       : 'Prosseguir para Pagamento'
 
@@ -354,17 +417,17 @@ export function ReviewClient({
       // Prepare team members data if team registration
       const teamMembersPayload: ParticipantData[] | null = isTeamRegistration
         ? teamMembersData.map((member) => ({
-            name: member.name.trim(),
-            email: member.email.trim(),
-            cpf: member.cpf,
-            phone: member.phone,
-            shirtSize: member.shirtSize,
-            shirtGender: member.shirtGender,
-          }))
+          name: member.name.trim(),
+          email: member.email.trim(),
+          cpf: member.cpf,
+          phone: member.phone,
+          shirtSize: member.shirtSize,
+          shirtGender: member.shirtGender,
+        }))
         : null
 
-      if (isFreeEvent) {
-        // Free or solidarity event - direct registration
+      if (!isPaymentRequired) {
+        // Free or solidarity event (and no paid kits) - direct registration
         const response = await fetch('/api/registration/create-free', {
           method: 'POST',
           headers: {
@@ -377,10 +440,13 @@ export function ReviewClient({
             shirtGender: userShirtGender,
             userName: name.trim(),
             userEmail: email.trim(),
+            participantData: userData, // kept for legacy
             userData,
             partnerName: partnerName || null,
             partnerData,
             teamMembers: teamMembersPayload,
+            customFieldValues: Object.keys(customFieldValues).length > 0 ? customFieldValues : null,
+            selectedKitItems: selectedKitItems.length > 0 ? selectedKitItems : undefined,
           }),
         })
 
@@ -409,7 +475,7 @@ export function ReviewClient({
           throw new Error('Resposta inválida do servidor.')
         }
       } else {
-        // Paid event - Stripe checkout
+        // Paid event - Mercado Pago checkout
         const response = await fetch('/api/checkout/create-session', {
           method: 'POST',
           headers: {
@@ -426,12 +492,15 @@ export function ReviewClient({
             partnerName: partnerName || null,
             partnerData,
             teamMembers: teamMembersPayload,
+            customFieldValues: Object.keys(customFieldValues).length > 0 ? customFieldValues : null,
+            selectedKitItems: selectedKitItems.length > 0 ? selectedKitItems : undefined,
             subtotal: adjustedPriceBreakdown.subtotal,
             clubDiscount: appliedDiscount.type === 'club' ? appliedDiscount.amount : undefined,
             couponCode: appliedDiscount.type === 'coupon' ? couponCode : null,
             couponDiscount: appliedDiscount.type === 'coupon' ? appliedDiscount.amount : undefined,
             serviceFee: adjustedPriceBreakdown.serviceFee,
             total: adjustedPriceBreakdown.total,
+            kitItemsTotal: adjustedPriceBreakdown.kitItemsTotal,
           }),
         })
 
@@ -465,6 +534,52 @@ export function ReviewClient({
       setError(message)
       setIsSubmitting(false)
     }
+  }
+
+  const handleApplyCoupon = async () => {
+    if (!couponInput.trim()) return
+
+    setCouponLoading(true)
+    setCouponError(null)
+    setCouponSuccess(null)
+
+    try {
+      const response = await fetch('/api/coupons/validate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          couponCode: couponInput,
+          eventId: event.id,
+          categoryPrice: category.price,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Cupom inválido')
+      }
+
+      setCouponCode(data.coupon.code)
+      setCouponDiscount(data.discountAmount)
+      setCouponSuccess(`Cupom aplicado com sucesso! Desconto de ${formatCurrency(data.discountAmount)}`)
+      setCouponInput('') // Clear input on success
+    } catch (error) {
+      setCouponCode(null)
+      setCouponDiscount(0)
+      setCouponError(error instanceof Error ? error.message : 'Erro ao validar cupom')
+    } finally {
+      setCouponLoading(false)
+    }
+  }
+
+  const handleRemoveCoupon = () => {
+    setCouponCode(null)
+    setCouponDiscount(0)
+    setCouponSuccess(null)
+    setCouponError(null)
   }
 
   return (
@@ -572,66 +687,7 @@ export function ReviewClient({
                   )}
                 </div>
 
-                <div className="space-y-3">
-                  <label className="text-sm font-semibold text-neutral-700 font-geist">
-                    Tamanho da camiseta
-                  </label>
-
-                  <div>
-                    <p className="text-xs text-neutral-500 font-geist mb-2">Gênero</p>
-                    <div className="grid grid-cols-3 gap-2">
-                      {(Object.keys(GENDER_LABELS) as ShirtGender[])
-                        .filter(gender => {
-                          if (!shirtSizesConfig) return true
-                          return shirtSizesConfig[gender] && shirtSizesConfig[gender].length > 0
-                        })
-                        .map((gender) => (
-                          <button
-                            key={gender}
-                            type="button"
-                            onClick={() => {
-                              setUserShirtGender(gender)
-                              const newSizes = shirtSizesConfig
-                                ? shirtSizesConfig[gender]
-                                : DEFAULT_SHIRT_SIZES_BY_GENDER[gender]
-                              if (newSizes && newSizes.length > 0) {
-                                setUserShirtSize(newSizes[0])
-                              }
-                            }}
-                            className={cn(
-                              'h-10 rounded-xl border-2 font-semibold text-xs transition-all',
-                              userShirtGender === gender
-                                ? 'border-orange-500 bg-orange-50 text-orange-700'
-                                : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
-                            )}
-                          >
-                            {GENDER_LABELS[gender]}
-                          </button>
-                        ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="text-xs text-neutral-500 font-geist mb-2">Tamanho</p>
-                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                      {userAvailableSizes?.map((size) => (
-                        <button
-                          key={size}
-                          type="button"
-                          onClick={() => setUserShirtSize(size)}
-                          className={cn(
-                            'h-12 rounded-xl border-2 font-semibold text-sm transition-all',
-                            userShirtSize === size
-                              ? 'border-orange-500 bg-orange-50 text-orange-700'
-                              : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
-                          )}
-                        >
-                          {size}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
+                {/* Shirt size selection moved to 'Itens Inclusos no Kit' section */}
 
                 <p className="text-xs text-neutral-500 font-inter">
                   Sua conta será criada automaticamente com estes dados.
@@ -708,69 +764,72 @@ export function ReviewClient({
                     )}
                   </div>
 
-                  <div className="space-y-3">
-                    <label className="text-sm font-semibold text-neutral-700 font-geist">
-                      Tamanho da camiseta
-                    </label>
+                  {/* Shirt size selection - only if there's a shirt item in kit */}
+                  {hasShirtInKit && (
+                    <div className="space-y-3">
+                      <label className="text-sm font-semibold text-neutral-700 font-geist">
+                        Tamanho da camiseta
+                      </label>
 
-                    {/* Gender Selector */}
-                    <div>
-                      <p className="text-xs text-neutral-500 font-geist mb-2">Gênero</p>
-                      <div className="grid grid-cols-3 gap-2">
-                        {(Object.keys(GENDER_LABELS) as ShirtGender[])
-                          .filter(gender => {
-                            if (!shirtSizesConfig) return true
-                            return shirtSizesConfig[gender] && shirtSizesConfig[gender].length > 0
-                          })
-                          .map((gender) => (
+                      {/* Gender Selector */}
+                      <div>
+                        <p className="text-xs text-neutral-500 font-geist mb-2">Gênero</p>
+                        <div className="grid grid-cols-3 gap-2">
+                          {(Object.keys(GENDER_LABELS) as ShirtGender[])
+                            .filter(gender => {
+                              if (!shirtSizesConfig) return true
+                              return shirtSizesConfig[gender] && shirtSizesConfig[gender].length > 0
+                            })
+                            .map((gender) => (
+                              <button
+                                key={gender}
+                                type="button"
+                                onClick={() => {
+                                  setPartnerShirtGender(gender)
+                                  // Reset shirt size when gender changes
+                                  const newSizes = shirtSizesConfig
+                                    ? shirtSizesConfig[gender]
+                                    : DEFAULT_SHIRT_SIZES_BY_GENDER[gender]
+                                  if (newSizes && newSizes.length > 0) {
+                                    setPartnerShirtSize(newSizes[0])
+                                  }
+                                }}
+                                className={cn(
+                                  'h-10 rounded-xl border-2 font-semibold text-xs transition-all',
+                                  partnerShirtGender === gender
+                                    ? 'border-orange-500 bg-orange-50 text-orange-700'
+                                    : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
+                                )}
+                              >
+                                {GENDER_LABELS[gender]}
+                              </button>
+                            ))}
+                        </div>
+                      </div>
+
+                      {/* Size Grid */}
+                      <div>
+                        <p className="text-xs text-neutral-500 font-geist mb-2">Tamanho</p>
+                        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                          {partnerAvailableSizes?.map((size) => (
                             <button
-                              key={gender}
+                              key={size}
                               type="button"
-                              onClick={() => {
-                                setPartnerShirtGender(gender)
-                                // Reset shirt size when gender changes
-                                const newSizes = shirtSizesConfig
-                                  ? shirtSizesConfig[gender]
-                                  : DEFAULT_SHIRT_SIZES_BY_GENDER[gender]
-                                if (newSizes && newSizes.length > 0) {
-                                  setPartnerShirtSize(newSizes[0])
-                                }
-                              }}
+                              onClick={() => setPartnerShirtSize(size)}
                               className={cn(
-                                'h-10 rounded-xl border-2 font-semibold text-xs transition-all',
-                                partnerShirtGender === gender
+                                'h-12 rounded-xl border-2 font-semibold text-sm transition-all',
+                                partnerShirtSize === size
                                   ? 'border-orange-500 bg-orange-50 text-orange-700'
                                   : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
                               )}
                             >
-                              {GENDER_LABELS[gender]}
+                              {size}
                             </button>
                           ))}
+                        </div>
                       </div>
                     </div>
-
-                    {/* Size Grid */}
-                    <div>
-                      <p className="text-xs text-neutral-500 font-geist mb-2">Tamanho</p>
-                      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                        {partnerAvailableSizes?.map((size) => (
-                          <button
-                            key={size}
-                            type="button"
-                            onClick={() => setPartnerShirtSize(size)}
-                            className={cn(
-                              'h-12 rounded-xl border-2 font-semibold text-sm transition-all',
-                              partnerShirtSize === size
-                                ? 'border-orange-500 bg-orange-50 text-orange-700'
-                                : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
-                            )}
-                          >
-                            {size}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+                  )}
 
                   <p className="text-xs text-neutral-500 font-inter">
                     Informe os dados completos do seu parceiro(a) de dupla.
@@ -898,75 +957,150 @@ export function ReviewClient({
                           )}
                         </div>
 
-                        <div className="space-y-3">
-                          <label className="text-sm font-semibold text-neutral-700 font-geist">
-                            Tamanho da camiseta
-                          </label>
+                        {/* Shirt size selection - only if there's a shirt item in kit */}
+                        {hasShirtInKit && (
+                          <div className="space-y-3">
+                            <label className="text-sm font-semibold text-neutral-700 font-geist">
+                              Tamanho da camiseta
+                            </label>
 
-                          <div>
-                            <p className="text-xs text-neutral-500 font-geist mb-2">Gênero</p>
-                            <div className="grid grid-cols-3 gap-2">
-                              {(Object.keys(GENDER_LABELS) as ShirtGender[])
-                                .filter(gender => {
-                                  if (!shirtSizesConfig) return true
-                                  return shirtSizesConfig[gender] && shirtSizesConfig[gender].length > 0
-                                })
-                                .map((gender) => (
+                            <div>
+                              <p className="text-xs text-neutral-500 font-geist mb-2">Gênero</p>
+                              <div className="grid grid-cols-3 gap-2">
+                                {(Object.keys(GENDER_LABELS) as ShirtGender[])
+                                  .filter(gender => {
+                                    if (!shirtSizesConfig) return true
+                                    return shirtSizesConfig[gender] && shirtSizesConfig[gender].length > 0
+                                  })
+                                  .map((gender) => (
+                                    <button
+                                      key={gender}
+                                      type="button"
+                                      onClick={() => {
+                                        const updated = [...teamMembersData]
+                                        updated[index].shirtGender = gender
+                                        const newSizes = shirtSizesConfig
+                                          ? shirtSizesConfig[gender]
+                                          : DEFAULT_SHIRT_SIZES_BY_GENDER[gender]
+                                        if (newSizes && newSizes.length > 0) {
+                                          updated[index].shirtSize = newSizes[0] as ShirtSize
+                                        }
+                                        setTeamMembersData(updated)
+                                      }}
+                                      className={cn(
+                                        'h-10 rounded-xl border-2 font-semibold text-xs transition-all',
+                                        member.shirtGender === gender
+                                          ? 'border-purple-500 bg-purple-50 text-purple-700'
+                                          : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
+                                      )}
+                                    >
+                                      {GENDER_LABELS[gender]}
+                                    </button>
+                                  ))}
+                              </div>
+                            </div>
+
+                            <div>
+                              <p className="text-xs text-neutral-500 font-geist mb-2">Tamanho</p>
+                              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                                {memberAvailableSizes?.map((size) => (
                                   <button
-                                    key={gender}
+                                    key={size}
                                     type="button"
                                     onClick={() => {
                                       const updated = [...teamMembersData]
-                                      updated[index].shirtGender = gender
-                                      const newSizes = shirtSizesConfig
-                                        ? shirtSizesConfig[gender]
-                                        : DEFAULT_SHIRT_SIZES_BY_GENDER[gender]
-                                      if (newSizes && newSizes.length > 0) {
-                                        updated[index].shirtSize = newSizes[0] as ShirtSize
-                                      }
+                                      updated[index].shirtSize = size as ShirtSize
                                       setTeamMembersData(updated)
                                     }}
                                     className={cn(
-                                      'h-10 rounded-xl border-2 font-semibold text-xs transition-all',
-                                      member.shirtGender === gender
+                                      'h-12 rounded-xl border-2 font-semibold text-sm transition-all',
+                                      member.shirtSize === size
                                         ? 'border-purple-500 bg-purple-50 text-purple-700'
                                         : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
                                     )}
                                   >
-                                    {GENDER_LABELS[gender]}
+                                    {size}
                                   </button>
                                 ))}
+                              </div>
                             </div>
                           </div>
-
-                          <div>
-                            <p className="text-xs text-neutral-500 font-geist mb-2">Tamanho</p>
-                            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                              {memberAvailableSizes?.map((size) => (
-                                <button
-                                  key={size}
-                                  type="button"
-                                  onClick={() => {
-                                    const updated = [...teamMembersData]
-                                    updated[index].shirtSize = size as ShirtSize
-                                    setTeamMembersData(updated)
-                                  }}
-                                  className={cn(
-                                    'h-12 rounded-xl border-2 font-semibold text-sm transition-all',
-                                    member.shirtSize === size
-                                      ? 'border-purple-500 bg-purple-50 text-purple-700'
-                                      : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
-                                  )}
-                                >
-                                  {size}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
+                        )}
                       </div>
                     )
                   })}
+                </div>
+              </section>
+            )}
+
+            {/* Custom Fields Section */}
+            {customFields && customFields.length > 0 && (
+              <section>
+                <h2 className="text-xl sm:text-2xl tracking-tight font-geist font-semibold text-neutral-900 mb-4">
+                  Informações Adicionais
+                </h2>
+                <div className="rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5 space-y-4">
+                  {customFields.map((field) => (
+                    <div key={field.id} className="space-y-2">
+                      <label className="text-sm font-semibold text-neutral-700 font-geist">
+                        {field.label} {field.is_required && <span className="text-red-500">*</span>}
+                      </label>
+
+                      {field.field_type === 'text' && (
+                        <Input
+                          value={customFieldValues[field.name] || ''}
+                          onChange={(e) => setCustomFieldValues({ ...customFieldValues, [field.name]: e.target.value })}
+                          placeholder={field.placeholder || ''}
+                          required={field.is_required}
+                        />
+                      )}
+
+                      {field.field_type === 'number' && (
+                        <Input
+                          type="number"
+                          value={customFieldValues[field.name] || ''}
+                          onChange={(e) => setCustomFieldValues({ ...customFieldValues, [field.name]: e.target.value })}
+                          placeholder={field.placeholder || ''}
+                          required={field.is_required}
+                        />
+                      )}
+
+                      {field.field_type === 'select' && (
+                        <Select
+                          value={customFieldValues[field.name] || ''}
+                          onChange={(e) => setCustomFieldValues({ ...customFieldValues, [field.name]: e.target.value })}
+                          required={field.is_required}
+                        >
+                          <option value="">Selecione...</option>
+                          {field.options?.map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </Select>
+                      )}
+
+                      {field.field_type === 'checkbox' && (
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id={field.name}
+                            checked={customFieldValues[field.name] || false}
+                            onChange={(e) =>
+                              setCustomFieldValues({ ...customFieldValues, [field.name]: e.target.checked })
+                            }
+                            className="h-4 w-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+                          />
+                          <label
+                            htmlFor={field.name}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                          >
+                            {field.placeholder || 'Sim'}
+                          </label>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </section>
             )}
@@ -990,6 +1124,108 @@ export function ReviewClient({
               </section>
             )}
 
+            {/* Kit do Atleta - Itens Inclusos */}
+            {event.has_kit && categoryKitItems && categoryKitItems.length > 0 && (
+              <section>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl sm:text-2xl tracking-tight font-geist font-semibold text-neutral-900 flex items-center gap-2">
+                    <Crown className="h-6 w-6 text-orange-600" />
+                    Itens Inclusos no Kit
+                  </h2>
+                </div>
+
+                <div className="space-y-3">
+                  {categoryKitItems.map((item) => {
+                    const isShirtItem = item.icon === 'shirt'
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="relative rounded-xl border border-neutral-200 bg-white p-4 transition-all"
+                      >
+                        <div className="flex items-start gap-4">
+                          <div className="flex-1">
+                            <span className="font-semibold text-neutral-900 block">
+                              {item.name}
+                            </span>
+                            {item.description && (
+                              <p className="text-sm text-neutral-600 mt-1">{item.description}</p>
+                            )}
+                          </div>
+
+                          <div className="text-right">
+                            <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+                              Incluso
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Shirt size selection - only for shirt items */}
+                        {isShirtItem && (
+                          <div className="mt-4 pt-4 border-t border-neutral-200 space-y-3">
+                            <div>
+                              <p className="text-xs text-neutral-500 font-geist mb-2">Gênero</p>
+                              <div className="grid grid-cols-3 gap-2">
+                                {(Object.keys(GENDER_LABELS) as ShirtGender[])
+                                  .filter(gender => {
+                                    if (!shirtSizesConfig) return true
+                                    return shirtSizesConfig[gender] && shirtSizesConfig[gender].length > 0
+                                  })
+                                  .map((gender) => (
+                                    <button
+                                      key={gender}
+                                      type="button"
+                                      onClick={() => {
+                                        setUserShirtGender(gender)
+                                        const newSizes = shirtSizesConfig
+                                          ? shirtSizesConfig[gender]
+                                          : DEFAULT_SHIRT_SIZES_BY_GENDER[gender]
+                                        if (newSizes && newSizes.length > 0) {
+                                          setUserShirtSize(newSizes[0])
+                                        }
+                                      }}
+                                      className={cn(
+                                        'h-10 rounded-xl border-2 font-semibold text-xs transition-all',
+                                        userShirtGender === gender
+                                          ? 'border-orange-500 bg-orange-50 text-orange-700'
+                                          : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
+                                      )}
+                                    >
+                                      {GENDER_LABELS[gender]}
+                                    </button>
+                                  ))}
+                              </div>
+                            </div>
+
+                            <div>
+                              <p className="text-xs text-neutral-500 font-geist mb-2">Tamanho</p>
+                              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                                {userAvailableSizes?.map((size) => (
+                                  <button
+                                    key={size}
+                                    type="button"
+                                    onClick={() => setUserShirtSize(size)}
+                                    className={cn(
+                                      'h-12 rounded-xl border-2 font-semibold text-sm transition-all',
+                                      userShirtSize === size
+                                        ? 'border-orange-500 bg-orange-50 text-orange-700'
+                                        : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
+                                    )}
+                                  >
+                                    {size}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+            )}
+
             {/* Detalhes do evento section */}
             <section>
               <h2 className="text-xl sm:text-2xl tracking-tight font-geist font-semibold text-neutral-900 mb-4">
@@ -997,15 +1233,17 @@ export function ReviewClient({
               </h2>
               <div className="rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5">
                 <EventSummaryCard event={event} category={category} />
-                <div className="mt-4 pt-4 border-t border-neutral-200">
-                  <p className="text-sm text-neutral-500 font-geist">Tamanho escolhido</p>
-                  <p className="text-base font-semibold text-neutral-900 font-geist">Camiseta {userShirtSize}</p>
-                </div>
+                {hasShirtInKit && userShirtSize && (
+                  <div className="mt-4 pt-4 border-t border-neutral-200">
+                    <p className="text-sm text-neutral-500 font-geist">Tamanho escolhido</p>
+                    <p className="text-base font-semibold text-neutral-900 font-geist">Camiseta {userShirtSize}</p>
+                  </div>
+                )}
                 {partnerName && (
                   <div className="mt-4 pt-4 border-t border-neutral-200">
                     <p className="text-sm text-neutral-500 font-geist">Parceiro(a) da dupla</p>
                     <p className="text-base font-semibold text-neutral-900 font-geist">{partnerName}</p>
-                    {partnerShirtSize && (
+                    {hasShirtInKit && partnerShirtSize && (
                       <p className="text-sm text-neutral-600 font-geist mt-1">Camiseta {partnerShirtSize}</p>
                     )}
                   </div>
@@ -1016,7 +1254,7 @@ export function ReviewClient({
                     <ul className="mt-2 space-y-1">
                       {teamMembersData.map((member, index) => (
                         <li key={index} className="text-sm text-neutral-700 font-geist">
-                          {member.name || `Membro ${index + 2}`} {member.shirtSize && `- Camiseta ${member.shirtSize}`}
+                          {member.name || `Membro ${index + 2}`} {hasShirtInKit && member.shirtSize && `- Camiseta ${member.shirtSize}`}
                         </li>
                       ))}
                     </ul>
@@ -1041,6 +1279,89 @@ export function ReviewClient({
                       -{formatCurrency(appliedDiscount.amount)}
                     </span>
                   </div>
+                </div>
+              </section>
+            )}
+
+            {/* Cupom de desconto section */}
+            {!isFreeEvent && (
+              <section>
+                <h2 className="text-xl sm:text-2xl tracking-tight font-geist font-semibold text-neutral-900 mb-4 flex items-center gap-2">
+                  <Ticket className="h-6 w-6 text-neutral-900" />
+                  Cupom de desconto
+                </h2>
+
+                <div className="rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5">
+                  {!couponCode ? (
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <div className="flex-1">
+                        <Input
+                          placeholder="Digite o código do cupom"
+                          value={couponInput}
+                          onChange={(e) => {
+                            setCouponInput(e.target.value)
+                            if (couponError) setCouponError(null)
+                          }}
+                          disabled={couponLoading}
+                          className="uppercase"
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleApplyCoupon}
+                        isLoading={couponLoading}
+                        disabled={!couponInput.trim() || couponLoading}
+                        className="w-full sm:w-auto"
+                      >
+                        Aplicar
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between bg-green-50 rounded-lg p-3 border border-green-200">
+                      <div className="flex items-center gap-2">
+                        <Ticket className="h-4 w-4 text-green-600" />
+                        <div>
+                          <p className="text-sm font-medium text-green-900">
+                            Cupom <strong>{couponCode}</strong> aplicado
+                          </p>
+                          <p className="text-xs text-green-700">
+                            Desconto de {formatCurrency(couponDiscount)}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleRemoveCoupon}
+                        className="text-xs font-semibold text-green-700 hover:text-green-800 underline"
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  )}
+
+                  {couponError && (
+                    <p className="mt-2 text-sm text-rose-500">{couponError}</p>
+                  )}
+
+                  {/* Warning if club discount was replaced by coupon */}
+                  {isClubMember && appliedDiscount.type === 'coupon' && (
+                    <div className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-lg text-sm text-blue-800">
+                      <p>
+                        <strong>Nota:</strong> O desconto do cupom é maior que o desconto do clube e foi aplicado.
+                        (Os descontos não são cumulativos)
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Warning if coupon was valid but club discount is better */}
+                  {isClubMember && appliedDiscount.type === 'club' && couponCode && (
+                    <div className="mt-3 p-3 bg-orange-50 border border-orange-100 rounded-lg text-sm text-orange-800">
+                      <p>
+                        <strong>Nota:</strong> O desconto do clube é maior que o desconto do cupom ({couponCode}) e foi mantido.
+                      </p>
+                    </div>
+                  )}
                 </div>
               </section>
             )}
@@ -1126,7 +1447,7 @@ export function ReviewClient({
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="flex items-center gap-2 order-2 sm:order-1">
               <ShieldCheck className="h-4 w-4 text-neutral-400" />
-              <span className="text-xs text-neutral-500 font-inter">Pagamento seguro via Stripe</span>
+              <span className="text-xs text-neutral-500 font-inter">Pagamento seguro via Mercado Pago</span>
             </div>
             <Button
               type="button"

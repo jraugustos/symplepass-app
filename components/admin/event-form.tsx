@@ -18,9 +18,12 @@ import { Badge } from "@/components/ui/badge";
 import { FileUpload } from "@/components/ui/file-upload";
 import { CategoryFormModal } from "./category-form-modal";
 import { ShirtSizesConfig } from "./shirt-sizes-config";
+import { KitItemsForm } from "./kit-items-form";
+import { KitPickupForm } from "./kit-pickup-form";
 import {
   Event,
   EventCategory,
+  EventKitItem,
   SportType,
   EventStatus,
   EventFormat,
@@ -31,6 +34,7 @@ import {
   CategoryFormData,
   EventType,
   ShirtSizesByGender,
+  KitItemFormData,
 } from "@/types";
 import { formatCurrency } from "@/lib/utils";
 import { GENDER_LABELS } from "@/lib/constants/shirt-sizes";
@@ -97,6 +101,8 @@ const publishSchema = z
     show_course_info: z.boolean(),
     show_championship_format: z.boolean(),
     allow_page_access: z.boolean(),
+    has_kit: z.boolean(),
+    has_kit_pickup_info: z.boolean(),
   })
   .refine(
     (data) => {
@@ -186,12 +192,14 @@ const draftSchema = z.object({
   show_course_info: z.boolean().optional(),
   show_championship_format: z.boolean().optional(),
   allow_page_access: z.boolean().optional(),
+  has_kit: z.boolean().optional(),
+  has_kit_pickup_info: z.boolean().optional(),
 });
 
 interface EventFormProps {
   event?: Event;
   categories?: EventCategory[];
-  kitItems?: Array<{ id: string; name: string;[key: string]: any }>;
+  kitItems?: EventKitItem[];
   onSubmit: (data: EventFormDataAdmin) => Promise<void>;
   onCancel?: () => void;
   onCategoryCreate?: (data: CategoryFormData) => Promise<void>;
@@ -201,6 +209,12 @@ interface EventFormProps {
   ) => Promise<void>;
   onCategoryDelete?: (categoryId: string) => Promise<void>;
   onCategoryReorder?: (items: { id: string; display_order: number }[]) => Promise<void>;
+  kitPickupInfo?: any;
+  onKitItemCreate?: (data: KitItemFormData) => Promise<void>;
+  onKitItemUpdate?: (id: string, data: KitItemFormData) => Promise<void>;
+  onKitItemDelete?: (id: string) => Promise<void>;
+  onKitItemsReorder?: (items: { id: string; display_order: number }[]) => Promise<void>;
+  onKitPickupInfoUpdate?: (data: any) => Promise<void>;
   eventDetailsSection?: ReactNode;
 }
 
@@ -208,6 +222,12 @@ export function EventForm({
   event,
   categories = [],
   kitItems = [],
+  kitPickupInfo,
+  onKitItemCreate,
+  onKitItemUpdate,
+  onKitItemDelete,
+  onKitItemsReorder,
+  onKitPickupInfoUpdate,
   onSubmit,
   onCancel,
   onCategoryCreate,
@@ -309,6 +329,8 @@ export function EventForm({
           event.show_championship_format !== undefined ? event.show_championship_format : true,
         allow_page_access:
           event.allow_page_access !== undefined ? event.allow_page_access : true,
+        has_kit: event.has_kit !== undefined ? event.has_kit : false,
+        has_kit_pickup_info: event.has_kit_pickup_info !== undefined ? event.has_kit_pickup_info : false,
       }
       : {
         title: "",
@@ -336,6 +358,8 @@ export function EventForm({
         show_course_info: true,
         show_championship_format: true,
         allow_page_access: true,
+        has_kit: false,
+        has_kit_pickup_info: false,
       },
   });
 
@@ -735,7 +759,7 @@ export function EventForm({
                   Tipo de Evento *
                 </label>
                 <Select {...register("event_type")}>
-                  <option value="paid">Pago - Requer pagamento via Stripe</option>
+                  <option value="paid">Pago - Requer pagamento</option>
                   <option value="free">Gratuito - Inscrição sem pagamento</option>
                   <option value="solidarity">Solidário - Inscrição com requisito (ex: doação)</option>
                 </Select>
@@ -907,9 +931,118 @@ export function EventForm({
                 Exibir seção de formato do campeonato na página do evento
               </label>
             </div>
+
+            <div className="flex items-start gap-3 pt-4 border-t border-neutral-200">
+              <input
+                type="checkbox"
+                id="has_kit"
+                {...register("has_kit")}
+                className="mt-1 h-4 w-4 text-orange-600 focus:ring-orange-500 border-neutral-300 rounded"
+              />
+              <div>
+                <label htmlFor="has_kit" className="text-sm font-medium text-neutral-700 cursor-pointer">
+                  O evento possuí um kit para o atleta?
+                </label>
+                <p className="text-xs text-neutral-500 mt-1">
+                  Habilite esta opção para configurar os itens que compõem o kit do atleta (camiseta, medalha, chip, etc).
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </Card>
+
+      {/* Kit do Atleta Section */}
+      {/* Kit do Atleta Section */}
+      {watch("has_kit") && (
+        <>
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold mb-4">Kit do Atleta</h3>
+
+            <div className="space-y-6">
+              <div className="bg-neutral-50 rounded-lg p-4 border border-neutral-200">
+                <KitItemsForm
+                  eventId={event?.id || ""}
+                  items={kitItems}
+                  onCreate={onKitItemCreate || (async () => { })}
+                  onUpdate={onKitItemUpdate || (async () => { })}
+                  onDelete={onKitItemDelete || (async () => { })}
+                  onReorder={onKitItemsReorder || (async () => { })}
+                />
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    id="has_kit_pickup_info"
+                    {...register("has_kit_pickup_info")}
+                    className="mt-1 h-4 w-4 text-orange-600 focus:ring-orange-500 border-neutral-300 rounded"
+                  />
+                  <div>
+                    <label htmlFor="has_kit_pickup_info" className="text-sm font-medium text-neutral-700 cursor-pointer">
+                      Deseja informar as informações de retirada do Kit?
+                    </label>
+                    <p className="text-xs text-neutral-500 mt-1">
+                      Local, datas e horários para retirada do kit.
+                    </p>
+                  </div>
+                </div>
+
+                {watch("has_kit_pickup_info") && (
+                  <div className="pl-7">
+                    <KitPickupForm
+                      pickupInfo={kitPickupInfo}
+                      onPickupInfoUpdate={onKitPickupInfoUpdate || (async () => { })}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          </Card>
+
+          {/* Shirt Sizes Config - Show immediately after Kit if shirt exists in kit */}
+          {hasShirtInKit && (
+            <ShirtSizesConfig
+              config={watch("shirt_sizes_config") as ShirtSizesByGender | null}
+              onChange={(config) => setValue("shirt_sizes_config", config)}
+              error={errors.shirt_sizes_config?.message}
+            />
+          )}
+
+          {/* Info message if no shirt in kit */}
+          {!hasShirtInKit && kitItems.length > 0 && (
+            <Card className="p-6 bg-blue-50 border-blue-200">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 mt-0.5">
+                  <svg
+                    className="h-5 w-5 text-blue-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-blue-900 mb-1">
+                    Tamanhos de camiseta não disponíveis
+                  </h3>
+                  <p className="text-sm text-blue-800">
+                    Para configurar os tamanhos de camiseta, primeiro adicione o
+                    item "Camiseta" no "Kit do Atleta".
+                  </p>
+                </div>
+              </div>
+            </Card>
+          )}
+        </>
+      )}
 
       {/* Categorias Section */}
       {event && (
@@ -1001,45 +1134,6 @@ export function EventForm({
       {eventDetailsSection}
 
       {/* Shirt Sizes Config - Only show if there's a shirt in kit or if it's a new event */}
-      {(hasShirtInKit || kitItems.length === 0) && (
-        <ShirtSizesConfig
-          config={watch("shirt_sizes_config") as ShirtSizesByGender | null}
-          onChange={(config) => setValue("shirt_sizes_config", config)}
-          error={errors.shirt_sizes_config?.message}
-        />
-      )}
-
-      {/* Info message if no shirt in kit */}
-      {!hasShirtInKit && kitItems.length > 0 && (
-        <Card className="p-6 bg-blue-50 border-blue-200">
-          <div className="flex items-start gap-3">
-            <div className="flex-shrink-0 mt-0.5">
-              <svg
-                className="h-5 w-5 text-blue-600"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-blue-900 mb-1">
-                Tamanhos de camiseta não disponíveis
-              </h3>
-              <p className="text-sm text-blue-800">
-                Para configurar os tamanhos de camiseta, primeiro adicione o
-                item "Camiseta" na aba "Detalhes do Evento" → "Kit do Atleta".
-              </p>
-            </div>
-          </div>
-        </Card>
-      )}
 
       {/* Spacer before action buttons */}
       <div className="pt-8 border-t border-neutral-200" />
@@ -1103,6 +1197,7 @@ export function EventForm({
         onSubmit={handleCategorySubmit}
         category={editingCategory}
         eventType={watch("event_type")}
+        kitItems={kitItems}
       />
     </div>
   );

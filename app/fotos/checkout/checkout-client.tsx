@@ -299,7 +299,7 @@ export function PhotoCheckoutClient({
                   <div>
                     <p className="font-medium text-neutral-900 font-geist">Pagamento seguro</p>
                     <p className="text-sm text-neutral-600 mt-0.5">
-                      Você será redirecionado para o Stripe, nossa plataforma de pagamento segura.
+                      Você será redirecionado para o Mercado Pago, nossa plataforma de pagamento segura.
                     </p>
                   </div>
                 </div>
@@ -410,7 +410,7 @@ export function PhotoCheckoutClient({
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="flex items-center gap-2 order-2 sm:order-1">
               <ShieldCheck className="h-4 w-4 text-neutral-400" />
-              <span className="text-xs text-neutral-500 font-inter">Pagamento seguro via Stripe</span>
+              <span className="text-xs text-neutral-500 font-inter">Pagamento seguro via Mercado Pago</span>
             </div>
             <Button
               type="button"

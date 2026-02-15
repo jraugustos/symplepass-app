@@ -9,9 +9,14 @@ interface EnvironmentConfig {
     url: string
     anonKey: string
   }
-  // Stripe
+  // Stripe (used for subscriptions only)
   stripe: {
     secretKey: string
+    publicKey: string
+  }
+  // Mercado Pago (used for event registrations and photo orders)
+  mercadopago: {
+    accessToken: string
     publicKey: string
   }
   // Application base configuration
@@ -96,6 +101,32 @@ function validateEnv(): EnvironmentConfig {
     }
   }
 
+  // Mercado Pago environment variables (for event registrations and photo orders)
+  const mpAccessToken = cleanEnvValue(process.env.MERCADOPAGO_ACCESS_TOKEN)
+  const mpPublicKey = cleanEnvValue(process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY)
+
+  if (!mpAccessToken) {
+    const message =
+      'Missing required Mercado Pago environment variables:\n' +
+      '  - MERCADOPAGO_ACCESS_TOKEN\n' +
+      'Please configure these in your .env.local file.'
+
+    if (isDevelopment) {
+      console.warn('⚠️  WARNING:', message)
+    } else {
+      throw new Error(message)
+    }
+  }
+
+  if (mpAccessToken && !mpAccessToken.startsWith('APP_USR-') && !mpAccessToken.startsWith('TEST-')) {
+    const message = 'Invalid MERCADOPAGO_ACCESS_TOKEN format. Expected key to start with APP_USR-* or TEST-*.'
+    if (isDevelopment) {
+      console.warn('⚠️  WARNING:', message)
+    } else {
+      throw new Error(message)
+    }
+  }
+
   // Application URL for redirects
   let appBaseUrl = cleanEnvValue(process.env.NEXT_PUBLIC_APP_URL)
 
@@ -103,7 +134,7 @@ function validateEnv(): EnvironmentConfig {
     const message =
       'Missing application base URL environment variable:\n' +
       '  - NEXT_PUBLIC_APP_URL\n' +
-      'This is required for building Stripe success and cancel URLs.'
+      'This is required for building checkout redirect URLs.'
 
     if (isDevelopment) {
       console.warn('⚠️  WARNING:', message, '\nUsing default: http://localhost:3000')
@@ -121,6 +152,10 @@ function validateEnv(): EnvironmentConfig {
     stripe: {
       secretKey: stripeSecretKey || '',
       publicKey: stripePublicKey || '',
+    },
+    mercadopago: {
+      accessToken: mpAccessToken || '',
+      publicKey: mpPublicKey || '',
     },
     app: {
       baseUrl: appBaseUrl,
@@ -161,6 +196,10 @@ export function getEnv(): EnvironmentConfig {
     stripe: {
       secretKey: '', // Not available on client
       publicKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '',
+    },
+    mercadopago: {
+      accessToken: '', // Not available on client
+      publicKey: process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY || '',
     },
     app: {
       baseUrl: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',

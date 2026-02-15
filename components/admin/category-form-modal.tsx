@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { MultiSelect } from '@/components/ui/select'
 import { CategoryFormData, ShirtGender } from '@/types'
-import { EventCategory, EventType } from '@/types/database.types'
+import { EventCategory, EventType, EventKitItem } from '@/types/database.types'
 
 const GENDER_OPTIONS = [
   { value: 'masculino', label: 'Masculino' },
@@ -30,6 +30,7 @@ const createCategoryFormSchema = (eventType?: EventType) => {
     price: z.number().min(0, 'Preço deve ser maior ou igual a 0'),
     max_participants: z.number().int().min(0, 'Vagas devem ser maior ou igual a 0').optional().nullable(),
     shirt_genders: z.array(z.enum(['masculino', 'feminino', 'infantil'])).nullable().optional(),
+    kit_item_ids: z.array(z.string()).optional(),
   }).refine(
     (data) => {
       // For free and solidarity events, price must be 0
@@ -53,6 +54,7 @@ interface CategoryFormModalProps {
   onSubmit: (data: CategoryFormData) => Promise<void>
   category?: EventCategory
   eventType?: EventType
+  kitItems?: EventKitItem[]
 }
 
 export function CategoryFormModal({
@@ -61,11 +63,18 @@ export function CategoryFormModal({
   onSubmit,
   category,
   eventType,
+  kitItems = [],
 }: CategoryFormModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const isFreeOrSolidarity = eventType === 'free' || eventType === 'solidarity'
+
+  // Prepare options for kit items
+  const kitItemOptions = kitItems.map(item => ({
+    value: item.id,
+    label: item.name
+  }))
 
   const {
     register,
@@ -73,6 +82,8 @@ export function CategoryFormModal({
     reset,
     control,
     setValue,
+    watch,
+    getValues,
     formState: { errors, isValid },
   } = useForm<CategoryFormData>({
     mode: 'onChange',
@@ -84,6 +95,7 @@ export function CategoryFormModal({
         price: isFreeOrSolidarity ? 0 : category.price,
         max_participants: category.max_participants,
         shirt_genders: category.shirt_genders || null,
+        kit_item_ids: category.kit_items?.map(k => k.id) || [],
       }
       : {
         name: '',
@@ -91,6 +103,7 @@ export function CategoryFormModal({
         price: isFreeOrSolidarity ? 0 : 0,
         max_participants: null,
         shirt_genders: null,
+        kit_item_ids: [],
       },
   })
 
@@ -98,6 +111,8 @@ export function CategoryFormModal({
   useEffect(() => {
     if (isOpen) {
       const genders = category?.shirt_genders || []
+      const currentKitItemIds = category?.kit_items?.map(k => k.id) || []
+
       reset(
         category
           ? {
@@ -106,6 +121,7 @@ export function CategoryFormModal({
             price: isFreeOrSolidarity ? 0 : category.price,
             max_participants: category.max_participants,
             shirt_genders: genders.length > 0 ? genders : null,
+            kit_item_ids: currentKitItemIds,
           }
           : {
             name: '',
@@ -113,6 +129,7 @@ export function CategoryFormModal({
             price: isFreeOrSolidarity ? 0 : 0,
             max_participants: null,
             shirt_genders: null,
+            kit_item_ids: [],
           }
       )
       setError(null)
@@ -123,6 +140,27 @@ export function CategoryFormModal({
       }
     }
   }, [isOpen, category, reset, isFreeOrSolidarity, setValue])
+
+  // Watch kit items to conditionally show shirt gender
+  const selectedKitItemIds = watch('kit_item_ids') || []
+  const hasShirtInKit = selectedKitItemIds.some(id => {
+    const item = kitItems.find(k => k.id === id)
+    return item && (
+      item.icon === 'shirt' ||
+      item.name.toLowerCase().includes('camiseta') ||
+      item.name.toLowerCase().includes('camisa')
+    )
+  })
+
+  // Reset shirt_genders if no shirt is in kit
+  useEffect(() => {
+    if (isOpen && !hasShirtInKit) {
+      const currentGenders = getValues('shirt_genders')
+      if (currentGenders && currentGenders.length > 0) {
+        setValue('shirt_genders', null)
+      }
+    }
+  }, [hasShirtInKit, isOpen, setValue])
 
   const handleFormSubmit = async (data: CategoryFormData) => {
     setIsSubmitting(true)
@@ -235,24 +273,55 @@ export function CategoryFormModal({
 
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-1">
-                Gêneros de Camiseta
+                Itens do Kit
               </label>
-              <Controller
-                name="shirt_genders"
-                control={control}
-                render={({ field }) => (
-                  <MultiSelect
-                    options={GENDER_OPTIONS}
-                    value={Array.isArray(field.value) ? field.value : []}
-                    onChange={(values) => field.onChange(values.length > 0 ? values as ShirtGender[] : null)}
-                    placeholder="Selecione os gêneros (deixe vazio para todos)"
-                  />
-                )}
-              />
+              {kitItems.length === 0 ? (
+                <p className="text-sm text-neutral-500 italic">
+                  Nenhum item de kit cadastrado para este evento.
+                </p>
+              ) : (
+                <Controller
+                  name="kit_item_ids"
+                  control={control}
+                  render={({ field }) => (
+                    <MultiSelect
+                      options={kitItemOptions}
+                      value={Array.isArray(field.value) ? field.value : []}
+                      onChange={(values) => field.onChange(values)}
+                      placeholder="Selecione os itens incluídos"
+                    />
+                  )}
+                />
+              )}
               <p className="mt-1 text-xs text-neutral-500">
-                Selecione os gêneros disponíveis para esta categoria. Deixe vazio para permitir todos.
+                Selecione quais itens do kit estão incluídos nesta categoria.
               </p>
             </div>
+
+            {/* Only show Shirt Genders if a shirt-type item is selected in the kit */}
+
+            {hasShirtInKit && (
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                  Gêneros de Camiseta
+                </label>
+                <Controller
+                  name="shirt_genders"
+                  control={control}
+                  render={({ field }) => (
+                    <MultiSelect
+                      options={GENDER_OPTIONS}
+                      value={Array.isArray(field.value) ? field.value : []}
+                      onChange={(values) => field.onChange(values.length > 0 ? values as ShirtGender[] : null)}
+                      placeholder="Selecione os gêneros (deixe vazio para todos)"
+                    />
+                  )}
+                />
+                <p className="mt-1 text-xs text-neutral-500">
+                  Selecione os gêneros disponíveis para esta categoria. Deixe vazio para permitir todos.
+                </p>
+              </div>
+            )}
 
             {error && (
               <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">

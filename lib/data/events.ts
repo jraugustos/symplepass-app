@@ -226,7 +226,12 @@ export async function getEventDetailBySlug(slug: string): Promise<EventDetailDat
     const [categoriesRes, kitItemsRes, courseInfoRes, faqsRes, regulationsRes] = await Promise.all([
       supabase
         .from('event_categories')
-        .select('*')
+        .select(`
+          *,
+          event_category_kit_items (
+            event_kit_items (*)
+          )
+        `)
         .eq('event_id', eventData.id)
         .order('display_order', { ascending: true }),
       supabase
@@ -280,9 +285,26 @@ export async function getEventDetailBySlug(slug: string): Promise<EventDetailDat
       }
     }
 
+    // Transform categories to include kit_items
+    const categories = (categoriesRes.data || []).map((category: any) => {
+      const kitItems = category.event_category_kit_items
+        ? category.event_category_kit_items
+          .map((item: any) => item.event_kit_items)
+          .filter(Boolean)
+          .sort((a: any, b: any) => a.display_order - b.display_order)
+        : []
+
+      const { event_category_kit_items, ...categoryData } = category
+
+      return {
+        ...categoryData,
+        kit_items: kitItems
+      }
+    })
+
     const eventDetail: EventDetailData = {
       ...eventData,
-      categories: categoriesRes.data || [],
+      categories: categories,
       kit_items: kitItemsRes.data || [],
       course_info: courseInfo,
       faqs: faqsRes.data || [],

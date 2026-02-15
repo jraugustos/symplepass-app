@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
-import { stripe } from '@/lib/stripe/client'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { calculateServiceFee, calculateTotal, validateEmail, validateCPF } from '@/lib/utils'
 import { getEnv } from '@/lib/env'
-import { createRegistration, updateRegistrationStripeSession } from '@/lib/data/registrations'
+import { createRegistration, updateRegistrationMpPreference } from '@/lib/data/registrations'
+import { createEventRegistrationPreference } from '@/lib/mercadopago/checkout'
 import { validateRegistration } from '@/lib/validations/registration-guards'
 import { getClubMemberDiscount } from '@/lib/data/subscriptions'
 import { validateCoupon, applyCoupon } from '@/lib/data/admin-coupons'
@@ -35,6 +35,9 @@ export async function POST(request: Request) {
       couponCode,
       serviceFee,
       total,
+      customFieldValues,
+      selectedKitItems,
+      kitItemsTotal,
     } = body || {}
 
     if (
@@ -243,8 +246,58 @@ export async function POST(request: Request) {
       discountType = 'coupon'
     }
 
-    // Recalculate values with discount
-    const serverSubtotal = categoryPrice - appliedDiscount
+    // Validate selected kit items if present
+    let kitItemsPayload: Array<{ id: string; price: number; details: any }> = []
+    let serverKitItemsTotal = 0
+
+    if (selectedKitItems && selectedKitItems.length > 0) {
+      const { data: kitItemsData, error: kitItemsError } = await adminSupabase
+        .from('event_kit_items')
+        .select('id, name, description, price, event_id')
+        .in('id', selectedKitItems)
+
+      if (kitItemsError || !kitItemsData) {
+        console.error('Error fetching kit items:', kitItemsError)
+        return NextResponse.json({ error: 'Erro ao validar itens do kit.' }, { status: 500 })
+      }
+
+      const typedKitItems = kitItemsData as Array<{
+        id: string
+        name: string
+        description: string | null
+        price: number
+        event_id: string
+      }>
+
+      // Verify count matches (to ensure all IDs were found)
+      if (typedKitItems.length !== selectedKitItems.length) {
+        return NextResponse.json({ error: 'Um ou mais itens do kit não foram encontrados.' }, { status: 400 })
+      }
+
+      // Verify all items belong to this event
+      const invalidItems = typedKitItems.filter(item => item.event_id !== eventId)
+      if (invalidItems.length > 0) {
+        return NextResponse.json({ error: 'Itens do kit inválidos para este evento.' }, { status: 400 })
+      }
+
+      serverKitItemsTotal = typedKitItems.reduce((acc, item) => acc + item.price, 0)
+
+      kitItemsPayload = typedKitItems.map(item => ({
+        id: item.id,
+        price: item.price,
+        details: { name: item.name, description: item.description }
+      }))
+    }
+
+    // Recalculate values with discount and kit items
+    // Subtotal here usually refers to (Registration Price - Discount)
+    // But incoming `subtotal` might behave differently in frontend calculation.
+    // Let's align with ReviewClient:
+    // ReviewClient: subtotal = (categoryPrice - discount) + kitItemsTotal
+
+    // Server calculation:
+    const discountedCategoryPrice = Math.max(0, categoryPrice - appliedDiscount)
+    const serverSubtotal = discountedCategoryPrice + serverKitItemsTotal
     const serverServiceFee = calculateServiceFee(serverSubtotal)
     const serverTotal = calculateTotal(serverSubtotal, serverServiceFee)
 
@@ -338,6 +391,8 @@ export async function POST(request: Request) {
       normalizedPartnerData,
       normalizedUserData,
       normalizedTeamMembers,
+      customFieldValues,
+      kitItemsPayload.length > 0 ? kitItemsPayload : undefined,
       supabase
     )
 
@@ -375,52 +430,31 @@ export async function POST(request: Request) {
     }
 
     const env = getEnv()
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      customer_email: normalizedEmail,
-      payment_intent_data: {
-        metadata: {
-          registrationId: registrationResult.data.id,
-        },
-      },
-      line_items: [
-        {
-          quantity: 1,
-          price_data: {
-            currency: 'brl',
-            unit_amount: Math.round(serverTotal * 100),
-            product_data: {
-              name: `${event.title} - ${category.name}`,
-              description: `Inscrição + taxa de serviço (${shirtSize})`,
-            },
-          },
-        },
-      ],
-      metadata: {
-        registrationId: registrationResult.data.id,
-        eventId: event.id,
-        categoryId: category.id,
-        userId: targetUserId,
-        shirtSize,
-        partnerData: normalizedPartnerData ? JSON.stringify(normalizedPartnerData) : '',
-        teamData: normalizedTeamMembers ? JSON.stringify(normalizedTeamMembers) : '',
-        discountType: discountType || '',
-        discountAmount: appliedDiscount.toString(),
-        couponId: discountType === 'coupon' && couponDiscountData.coupon ? couponDiscountData.coupon.id : '',
-      },
-      success_url: `${env.app.baseUrl}/confirmacao?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${env.app.baseUrl}/inscricao?${cancelUrlParams.toString()}`,
+
+    // Create Mercado Pago Checkout Pro preference
+    const mpPreference = await createEventRegistrationPreference({
+      registrationId: registrationResult.data.id,
+      eventTitle: event.title,
+      categoryName: category.name,
+      description: `Inscrição ${shirtSize}${serverKitItemsTotal > 0 ? ' + Kit' : ''} + taxa`,
+      totalAmount: serverTotal, // BRL (reais), NOT centavos
+      payerEmail: normalizedEmail,
+      eventId: event.id,
+      categoryId: category.id,
+      userId: targetUserId,
+      cancelUrlParams: cancelUrlParams.toString(),
     })
 
-    if (!session.url) {
-      console.error('Stripe session criada sem URL retornada.')
+    if (!mpPreference.initPoint) {
+      console.error('Mercado Pago preference criada sem URL retornada.')
       return NextResponse.json(
         { error: 'Não foi possível iniciar o pagamento. Tente novamente.' },
         { status: 500 }
       )
     }
 
-    await updateRegistrationStripeSession(registrationResult.data.id, session.id, supabase)
+    // Update registration with MP preference ID
+    await updateRegistrationMpPreference(registrationResult.data.id, mpPreference.id, supabase)
 
     // Register coupon usage if coupon was applied
     if (discountType === 'coupon' && couponDiscountData.coupon) {
@@ -433,14 +467,20 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({
-      sessionId: session.id,
-      url: session.url,
+      preferenceId: mpPreference.id,
+      url: mpPreference.initPoint,
       registrationId: registrationResult.data.id,
     })
   } catch (error) {
     console.error('Erro ao criar sessão de checkout:', error)
+    const errorMessage = error instanceof Error
+      ? error.message
+      : JSON.stringify(error, null, 2)
     return NextResponse.json(
-      { error: 'Não foi possível iniciar o checkout. Tente novamente.' },
+      {
+        error: 'Não foi possível iniciar o checkout. Tente novamente.',
+        ...(process.env.NODE_ENV === 'development' && { debug: errorMessage }),
+      },
       { status: 500 }
     )
   }

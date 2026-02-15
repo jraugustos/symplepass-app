@@ -33,6 +33,8 @@ function mapPaymentHistoryItem(payload: PaymentHistoryRow): PaymentHistoryItem {
     payment_status: (payload.payment_status ?? 'pending') as PaymentStatus,
     payment_date: payload.created_at,
     stripe_payment_intent_id: payload.stripe_payment_intent_id ?? null,
+    mp_payment_id: payload.mp_payment_id ?? null,
+    payment_provider: (payload.payment_provider ?? 'stripe') as PaymentHistoryItem['payment_provider'],
   }
 }
 

@@ -1,22 +1,21 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Plus, Trash2, GripVertical, Upload, X } from 'lucide-react'
+import { useState } from 'react'
+import { Plus, Trash2, GripVertical } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Modal, ModalHeader, ModalTitle, ModalBody } from '@/components/ui/modal'
 import { FileUpload } from '@/components/ui/file-upload'
+import { formatCurrency } from '@/lib/utils'
 import type { EventKitItem, KitItemFormData } from '@/types'
 
 interface KitItemsFormProps {
     eventId: string
     items: EventKitItem[]
-    pickupInfo: any
     onCreate: (data: KitItemFormData) => Promise<void>
     onUpdate: (id: string, data: KitItemFormData) => Promise<void>
     onDelete: (id: string) => Promise<void>
     onReorder: (items: { id: string; display_order: number }[]) => Promise<void>
-    onPickupInfoUpdate: (data: any) => Promise<void>
 }
 
 const ICON_OPTIONS = [
@@ -33,12 +32,10 @@ const ICON_OPTIONS = [
 export function KitItemsForm({
     eventId,
     items,
-    pickupInfo,
     onCreate,
     onUpdate,
     onDelete,
     onReorder,
-    onPickupInfoUpdate,
 }: KitItemsFormProps) {
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [editingItem, setEditingItem] = useState<EventKitItem | null>(null)
@@ -52,27 +49,8 @@ export function KitItemsForm({
         description: '',
         icon: 'package',
         image_url: null,
+        price: 0,
     })
-
-    // Pickup info state
-    const [pickupFormData, setPickupFormData] = useState({
-        dates: pickupInfo?.dates || '',
-        hours: pickupInfo?.hours || '',
-        location: pickupInfo?.location || '',
-        notes: pickupInfo?.notes || '',
-        google_maps_url: pickupInfo?.google_maps_url || '',
-    })
-
-    // Sync pickupFormData when pickupInfo prop changes (e.g., after save and revalidation)
-    useEffect(() => {
-        setPickupFormData({
-            dates: pickupInfo?.dates || '',
-            hours: pickupInfo?.hours || '',
-            location: pickupInfo?.location || '',
-            notes: pickupInfo?.notes || '',
-            google_maps_url: pickupInfo?.google_maps_url || '',
-        })
-    }, [pickupInfo])
 
     const handleOpenModal = (item?: EventKitItem) => {
         if (item) {
@@ -82,6 +60,7 @@ export function KitItemsForm({
                 description: item.description,
                 icon: item.icon,
                 image_url: item.image_url,
+                price: item.price || 0,
             })
         } else {
             setEditingItem(null)
@@ -90,6 +69,7 @@ export function KitItemsForm({
                 description: '',
                 icon: 'package',
                 image_url: null,
+                price: 0,
             })
         }
         setIsModalOpen(true)
@@ -103,6 +83,7 @@ export function KitItemsForm({
             description: '',
             icon: 'package',
             image_url: null,
+            price: 0,
         })
     }
 
@@ -154,24 +135,13 @@ export function KitItemsForm({
         setDraggedIndex(null)
     }
 
-    const handlePickupInfoSave = async () => {
-        setIsSubmitting(true)
-        try {
-            await onPickupInfoUpdate(pickupFormData)
-        } catch (error) {
-            console.error('Error saving pickup info:', error)
-        } finally {
-            setIsSubmitting(false)
-        }
-    }
-
     return (
         <div className="space-y-6">
             {/* Kit Items List */}
             <div>
                 <div className="flex justify-between items-center mb-4">
-                    <h4 className="font-medium">Itens do Kit</h4>
-                    <Button size="sm" onClick={() => handleOpenModal()}>
+                    <h4 className="font-medium text-sm text-neutral-900">Itens Adicionados</h4>
+                    <Button size="sm" onClick={() => handleOpenModal()} variant="outline">
                         <Plus className="h-4 w-4 mr-1" />
                         Adicionar Item
                     </Button>
@@ -186,12 +156,17 @@ export function KitItemsForm({
                                 onDragStart={() => handleDragStart(index)}
                                 onDragOver={(e) => handleDragOver(e, index)}
                                 onDragEnd={handleDragEnd}
-                                className="flex items-center gap-3 p-3 bg-neutral-50 rounded-lg cursor-move hover:bg-neutral-100 transition"
+                                className="flex items-center gap-3 p-3 bg-white border border-neutral-200 rounded-lg cursor-move hover:border-neutral-300 transition shadow-sm"
                             >
                                 <GripVertical className="h-5 w-5 text-neutral-400" />
                                 <div className="flex-1">
-                                    <p className="font-medium">{item.name}</p>
-                                    <p className="text-sm text-neutral-600">{item.description}</p>
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <p className="font-medium text-sm text-neutral-900">{item.name}</p>
+                                            <p className="text-xs text-neutral-500 mt-0.5">{item.description}</p>
+                                        </div>
+                                        {/* Price display removed */}
+                                    </div>
                                 </div>
                                 <div className="flex gap-2">
                                     <Button
@@ -204,6 +179,7 @@ export function KitItemsForm({
                                     <Button
                                         size="sm"
                                         variant="ghost"
+                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
                                         onClick={() => onDelete(item.id)}
                                     >
                                         <Trash2 className="h-4 w-4" />
@@ -213,85 +189,13 @@ export function KitItemsForm({
                         ))}
                     </div>
                 ) : (
-                    <p className="text-neutral-500 text-sm">Nenhum item adicionado ainda.</p>
+                    <div className="text-center py-8 bg-neutral-50 rounded-lg border-2 border-dashed border-neutral-200">
+                        <p className="text-neutral-500 text-sm">Nenhum item adicionado ao kit ainda.</p>
+                        <Button variant="ghost" onClick={() => handleOpenModal()} className="mt-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50">
+                            Adicionar primeiro item
+                        </Button>
+                    </div>
                 )}
-            </div>
-
-            {/* Kit Pickup Information */}
-            <div className="border-t border-neutral-200 pt-6">
-                <h4 className="font-medium mb-4">Informações de Retirada do Kit</h4>
-                <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-neutral-700 mb-1">
-                                Datas
-                            </label>
-                            <Input
-                                value={pickupFormData.dates}
-                                onChange={(e) =>
-                                    setPickupFormData({ ...pickupFormData, dates: e.target.value })
-                                }
-                                placeholder="Ex: 13 e 14 de Mar"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-neutral-700 mb-1">
-                                Horários
-                            </label>
-                            <Input
-                                value={pickupFormData.hours}
-                                onChange={(e) =>
-                                    setPickupFormData({ ...pickupFormData, hours: e.target.value })
-                                }
-                                placeholder="Ex: 10h às 20h"
-                            />
-                        </div>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-neutral-700 mb-1">
-                            Local
-                        </label>
-                        <Input
-                            value={pickupFormData.location}
-                            onChange={(e) =>
-                                setPickupFormData({ ...pickupFormData, location: e.target.value })
-                            }
-                            placeholder="Ex: Ginásio do Ibirapuera — Portão 7"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-neutral-700 mb-1">
-                            Link Google Maps
-                        </label>
-                        <Input
-                            value={pickupFormData.google_maps_url}
-                            onChange={(e) =>
-                                setPickupFormData({ ...pickupFormData, google_maps_url: e.target.value })
-                            }
-                            placeholder="Ex: https://maps.google.com/..."
-                        />
-                        <p className="text-xs text-neutral-500 mt-1">
-                            Cole o link do Google Maps para o local de retirada do kit
-                        </p>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-neutral-700 mb-1">
-                            Observações
-                        </label>
-                        <textarea
-                            value={pickupFormData.notes}
-                            onChange={(e) =>
-                                setPickupFormData({ ...pickupFormData, notes: e.target.value })
-                            }
-                            rows={3}
-                            placeholder="Informações adicionais sobre a retirada"
-                            className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
-                        />
-                    </div>
-                    <Button onClick={handlePickupInfoSave} disabled={isSubmitting}>
-                        {isSubmitting ? 'Salvando...' : 'Salvar Informações de Retirada'}
-                    </Button>
-                </div>
             </div>
 
             {/* Modal for Add/Edit Kit Item */}
@@ -332,9 +236,12 @@ export function KitItemsForm({
                                 rows={3}
                                 placeholder="Ex: Modelos masculino e feminino • Tamanhos P ao GG"
                                 required
-                                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+                                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none text-sm"
                             />
                         </div>
+
+                        {/* Price field removed as kit pricing is now category-based */}
+                        {/* Kept internally as 0 for compatibility if needed */}
 
                         <div>
                             <label className="block text-sm font-medium text-neutral-700 mb-1">
@@ -343,7 +250,7 @@ export function KitItemsForm({
                             <select
                                 value={formData.icon}
                                 onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
-                                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
                                 required
                             >
                                 {ICON_OPTIONS.map((option) => (

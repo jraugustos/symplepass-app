@@ -29,6 +29,8 @@ export async function createRegistration(
   partnerData?: PartnerData | null,
   userData?: ParticipantData | null,
   teamMembers?: ParticipantData[] | null,
+  customFieldValues?: Record<string, any> | null,
+  kitItems?: Array<{ id: string; price: number; details: any }> | null,
   supabaseClient?: SupabaseServerClient
 ): Promise<RegistrationResult<Registration>> {
   try {
@@ -70,6 +72,10 @@ export async function createRegistration(
         shirtSize: member.shirtSize,
         shirtGender: member.shirtGender || null,
       }))
+    }
+
+    if (customFieldValues) {
+      registrationDataPayload.custom_fields = customFieldValues
     }
 
     const registrationData = Object.keys(registrationDataPayload).length > 0 ? registrationDataPayload : null
@@ -155,6 +161,25 @@ export async function createRegistration(
     if (teamMembers && teamMembers.length > 0) {
       for (const member of teamMembers) {
         await createOrUpdatePartnerProfile(member)
+      }
+    }
+
+    // Insert kit items if provided
+    if (kitItems && kitItems.length > 0) {
+      const kitItemsToInsert = kitItems.map(item => ({
+        registration_id: data.id,
+        kit_item_id: item.id,
+        price: item.price,
+        details: item.details
+      }))
+
+      const { error: kitError } = await supabase
+        .from('registration_kit_items')
+        .insert(kitItemsToInsert)
+
+      if (kitError) {
+        console.error('Error inserting registration kit items:', kitError)
+        // We log the error but don't fail the registration, as the main registration is created
       }
     }
 
@@ -358,6 +383,182 @@ export async function getRegistrationByStripeSessionWithDetails(
     return { data: data ? (data as RegistrationWithDetails) : null, error: null }
   } catch (error) {
     console.error('Unexpected error fetching registration with details:', error)
+    return { data: null, error: 'Unable to fetch registration' }
+  }
+}
+
+// ============================================================
+// MERCADO PAGO — Data Layer Functions
+// ============================================================
+
+/**
+ * Updates the Mercado Pago Preference ID for an existing registration.
+ * Called after creating a Checkout Pro preference.
+ * @returns Updated registration or error description
+ */
+export async function updateRegistrationMpPreference(
+  registrationId: string,
+  mpPreferenceId: string,
+  supabaseClient?: SupabaseServerClient
+): Promise<RegistrationResult<Registration>> {
+  try {
+    const supabase = getClient(supabaseClient)
+
+    const { data, error } = await (supabase
+      .from('registrations') as any)
+      .update({
+        mp_preference_id: mpPreferenceId,
+        payment_provider: 'mercadopago',
+      })
+      .eq('id', registrationId)
+      .select('*')
+      .single()
+
+    if (error) {
+      console.error('Error updating registration MP preference:', error)
+      return { data: null, error: error.message }
+    }
+
+    return { data, error: null }
+  } catch (error) {
+    console.error('Unexpected error updating registration MP preference:', error)
+    return { data: null, error: 'Unable to update registration' }
+  }
+}
+
+/**
+ * Retrieves a registration by its Mercado Pago Preference ID.
+ * Used to look up registration when MP redirects back after checkout.
+ * @returns Registration linked to preference or null if not found
+ */
+export async function getRegistrationByMpPreference(
+  mpPreferenceId: string,
+  supabaseClient?: SupabaseServerClient
+): Promise<RegistrationResult<Registration>> {
+  try {
+    const supabase = supabaseClient ?? createAdminClient()
+
+    const { data, error } = await supabase
+      .from('registrations')
+      .select('*')
+      .eq('mp_preference_id', mpPreferenceId)
+      .maybeSingle()
+
+    if (error) {
+      console.error('Error fetching registration by MP preference:', error)
+      return { data: null, error: error.message }
+    }
+
+    return { data, error: null }
+  } catch (error) {
+    console.error('Unexpected error fetching registration by MP preference:', error)
+    return { data: null, error: 'Unable to fetch registration' }
+  }
+}
+
+/**
+ * Retrieves a registration by its Mercado Pago Payment ID.
+ * Used in the MP webhook handler to find the registration after payment.
+ * Uses admin client to bypass RLS — webhooks don't have user context.
+ * @returns Registration linked to payment or null if not found
+ */
+export async function getRegistrationByMpPayment(
+  mpPaymentId: number,
+  supabaseClient?: SupabaseServerClient
+): Promise<RegistrationResult<Registration>> {
+  try {
+    const supabase = supabaseClient ?? createAdminClient()
+
+    const { data, error } = await supabase
+      .from('registrations')
+      .select('*')
+      .eq('mp_payment_id', mpPaymentId)
+      .maybeSingle()
+
+    if (error) {
+      console.error('Error fetching registration by MP payment:', error)
+      return { data: null, error: error.message }
+    }
+
+    return { data, error: null }
+  } catch (error) {
+    console.error('Unexpected error fetching registration by MP payment:', error)
+    return { data: null, error: 'Unable to fetch registration' }
+  }
+}
+
+/**
+ * Updates registration payment status with Mercado Pago payment ID.
+ * Called from the MP webhook handler after payment confirmation.
+ * Uses admin client to bypass RLS since webhooks don't have user context.
+ * @returns Updated registration or error description
+ */
+export async function updateRegistrationMpPaymentStatus(
+  registrationId: string,
+  status: RegistrationStatus,
+  paymentStatus: PaymentStatus,
+  mpPaymentId: number,
+  supabaseClient?: SupabaseServerClient
+): Promise<RegistrationResult<Registration>> {
+  try {
+    const supabase = supabaseClient ?? createAdminClient()
+
+    const { data, error } = await (supabase
+      .from('registrations') as any)
+      .update({
+        status,
+        payment_status: paymentStatus,
+        mp_payment_id: mpPaymentId,
+      })
+      .eq('id', registrationId)
+      .select('*')
+      .single()
+
+    if (error) {
+      console.error('Error updating registration MP payment status:', error)
+      return { data: null, error: error.message }
+    }
+
+    return { data, error: null }
+  } catch (error) {
+    console.error('Unexpected error updating registration MP payment status:', error)
+    return { data: null, error: 'Unable to update registration' }
+  }
+}
+
+/**
+ * Retrieves a registration by its Mercado Pago Preference ID with full details.
+ * Used for the confirmation page after MP Checkout Pro redirect.
+ * Uses admin client to bypass RLS.
+ */
+export async function getRegistrationByMpPreferenceWithDetails(
+  mpPreferenceId: string,
+  supabaseClient?: SupabaseServerClient
+): Promise<RegistrationResult<RegistrationWithDetails>> {
+  try {
+    const supabase = supabaseClient ?? createAdminClient()
+
+    const { data, error } = await supabase
+      .from('registrations')
+      .select(
+        `
+        *,
+        event:events(*),
+        category:event_categories(*),
+        user:profiles(*)
+      `
+      )
+      .eq('mp_preference_id', mpPreferenceId)
+      .maybeSingle()
+
+    if (error) {
+      console.error('Error fetching registration by MP preference with details:', error)
+      return { data: null, error: error.message }
+    }
+
+    return { data: data ? (data as RegistrationWithDetails) : null, error: null }
+  } catch (error) {
+    console.error('Unexpected error fetching registration by MP preference with details:', error)
     return { data: null, error: 'Unable to fetch registration' }
   }
 }

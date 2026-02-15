@@ -1,7 +1,9 @@
+import { Suspense } from 'react'
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { Footer } from '@/components/layout/footer'
 import { getEventDetailBySlug } from '@/lib/data/events'
+import { getCustomFieldsByEventId } from '@/lib/data/admin-custom-fields'
 import { createClient } from '@/lib/supabase/server'
 import { calculateServiceFee, calculateTotal } from '@/lib/utils'
 import { isClubMember } from '@/lib/data/subscriptions'
@@ -11,7 +13,7 @@ import { ReviewClient } from './review-client'
 export const metadata: Metadata = {
   title: 'Revise suas informações - Symplepass',
   description:
-    'Confirme seus dados e finalize sua inscrição com pagamento seguro via Stripe na Symplepass.',
+    'Confirme seus dados e finalize sua inscrição com pagamento seguro via Mercado Pago na Symplepass.',
 }
 
 export const revalidate = 3600
@@ -135,11 +137,20 @@ export default async function ReviewPage({ searchParams }: ReviewPageProps) {
     partnerShirtGender: normalizedPartnerGender,
     user: userData,
     isAuthenticated: Boolean(user),
+    kitItems: eventData.kit_items,
+  }
+
+  // Fetch custom fields for this event
+  const { data: customFields } = await getCustomFieldsByEventId(eventData.id)
+  if (customFields && customFields.length > 0) {
+    reviewData.customFields = customFields
   }
 
   return (
     <>
-      <ReviewClient {...reviewData} priceBreakdown={priceBreakdown} isClubMember={userIsClubMember} />
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Carregando...</div>}>
+        <ReviewClient {...reviewData} priceBreakdown={priceBreakdown} isClubMember={userIsClubMember} />
+      </Suspense>
       <Footer variant="light" />
     </>
   )

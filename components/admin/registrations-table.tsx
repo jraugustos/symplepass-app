@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
-import { RegistrationWithDetails, EventCategory } from '@/types/database.types'
+import { RegistrationWithDetails, EventCategory, EventCustomField } from '@/types/database.types'
 import { RegistrationFilters } from '@/types'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
@@ -18,6 +18,8 @@ interface RegistrationsTableProps {
   onExport: () => Promise<void>
   onDelete?: (registrationId: string) => Promise<void>
   onEdit?: (registration: any) => void
+  customFields?: EventCustomField[]
+
 }
 
 export function RegistrationsTable({
@@ -27,6 +29,7 @@ export function RegistrationsTable({
   onExport,
   onDelete,
   onEdit,
+  customFields,
 }: RegistrationsTableProps) {
   const [filters, setFilters] = useState<RegistrationFilters>({})
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -163,6 +166,11 @@ export function RegistrationsTable({
               <th className="px-4 py-3 text-left text-xs font-medium text-neutral-600 uppercase tracking-wider">
                 Data
               </th>
+              {customFields?.map((field) => (
+                <th key={field.id} className="px-4 py-3 text-left text-xs font-medium text-neutral-600 uppercase tracking-wider">
+                  {field.label}
+                </th>
+              ))}
               <th className="px-4 py-3 text-right text-xs font-medium text-neutral-600 uppercase tracking-wider">
                 Ações
               </th>
@@ -268,6 +276,11 @@ export function RegistrationsTable({
                   <td className="px-4 py-4 text-sm text-neutral-600">
                     {formatDate(registration.created_at)}
                   </td>
+                  {customFields?.map((field) => (
+                    <td key={field.id} className="px-4 py-4 text-sm text-neutral-600">
+                      {registration.registration_data?.custom_fields?.[field.name] || '-'}
+                    </td>
+                  ))}
                   <td className="px-4 py-4 text-right">
                     <div className="flex items-center justify-end gap-1">
                       {onEdit && (
@@ -311,128 +324,128 @@ export function RegistrationsTable({
               className="bg-white rounded-lg border border-neutral-200 p-4"
             >
               <div className="flex justify-between items-start mb-2">
-              <div>
-                {(registration.registration_data?.partner || registration.partner_name) && (
-                  <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Participante 1</p>
-                )}
-                {registration.profiles?.id ? (
-                  <Link
-                    href={`/admin/usuarios/${registration.profiles.id}`}
-                    className="font-medium text-neutral-900 hover:text-orange-600 transition-colors inline-flex items-center gap-1"
-                  >
-                    {registration.profiles?.full_name || 'N/A'}
-                    <ExternalLink className="h-3 w-3" />
-                  </Link>
-                ) : (
-                  <p className="font-medium text-neutral-900">
-                    {registration.profiles?.full_name || 'N/A'}
-                  </p>
-                )}
-                <p className="text-sm text-neutral-500">
-                  {registration.profiles?.email || 'N/A'}
-                </p>
-                {registration.profiles?.cpf && (
-                  <p className="text-xs text-neutral-400">
-                    CPF: {registration.profiles.cpf}
-                  </p>
-                )}
-                {registration.profiles?.phone && (
-                  <p className="text-xs text-neutral-400">
-                    Tel: {registration.profiles.phone}
-                  </p>
-                )}
-              </div>
-              <Badge variant={getPaymentStatusVariant(registration.payment_status)}>
-                {getPaymentStatusLabel(registration.payment_status)}
-              </Badge>
-            </div>
-            <div className="space-y-1 text-sm">
-              <p className="text-neutral-600">
-                <span className="font-medium">Categoria:</span>{' '}
-                {registration.event_categories?.name || 'N/A'}
-              </p>
-              {registration.registration_data?.team_members && registration.registration_data.team_members.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-neutral-100">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Badge variant="neutral">Equipe ({registration.registration_data.team_members.length + 1})</Badge>
-                  </div>
-                  <ul className="text-xs text-neutral-600 space-y-1">
-                    {registration.registration_data.team_members.map((member: any, idx: number) => (
-                      <li key={idx}>
-                        <span className="font-medium">{member.name || `Membro ${idx + 2}`}</span>
-                        {member.email && <span className="text-neutral-400"> - {member.email}</span>}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {!registration.registration_data?.team_members && (registration.registration_data?.partner || registration.partner_name) && (
-                <div className="mt-3 pt-3 border-t border-neutral-100">
-                  <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-2">Participante 2</p>
-                  <div>
+                <div>
+                  {(registration.registration_data?.partner || registration.partner_name) && (
+                    <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1">Participante 1</p>
+                  )}
+                  {registration.profiles?.id ? (
+                    <Link
+                      href={`/admin/usuarios/${registration.profiles.id}`}
+                      className="font-medium text-neutral-900 hover:text-orange-600 transition-colors inline-flex items-center gap-1"
+                    >
+                      {registration.profiles?.full_name || 'N/A'}
+                      <ExternalLink className="h-3 w-3" />
+                    </Link>
+                  ) : (
                     <p className="font-medium text-neutral-900">
-                      {registration.registration_data?.partner?.name || registration.partner_name || 'N/A'}
+                      {registration.profiles?.full_name || 'N/A'}
                     </p>
-                    {registration.registration_data?.partner?.email && (
-                      <p className="text-sm text-neutral-500">
-                        {registration.registration_data.partner.email}
-                      </p>
-                    )}
-                    {registration.registration_data?.partner?.cpf && (
-                      <p className="text-xs text-neutral-400">
-                        CPF: {registration.registration_data.partner.cpf}
-                      </p>
-                    )}
-                    {registration.registration_data?.partner?.phone && (
-                      <p className="text-xs text-neutral-400">
-                        Tel: {registration.registration_data.partner.phone}
-                      </p>
-                    )}
+                  )}
+                  <p className="text-sm text-neutral-500">
+                    {registration.profiles?.email || 'N/A'}
+                  </p>
+                  {registration.profiles?.cpf && (
+                    <p className="text-xs text-neutral-400">
+                      CPF: {registration.profiles.cpf}
+                    </p>
+                  )}
+                  {registration.profiles?.phone && (
+                    <p className="text-xs text-neutral-400">
+                      Tel: {registration.profiles.phone}
+                    </p>
+                  )}
+                </div>
+                <Badge variant={getPaymentStatusVariant(registration.payment_status)}>
+                  {getPaymentStatusLabel(registration.payment_status)}
+                </Badge>
+              </div>
+              <div className="space-y-1 text-sm">
+                <p className="text-neutral-600">
+                  <span className="font-medium">Categoria:</span>{' '}
+                  {registration.event_categories?.name || 'N/A'}
+                </p>
+                {registration.registration_data?.team_members && registration.registration_data.team_members.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-neutral-100">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge variant="neutral">Equipe ({registration.registration_data.team_members.length + 1})</Badge>
+                    </div>
+                    <ul className="text-xs text-neutral-600 space-y-1">
+                      {registration.registration_data.team_members.map((member: any, idx: number) => (
+                        <li key={idx}>
+                          <span className="font-medium">{member.name || `Membro ${idx + 2}`}</span>
+                          {member.email && <span className="text-neutral-400"> - {member.email}</span>}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
+                )}
+                {!registration.registration_data?.team_members && (registration.registration_data?.partner || registration.partner_name) && (
+                  <div className="mt-3 pt-3 border-t border-neutral-100">
+                    <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-2">Participante 2</p>
+                    <div>
+                      <p className="font-medium text-neutral-900">
+                        {registration.registration_data?.partner?.name || registration.partner_name || 'N/A'}
+                      </p>
+                      {registration.registration_data?.partner?.email && (
+                        <p className="text-sm text-neutral-500">
+                          {registration.registration_data.partner.email}
+                        </p>
+                      )}
+                      {registration.registration_data?.partner?.cpf && (
+                        <p className="text-xs text-neutral-400">
+                          CPF: {registration.registration_data.partner.cpf}
+                        </p>
+                      )}
+                      {registration.registration_data?.partner?.phone && (
+                        <p className="text-xs text-neutral-400">
+                          Tel: {registration.registration_data.partner.phone}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {shortCode && (
+                  <p className="text-neutral-600">
+                    <span className="font-medium">Código:</span>{' '}
+                    <span className="font-mono text-xs bg-neutral-100 px-1.5 py-0.5 rounded">{shortCode}</span>
+                  </p>
+                )}
+                <p className="text-neutral-600">
+                  <span className="font-medium">Valor:</span>{' '}
+                  {formatCurrency(registration.amount_paid || 0)}
+                </p>
+                <p className="text-neutral-600">
+                  <span className="font-medium">Data:</span>{' '}
+                  {formatDate(registration.created_at)}
+                </p>
+              </div>
+              {(onEdit || onDelete) && (
+                <div className="mt-3 pt-3 border-t border-neutral-100 flex justify-end gap-2">
+                  {onEdit && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onEdit(registration)}
+                      className="text-neutral-600 hover:text-neutral-700 hover:bg-neutral-50"
+                    >
+                      <Pencil className="h-4 w-4 mr-1" />
+                      Editar
+                    </Button>
+                  )}
+                  {onDelete && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDelete(registration.id, registration.profiles?.full_name || 'Participante')}
+                      disabled={deletingId === registration.id}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Excluir
+                    </Button>
+                  )}
                 </div>
               )}
-              {shortCode && (
-                <p className="text-neutral-600">
-                  <span className="font-medium">Código:</span>{' '}
-                  <span className="font-mono text-xs bg-neutral-100 px-1.5 py-0.5 rounded">{shortCode}</span>
-                </p>
-              )}
-              <p className="text-neutral-600">
-                <span className="font-medium">Valor:</span>{' '}
-                {formatCurrency(registration.amount_paid || 0)}
-              </p>
-              <p className="text-neutral-600">
-                <span className="font-medium">Data:</span>{' '}
-                {formatDate(registration.created_at)}
-              </p>
-            </div>
-            {(onEdit || onDelete) && (
-              <div className="mt-3 pt-3 border-t border-neutral-100 flex justify-end gap-2">
-                {onEdit && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onEdit(registration)}
-                    className="text-neutral-600 hover:text-neutral-700 hover:bg-neutral-50"
-                  >
-                    <Pencil className="h-4 w-4 mr-1" />
-                    Editar
-                  </Button>
-                )}
-                {onDelete && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDelete(registration.id, registration.profiles?.full_name || 'Participante')}
-                    disabled={deletingId === registration.id}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                  >
-                    <Trash2 className="h-4 w-4 mr-1" />
-                    Excluir
-                  </Button>
-                )}
-              </div>
-            )}
             </div>
           )
         })}

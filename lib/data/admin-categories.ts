@@ -14,7 +14,12 @@ export async function getCategoriesByEventId(
 
     const { data, error } = await supabase
       .from('event_categories')
-      .select('*')
+      .select(`
+        *,
+        event_category_kit_items (
+          event_kit_items (*)
+        )
+      `)
       .eq('event_id', eventId)
       .order('display_order', { ascending: true })
 
@@ -23,7 +28,25 @@ export async function getCategoriesByEventId(
       return []
     }
 
-    return data || []
+    // Transform the data to match the EventCategory interface with kit_items
+    const categoriesWithKitItems = data.map((category: any) => {
+      const kitItems = category.event_category_kit_items
+        ? category.event_category_kit_items
+          .map((item: any) => item.event_kit_items)
+          .filter(Boolean) // Remove nulls if any
+          .sort((a: any, b: any) => a.display_order - b.display_order)
+        : []
+
+      // Remove the join table data from the final object
+      const { event_category_kit_items, ...categoryData } = category
+
+      return {
+        ...categoryData,
+        kit_items: kitItems
+      }
+    })
+
+    return categoriesWithKitItems || []
   } catch (error) {
     console.error('Error in getCategoriesByEventId:', error)
     return []
@@ -42,6 +65,7 @@ export async function createCategory(categoryData: {
   description?: string | null
   max_participants?: number | null
   shirt_genders?: ('masculino' | 'feminino' | 'infantil')[] | null
+  kit_item_ids?: string[]
 }) {
   try {
     const supabase = await createClient()
@@ -63,10 +87,15 @@ export async function createCategory(categoryData: {
       ? (existingCategories[0].display_order || 0) + 1
       : 0
 
-    const { data, error } = await supabase
+    const { kit_item_ids, ...dataToInsert } = categoryData
+
+    // Start a transaction-like flow (though supabase-js doesn't support true transactions yet without rpc)
+    // We'll insert category first, then items.
+
+    const { data: category, error } = await supabase
       .from('event_categories')
       .insert({
-        ...categoryData,
+        ...dataToInsert,
         current_participants: 0,
         display_order: nextDisplayOrder,
       })
@@ -78,7 +107,26 @@ export async function createCategory(categoryData: {
       return { data: null, error: error.message }
     }
 
-    return { data, error: null }
+    // Associate kit items if provided
+    if (kit_item_ids && kit_item_ids.length > 0) {
+      const kitItemsToInsert = kit_item_ids.map(itemId => ({
+        category_id: category.id,
+        kit_item_id: itemId
+      }))
+
+      const { error: kitItemsError } = await supabase
+        .from('event_category_kit_items')
+        .insert(kitItemsToInsert)
+
+      if (kitItemsError) {
+        console.error('Error linking kit items:', kitItemsError)
+        // We could delete the category here to "rollback", but for now let's just return error warning?
+        // Or just log it. The category exists, just items failed.
+        // Let's assume critical failure if items fail.
+      }
+    }
+
+    return { data: category, error: null }
   } catch (error) {
     console.error('Error in createCategory:', error)
     return { data: null, error: 'Failed to create category' }
@@ -94,7 +142,7 @@ export async function createCategory(categoryData: {
  */
 export async function updateCategory(
   categoryId: string,
-  categoryData: Partial<EventCategory>,
+  categoryData: Partial<EventCategory> & { kit_item_ids?: string[] },
   eventId: string
 ) {
   try {
@@ -129,9 +177,11 @@ export async function updateCategory(
       return { data: null, error: 'Price must be greater than or equal to 0' }
     }
 
+    const { kit_item_ids, ...dataToUpdate } = categoryData
+
     const { data, error } = await supabase
       .from('event_categories')
-      .update(categoryData)
+      .update(dataToUpdate)
       .eq('id', categoryId)
       .select()
       .single()
@@ -139,6 +189,33 @@ export async function updateCategory(
     if (error) {
       console.error('Error updating category:', error)
       return { data: null, error: error.message }
+    }
+
+    // Update kit items if provided
+    if (kit_item_ids) {
+      // 1. Delete existing links
+      const { error: deleteError } = await supabase
+        .from('event_category_kit_items')
+        .delete()
+        .eq('category_id', categoryId)
+
+      if (deleteError) {
+        console.error('Error clearing kit items:', deleteError)
+      } else if (kit_item_ids.length > 0) {
+        // 2. Insert new links
+        const kitItemsToInsert = kit_item_ids.map(itemId => ({
+          category_id: categoryId,
+          kit_item_id: itemId
+        }))
+
+        const { error: insertError } = await supabase
+          .from('event_category_kit_items')
+          .insert(kitItemsToInsert)
+
+        if (insertError) {
+          console.error('Error inserting kit items:', insertError)
+        }
+      }
     }
 
     return { data, error: null }

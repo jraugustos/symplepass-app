@@ -6,6 +6,7 @@ import {
 } from '@/types/database.types'
 import { ShirtGender } from '@/types'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { getCustomFieldsByEventId } from './admin-custom-fields'
 
 /**
  * Data for updating a registration (admin action)
@@ -180,6 +181,15 @@ export async function exportRegistrationsToCSV(eventId: string) {
   try {
     const supabase = await createClient()
 
+    // Fetch custom fields definition for header mapping
+    const { data: customFieldsData } = await getCustomFieldsByEventId(eventId)
+    const customFields = customFieldsData || []
+
+    const customFieldsMap = customFields.reduce<Record<string, string>>((acc, field) => {
+      acc[field.name] = field.label
+      return acc
+    }, {})
+
     const { data: registrations, error } = await supabase
       .from('registrations')
       .select(
@@ -201,6 +211,12 @@ export async function exportRegistrationsToCSV(eventId: string) {
     const exportData = registrations?.map((reg: any) => {
       const partnerData = reg.registration_data?.partner
       const userData = reg.registration_data?.user
+      const customFieldValues = reg.registration_data?.custom_fields || {}
+
+      const customFieldsExport = Object.entries(customFieldsMap).reduce((acc, [name, label]) => {
+        acc[label] = customFieldValues[name] || ''
+        return acc
+      }, {} as Record<string, any>)
 
       return {
         codigo_inscricao: reg.ticket_code?.split('-').pop() || 'N/A',
@@ -221,6 +237,7 @@ export async function exportRegistrationsToCSV(eventId: string) {
         telefone_parceiro: partnerData?.phone || '',
         tamanho_camisa_parceiro: partnerData?.shirtSize || '',
         genero_camisa_parceiro: partnerData?.shirtGender || '',
+        ...customFieldsExport,
       }
     })
 

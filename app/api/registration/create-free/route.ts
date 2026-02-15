@@ -24,12 +24,14 @@ interface FreeRegistrationRequest {
     partnerName?: string | null
     partnerData?: PartnerData | null
     teamMembers?: ParticipantData[] | null
+    customFieldValues?: Record<string, any> | null
+    selectedKitItems?: string[] | null
 }
 
 export async function POST(request: Request) {
     try {
         const body = (await request.json()) as FreeRegistrationRequest
-        const { eventId, categoryId, shirtSize, shirtGender, userName, userEmail, userData, partnerName, partnerData, teamMembers } = body || {}
+        const { eventId, categoryId, shirtSize, shirtGender, userName, userEmail, userData, partnerName, partnerData, teamMembers, customFieldValues, selectedKitItems } = body || {}
 
         if (
             !eventId ||
@@ -207,6 +209,52 @@ export async function POST(request: Request) {
             }
             : null
 
+        // Validate selected kit items if present
+        let kitItemsPayload: Array<{ id: string; price: number; details: any }> = []
+
+        if (selectedKitItems && selectedKitItems.length > 0) {
+            const { data: kitItemsData, error: kitItemsError } = await adminSupabase
+                .from('event_kit_items')
+                .select('id, name, description, price, event_id')
+                .in('id', selectedKitItems)
+
+            if (kitItemsError || !kitItemsData) {
+                console.error('Error fetching kit items:', kitItemsError)
+                return NextResponse.json({ error: 'Erro ao validar itens do kit.' }, { status: 500 })
+            }
+
+            const typedKitItems = kitItemsData as Array<{
+                id: string
+                name: string
+                description: string | null
+                price: number
+                event_id: string
+            }>
+
+            // Verify count matches (to ensure all IDs were found)
+            if (typedKitItems.length !== selectedKitItems.length) {
+                return NextResponse.json({ error: 'Um ou mais itens do kit não foram encontrados.' }, { status: 400 })
+            }
+
+            // Verify all items belong to this event
+            const invalidItems = typedKitItems.filter(item => item.event_id !== eventId)
+            if (invalidItems.length > 0) {
+                return NextResponse.json({ error: 'Itens do kit inválidos para este evento.' }, { status: 400 })
+            }
+
+            // Verify prices are 0 for free registration endpoint
+            const paidItems = typedKitItems.filter(item => item.price > 0)
+            if (paidItems.length > 0) {
+                return NextResponse.json({ error: 'Itens pagos não são permitidos em inscrições gratuitas.' }, { status: 400 })
+            }
+
+            kitItemsPayload = typedKitItems.map(item => ({
+                id: item.id,
+                price: item.price,
+                details: { name: item.name, description: item.description }
+            }))
+        }
+
         const targetUserId =
             user?.id ||
             (await getOrCreateCheckoutUser({
@@ -277,6 +325,8 @@ export async function POST(request: Request) {
             normalizedPartnerData,
             normalizedUserData,
             normalizedTeamMembers,
+            customFieldValues,
+            kitItemsPayload.length > 0 ? kitItemsPayload : undefined,
             supabase
         )
 

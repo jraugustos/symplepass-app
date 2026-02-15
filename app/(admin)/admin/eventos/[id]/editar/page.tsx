@@ -10,6 +10,7 @@ import {
   getFAQsByEventId,
   getRegulationsByEventId,
 } from '@/lib/data/admin-event-details'
+import { getCustomFieldsByEventId } from '@/lib/data/admin-custom-fields'
 import {
   updateEventAction,
   createCategoryAction,
@@ -33,6 +34,9 @@ import {
   deleteRegulationAction,
   reorderRegulationsAction,
   updateRegulationPdfAction,
+  createCustomFieldAction,
+  updateCustomFieldAction,
+  deleteCustomFieldAction,
 } from '@/app/actions/event-details'
 import { EventForm, EventDetailsTabs } from '@/components/admin'
 
@@ -61,6 +65,7 @@ export default async function EditarEventoPage({ params }: { params: { id: strin
     { data: courseInfo },
     { data: faqs },
     { data: regulations },
+    { data: customFields },
   ] = await Promise.all([
     getEventByIdForAdmin(eventId),
     getCategoriesByEventId(eventId),
@@ -68,6 +73,7 @@ export default async function EditarEventoPage({ params }: { params: { id: strin
     getCourseInfoByEventId(eventId),
     getFAQsByEventId(eventId),
     getRegulationsByEventId(eventId),
+    getCustomFieldsByEventId(eventId),
   ])
 
   if (!event) {
@@ -103,6 +109,11 @@ export default async function EditarEventoPage({ params }: { params: { id: strin
   const boundDeleteRegulation = deleteRegulationAction.bind(null, eventId)
   const boundReorderRegulations = reorderRegulationsAction.bind(null, eventId)
   const boundUpdateRegulationPdf = updateRegulationPdfAction.bind(null, eventId)
+
+  // Custom fields actions
+  const boundCreateCustomField = createCustomFieldAction.bind(null, eventId)
+  const boundUpdateCustomField = updateCustomFieldAction.bind(null, eventId)
+  const boundDeleteCustomField = deleteCustomFieldAction.bind(null, eventId)
 
   return (
     <div className="space-y-6 pb-10">
@@ -149,19 +160,20 @@ export default async function EditarEventoPage({ params }: { params: { id: strin
           onCategoryUpdate={boundUpdateCategory}
           onCategoryDelete={boundDeleteCategory}
           onCategoryReorder={boundReorderCategories}
+          kitPickupInfo={event.kit_pickup_info}
+          onKitItemCreate={boundCreateKitItem}
+          onKitItemUpdate={boundUpdateKitItem}
+          onKitItemDelete={boundDeleteKitItem}
+          onKitItemsReorder={boundReorderKitItems}
+          onKitPickupInfoUpdate={boundUpdateKitPickupInfo}
           eventDetailsSection={
             <EventDetailsTabs
               eventId={eventId}
-              kitItems={kitItems || []}
               courseInfo={courseInfo}
               faqs={faqs || []}
               regulations={regulations || []}
-              kitPickupInfo={event.kit_pickup_info}
               regulationPdfUrl={event.regulation_pdf_url}
-              onKitItemCreate={boundCreateKitItem}
-              onKitItemUpdate={boundUpdateKitItem}
-              onKitItemDelete={boundDeleteKitItem}
-              onKitItemsReorder={boundReorderKitItems}
+              customFields={customFields || []}
               onCourseInfoUpdate={boundUpdateCourseInfo}
               onFAQCreate={boundCreateFAQ}
               onFAQUpdate={boundUpdateFAQ}
@@ -171,8 +183,10 @@ export default async function EditarEventoPage({ params }: { params: { id: strin
               onRegulationUpdate={boundUpdateRegulation}
               onRegulationDelete={boundDeleteRegulation}
               onRegulationsReorder={boundReorderRegulations}
-              onKitPickupInfoUpdate={boundUpdateKitPickupInfo}
               onRegulationPdfUpdate={boundUpdateRegulationPdf}
+              onCustomFieldCreate={boundCreateCustomField}
+              onCustomFieldUpdate={boundUpdateCustomField}
+              onCustomFieldDelete={boundDeleteCustomField}
             />
           }
         />

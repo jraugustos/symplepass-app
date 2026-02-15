@@ -67,6 +67,7 @@ export type SportType =
   | 'outro'
 export type RegistrationStatus = 'pending' | 'confirmed' | 'cancelled'
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded'
+export type PaymentProvider = 'stripe' | 'mercadopago' | 'free'
 export type ShirtSize = string
 
 // Photo order types
@@ -138,6 +139,8 @@ export interface Event {
   has_organizer: boolean
   show_course_info: boolean
   show_championship_format: boolean
+  has_kit: boolean
+  has_kit_pickup_info: boolean
   regulation_pdf_url: string | null
   regulation_updated_at: string | null
   kit_pickup_info: any // JSONB field
@@ -169,6 +172,7 @@ export interface EventCategory {
   shirt_genders: ('masculino' | 'feminino' | 'infantil')[] | null
   created_at: string
   updated_at: string
+  kit_items?: EventKitItem[]
 }
 
 export interface Registration {
@@ -181,6 +185,11 @@ export interface Registration {
   amount_paid: number | null
   stripe_session_id: string | null
   stripe_payment_intent_id: string | null
+  // Mercado Pago fields
+  mp_preference_id: string | null
+  mp_payment_id: number | null
+  payment_provider: PaymentProvider
+  //
   qr_code: string | null
   ticket_code: string | null
   shirt_size: ShirtSize | null
@@ -219,6 +228,7 @@ export interface EventKitItem {
   description: string
   icon: string
   image_url: string | null
+  price: number
   display_order: number
   created_at: string
   updated_at: string
@@ -372,6 +382,11 @@ export interface PhotoOrder {
   price_per_photo_applied: number | null
   stripe_session_id: string | null
   stripe_payment_intent_id: string | null
+  // Mercado Pago fields
+  mp_preference_id: string | null
+  mp_payment_id: number | null
+  payment_provider: 'stripe' | 'mercadopago'
+  //
   created_at: string
   updated_at: string
 }
@@ -437,7 +452,38 @@ export interface PhotoFaceProcessing {
   updated_at: string
 }
 
+// Custom field types
+export type CustomFieldType = 'text' | 'number' | 'select' | 'checkbox'
+
+export interface EventCustomField {
+  id: string
+  event_id: string
+  name: string
+  label: string
+  field_type: CustomFieldType
+  is_required: boolean
+  options: string[] | null
+  placeholder: string | null
+  display_order: number
+  created_at: string
+  updated_at: string
+}
+
 // Database schema type
+export interface RegistrationKitItem {
+  id: string
+  registration_id: string
+  kit_item_id: string
+  price: number
+  created_at: string
+}
+
+export interface EventCategoryKitItem {
+  category_id: string
+  kit_item_id: string
+  created_at: string
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -460,6 +506,11 @@ export interface Database {
         Row: EventKitItem
         Insert: Omit<EventKitItem, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Omit<EventKitItem, 'id' | 'created_at' | 'updated_at'>>
+      }
+      event_category_kit_items: {
+        Row: EventCategoryKitItem
+        Insert: Omit<EventCategoryKitItem, 'created_at'>
+        Update: Partial<Omit<EventCategoryKitItem, 'created_at'>>
       }
       event_course_info: {
         Row: EventCourseInfo
@@ -530,6 +581,16 @@ export interface Database {
         Row: PhotoFaceProcessing
         Insert: Omit<PhotoFaceProcessing, 'created_at' | 'updated_at'>
         Update: Partial<Omit<PhotoFaceProcessing, 'created_at' | 'updated_at'>>
+      }
+      event_custom_fields: {
+        Row: EventCustomField
+        Insert: Omit<EventCustomField, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<EventCustomField, 'id' | 'created_at' | 'updated_at'>>
+      }
+      registration_kit_items: {
+        Row: RegistrationKitItem
+        Insert: Omit<RegistrationKitItem, 'id' | 'created_at'>
+        Update: Partial<Omit<RegistrationKitItem, 'id' | 'created_at'>>
       }
     }
   }

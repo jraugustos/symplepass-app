@@ -168,7 +168,7 @@ export function CouponsTable({
                   {coupon.events?.title || 'Todos os eventos'}
                 </td>
                 <td className="px-4 py-4 text-sm text-neutral-600">
-                  {formatDate(coupon.valid_from)} - {formatDate(coupon.valid_until)}
+                  {coupon.valid_from ? formatDate(coupon.valid_from) : '-'} - {coupon.valid_until ? formatDate(coupon.valid_until) : '-'}
                 </td>
                 <td className="px-4 py-4 text-sm text-neutral-600">
                   {coupon.current_uses} / {coupon.max_uses || '∞'}

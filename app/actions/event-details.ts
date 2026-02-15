@@ -153,3 +153,25 @@ export async function updateRegulationPdfAction(eventId: string, url: string) {
     revalidatePath(`/admin/eventos/${eventId}/editar`)
     revalidatePath(`/eventos/[slug]`)
 }
+
+// Custom Fields
+import * as customFieldsDb from '@/lib/data/admin-custom-fields'
+import type { EventCustomFieldFormData } from '@/types'
+
+export async function createCustomFieldAction(eventId: string, data: EventCustomFieldFormData) {
+    const result = await customFieldsDb.createCustomField(eventId, data)
+    if (result.error) throw new Error(result.error)
+    revalidatePath(`/admin/eventos/${eventId}/editar`)
+}
+
+export async function updateCustomFieldAction(eventId: string, id: string, data: EventCustomFieldFormData) {
+    const result = await customFieldsDb.updateCustomField(id, data)
+    if (result.error) throw new Error(result.error)
+    revalidatePath(`/admin/eventos/${eventId}/editar`)
+}
+
+export async function deleteCustomFieldAction(eventId: string, id: string) {
+    const result = await customFieldsDb.deleteCustomField(id)
+    if (!result.success) throw new Error(result.error || 'Failed to delete custom field')
+    revalidatePath(`/admin/eventos/${eventId}/editar`)
+}

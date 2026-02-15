@@ -3,13 +3,13 @@ import { Payment } from 'mercadopago'
 import { mpClient } from '@/lib/mercadopago/client'
 import {
     getRegistrationByMpPreference,
-    getRegistrationByMpPreferenceWithDetails,
+    getRegistrationByIdWithDetails,
     updateRegistrationMpPaymentStatus,
     updateRegistrationQRCode,
 } from '@/lib/data/registrations'
 import {
     getPhotoOrderByMpPreference,
-    getPhotoOrderByMpPreferenceWithDetails,
+    getPhotoOrderByIdWithDetails,
     updatePhotoOrderMpPaymentStatus,
 } from '@/lib/data/photo-orders'
 import { generateQRCode } from '@/lib/qrcode/generate'
@@ -128,11 +128,7 @@ async function handleRegistrationPayment(
             )
 
             // Fetch full details for email
-            let registrationDetails = null
-            if (preferenceId) {
-                const result = await getRegistrationByMpPreferenceWithDetails(preferenceId)
-                registrationDetails = result.data
-            }
+            const { data: registrationDetails } = await getRegistrationByIdWithDetails(registrationId)
 
             if (registrationDetails) {
                 // Generate ticket code
@@ -266,11 +262,7 @@ async function handlePhotoOrderPayment(
             )
 
             // Fetch full details for email
-            let orderDetails = null
-            if (preferenceId) {
-                const result = await getPhotoOrderByMpPreferenceWithDetails(preferenceId)
-                orderDetails = result.data
-            }
+            const { data: orderDetails } = await getPhotoOrderByIdWithDetails(orderId)
 
             if (orderDetails) {
                 const userEmail = orderDetails.user?.email || ''

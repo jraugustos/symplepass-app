@@ -78,53 +78,64 @@ export async function createEventRegistrationPreference(
 ): Promise<PreferenceResult> {
     const preference = new Preference(mpClient)
 
-    const result = await preference.create({
-        body: {
-            items: [
-                {
-                    id: params.registrationId,
-                    title: `${params.eventTitle} - ${params.categoryName}`,
-                    description: params.description,
-                    quantity: 1,
-                    currency_id: 'BRL',
-                    unit_price: params.totalAmount, // BRL, NOT centavos
-                },
-            ],
-            payer: {
-                email: params.payerEmail,
+    const preferenceBody = {
+        items: [
+            {
+                id: params.registrationId,
+                title: `${params.eventTitle} - ${params.categoryName}`,
+                description: params.description,
+                quantity: 1,
+                currency_id: 'BRL',
+                unit_price: params.totalAmount,
             },
-            // MP rejects localhost URLs for back_urls and notification_url.
-            // On localhost, omit them — user returns manually from MP checkout.
-            ...(isLocalhost
-                ? {}
-                : {
-                    back_urls: {
-                        success: `${baseUrl}/confirmacao`,
-                        failure: `${baseUrl}/inscricao?${params.cancelUrlParams}`,
-                        pending: `${baseUrl}/confirmacao?status=pending`,
-                    },
-                    auto_return: 'approved' as const,
-                    notification_url: `${baseUrl}/api/webhooks/mercadopago`,
-                }),
-            external_reference: params.registrationId,
-            metadata: {
-                type: 'registration',
-                registration_id: params.registrationId,
-                event_id: params.eventId,
-                category_id: params.categoryId,
-                user_id: params.userId,
-            },
-            statement_descriptor: 'SYMPLEPASS',
+        ],
+        payer: {
+            email: params.payerEmail,
         },
-    })
-
-    if (!result.id || !result.init_point) {
-        throw new Error('Mercado Pago preference creation failed: missing id or init_point')
+        ...(isLocalhost
+            ? {}
+            : {
+                back_urls: {
+                    success: `${baseUrl}/confirmacao`,
+                    failure: `${baseUrl}/inscricao?${params.cancelUrlParams}`,
+                    pending: `${baseUrl}/confirmacao?status=pending`,
+                },
+                auto_return: 'approved' as const,
+                notification_url: `${baseUrl}/api/webhooks/mercadopago`,
+            }),
+        external_reference: params.registrationId,
+        metadata: {
+            type: 'registration',
+            registration_id: params.registrationId,
+            event_id: params.eventId,
+            category_id: params.categoryId,
+            user_id: params.userId,
+        },
+        statement_descriptor: 'SYMPLEPASS',
     }
 
-    return {
-        id: result.id,
-        initPoint: result.init_point,
+    console.log('[MercadoPago] Creating preference with body:', JSON.stringify(preferenceBody, null, 2))
+
+    try {
+        const result = await preference.create({ body: preferenceBody })
+
+        if (!result.id || !result.init_point) {
+            throw new Error('Mercado Pago preference creation failed: missing id or init_point')
+        }
+
+        return {
+            id: result.id,
+            initPoint: result.init_point,
+        }
+    } catch (error: any) {
+        console.error('[MercadoPago] Preference creation error:', {
+            message: error?.message,
+            cause: error?.cause,
+            status: error?.status,
+            response: error?.response,
+            fullError: JSON.stringify(error, Object.getOwnPropertyNames(error), 2),
+        })
+        throw error
     }
 }
 

@@ -431,6 +431,9 @@ export async function POST(request: Request) {
     const env = getEnv()
 
     // Create Mercado Pago Checkout Pro preference
+    console.log('[Checkout] About to create MP preference for registration:', registrationResult.data.id)
+    console.log('[Checkout] MP token available:', !!env.mercadopago.accessToken)
+
     const mpPreference = await createEventRegistrationPreference({
       registrationId: registrationResult.data.id,
       eventTitle: event.title,

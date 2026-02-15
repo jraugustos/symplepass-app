@@ -8,6 +8,8 @@ import { getEnv } from '@/lib/env'
 
 const env = getEnv()
 
+console.log('[MercadoPago Client] Initializing with token prefix:', env.mercadopago.accessToken?.substring(0, 15) + '...')
+
 export const mpClient = new MercadoPagoConfig({
     accessToken: env.mercadopago.accessToken,
 })

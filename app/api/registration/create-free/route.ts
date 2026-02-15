@@ -210,7 +210,7 @@ export async function POST(request: Request) {
             : null
 
         // Validate selected kit items if present
-        let kitItemsPayload: Array<{ id: string; price: number; details: any }> = []
+        let kitItemsPayload: Array<{ id: string; price: number }> = []
 
         if (selectedKitItems && selectedKitItems.length > 0) {
             const { data: kitItemsData, error: kitItemsError } = await adminSupabase
@@ -251,7 +251,6 @@ export async function POST(request: Request) {
             kitItemsPayload = typedKitItems.map(item => ({
                 id: item.id,
                 price: item.price,
-                details: { name: item.name, description: item.description }
             }))
         }
 

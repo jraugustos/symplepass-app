@@ -247,7 +247,7 @@ export async function POST(request: Request) {
     }
 
     // Validate selected kit items if present
-    let kitItemsPayload: Array<{ id: string; price: number; details: any }> = []
+    let kitItemsPayload: Array<{ id: string; price: number }> = []
     let serverKitItemsTotal = 0
 
     if (selectedKitItems && selectedKitItems.length > 0) {
@@ -285,7 +285,6 @@ export async function POST(request: Request) {
       kitItemsPayload = typedKitItems.map(item => ({
         id: item.id,
         price: item.price,
-        details: { name: item.name, description: item.description }
       }))
     }
 

@@ -30,7 +30,7 @@ export async function createRegistration(
   userData?: ParticipantData | null,
   teamMembers?: ParticipantData[] | null,
   customFieldValues?: Record<string, any> | null,
-  kitItems?: Array<{ id: string; price: number; details: any }> | null,
+  kitItems?: Array<{ id: string; price: number }> | null,
   supabaseClient?: SupabaseServerClient
 ): Promise<RegistrationResult<Registration>> {
   try {
@@ -170,7 +170,6 @@ export async function createRegistration(
         registration_id: data.id,
         kit_item_id: item.id,
         price: item.price,
-        details: item.details
       }))
 
       const { error: kitError } = await supabase

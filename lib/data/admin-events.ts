@@ -368,7 +368,7 @@ export async function deleteEvent(
   hardDelete = false,
 ) {
   try {
-    const supabase = await createClient();
+    const supabase = createClient();
 
     console.log(`[deleteEvent] Attempting to delete event ${eventId} by user ${userId} with role ${userRole}, hardDelete: ${hardDelete}`);
 
@@ -391,9 +391,13 @@ export async function deleteEvent(
       }
     }
 
+    // Use admin client to bypass RLS for the delete operation
+    // This is safe because we already verified permissions above
+    const adminSupabase = createAdminClient();
+
     if (hardDelete) {
-      const { error } = await supabase
-        .from("events")
+      const { error } = await (adminSupabase
+        .from("events") as any)
         .delete()
         .eq("id", eventId);
 
@@ -404,8 +408,8 @@ export async function deleteEvent(
       console.log(`[deleteEvent] Successfully hard deleted event ${eventId}`);
     } else {
       // Soft delete
-      const { error } = await supabase
-        .from("events")
+      const { error } = await (adminSupabase
+        .from("events") as any)
         .update({ status: "cancelled" })
         .eq("id", eventId);
 
@@ -433,7 +437,7 @@ export async function updateEventStatus(
   userRole: string,
 ) {
   try {
-    const supabase = await createClient();
+    const supabase = createClient();
 
     console.log(`[updateEventStatus] Updating event ${eventId} to status ${status} by user ${userId} with role ${userRole}`);
 
@@ -455,9 +459,13 @@ export async function updateEventStatus(
       }
     }
 
+    // Use admin client to bypass RLS for the update
+    // This is safe because we already verified permissions above
+    const adminSupabase = createAdminClient();
+
     // Update without .single() to avoid "cannot coerce" error
-    const { data: updatedData, error } = await supabase
-      .from("events")
+    const { data: updatedData, error } = await (adminSupabase
+      .from("events") as any)
       .update({ status })
       .eq("id", eventId)
       .select();

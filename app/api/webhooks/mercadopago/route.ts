@@ -18,6 +18,7 @@ import { sendPhotoOrderConfirmationEmail } from '@/lib/email/send-photo-order-co
 import { markContactAsEventParticipant } from '@/lib/email/contacts'
 import { formatDateTimeLong, extractLocationString } from '@/lib/utils'
 import { APP_URL } from '@/lib/email/templates/base-layout'
+import { createAdminClient } from '@/lib/supabase/server'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -128,7 +129,8 @@ async function handleRegistrationPayment(
             )
 
             // Fetch full details for email
-            const { data: registrationDetails } = await getRegistrationByIdWithDetails(registrationId)
+            const adminClient = createAdminClient()
+            const { data: registrationDetails } = await getRegistrationByIdWithDetails(registrationId, adminClient)
 
             if (registrationDetails) {
                 // Generate ticket code
@@ -262,7 +264,8 @@ async function handlePhotoOrderPayment(
             )
 
             // Fetch full details for email
-            const { data: orderDetails } = await getPhotoOrderByIdWithDetails(orderId)
+            const adminClient = createAdminClient()
+            const { data: orderDetails } = await getPhotoOrderByIdWithDetails(orderId, adminClient)
 
             if (orderDetails) {
                 const userEmail = orderDetails.user?.email || ''

@@ -724,3 +724,52 @@ function generateTempPassword(): string {
   const random = Math.random().toString(36).slice(-8)
   return `Symp!e${random}${Date.now().toString().slice(-2)}`
 }
+
+/**
+ * Updates the registration_data JSONB column for a registration.
+ * Merges the new data with existing data.
+ * @returns Updated registration or error description
+ */
+export async function updateRegistrationData(
+  registrationId: string,
+  dataToUpdate: Record<string, any>,
+  supabaseClient?: SupabaseServerClient
+): Promise<RegistrationResult<Registration>> {
+  try {
+    const supabase = getClient(supabaseClient)
+
+    // First fetch existing data to merge
+    const { data: currentRegistration, error: fetchError } = await supabase
+      .from('registrations')
+      .select('registration_data')
+      .eq('id', registrationId)
+      .single()
+
+    if (fetchError) {
+      console.error('Error fetching registration data for update:', fetchError)
+      return { data: null, error: fetchError.message }
+    }
+
+    const currentData = currentRegistration.registration_data || {}
+    const newData = { ...currentData, ...dataToUpdate }
+
+    const { data, error } = await supabase
+      .from('registrations')
+      .update({
+        registration_data: newData,
+      })
+      .eq('id', registrationId)
+      .select('*')
+      .single()
+
+    if (error) {
+      console.error('Error updating registration data:', error)
+      return { data: null, error: error.message }
+    }
+
+    return { data, error: null }
+  } catch (error) {
+    console.error('Unexpected error updating registration data:', error)
+    return { data: null, error: 'Unable to update registration data' }
+  }
+}

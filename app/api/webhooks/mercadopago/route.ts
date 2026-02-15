@@ -115,12 +115,19 @@ async function handleRegistrationPayment(
     // Map MP status to our system
     switch (mpStatus) {
         case 'approved': {
-            // Check idempotency — don't re-process if already paid
-            if (registration?.payment_status === 'paid') {
-                console.log('[MP Webhook] Registration already confirmed:', registrationId)
+            // Fetch full details for email first to check if email was already sent
+            const adminClient = createAdminClient()
+            const { data: registrationDetails } = await getRegistrationByIdWithDetails(registrationId, adminClient)
+
+            // Check idempotency for EMAIL sending
+            const emailAlreadySent = registrationDetails?.registration_data?.confirmation_email_sent === true
+
+            if (registration?.payment_status === 'paid' && emailAlreadySent) {
+                console.log('[MP Webhook] Registration already confirmed AND email sent:', registrationId)
                 return
             }
 
+            // Always ensure payment status is updated to paid/confirmed
             await updateRegistrationMpPaymentStatus(
                 registrationId,
                 'confirmed',
@@ -128,11 +135,8 @@ async function handleRegistrationPayment(
                 mpPaymentId
             )
 
-            // Fetch full details for email
-            const adminClient = createAdminClient()
-            const { data: registrationDetails } = await getRegistrationByIdWithDetails(registrationId, adminClient)
-
-            if (registrationDetails) {
+            // Proceed to send email if not sent yet
+            if (registrationDetails && !emailAlreadySent) {
                 // Generate ticket code
                 const eventSlug = registrationDetails.event?.slug || 'EVENT'
                 const ticketCode = `${eventSlug.toUpperCase()}-${registrationId.slice(0, 8).toUpperCase()}`
@@ -167,7 +171,7 @@ async function handleRegistrationPayment(
                         }
                         : undefined
 
-                    await sendConfirmationEmail({
+                    const emailResult = await sendConfirmationEmail({
                         userEmail: recipientEmail,
                         userName: registrationDetails.user?.full_name || '',
                         eventTitle,
@@ -183,11 +187,19 @@ async function handleRegistrationPayment(
                         partnerData,
                     })
 
-                    markContactAsEventParticipant(recipientEmail).catch((err) => {
-                        console.error('[MP Webhook] Failed to update Resend contact:', err)
-                    })
+                    if (emailResult.success) {
+                        // Mark email as sent to prevent re-sending
+                        const { updateRegistrationData } = await import('@/lib/data/registrations')
+                        await updateRegistrationData(registrationId, { confirmation_email_sent: true }, adminClient)
 
-                    console.log('[MP Webhook] Confirmation email sent for registration:', registrationId)
+                        console.log('[MP Webhook] Confirmation email sent for registration:', registrationId)
+
+                        markContactAsEventParticipant(recipientEmail).catch((err) => {
+                            console.error('[MP Webhook] Failed to update Resend contact:', err)
+                        })
+                    } else {
+                        console.error('[MP Webhook] Failed to send email, will retry on next webhook:', emailResult.error)
+                    }
                 }
             }
 

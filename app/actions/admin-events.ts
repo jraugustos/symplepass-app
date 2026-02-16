@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { getCurrentUser } from '@/lib/auth/actions'
 import { updateEvent } from '@/lib/data/admin-events'
+import { createAdminClient } from '@/lib/supabase/server'
 import {
   createCategory,
   updateCategory,
@@ -107,4 +108,35 @@ export async function reorderCategoriesAction(
   }
 
   revalidatePath(`/admin/eventos/${eventId}/editar`)
+}
+
+export async function updateEventServiceFee(eventId: string, serviceFee: number) {
+  try {
+    const result = await getCurrentUser()
+
+    if (!result?.profile || result.profile.role !== 'admin') {
+      return { error: 'Apenas administradores podem alterar a taxa de serviço' }
+    }
+
+    const supabase = createAdminClient()
+
+    const { error } = await supabase
+      .from('events')
+      // @ts-ignore
+      .update({ service_fee: serviceFee })
+      .eq('id', eventId)
+
+    if (error) {
+      console.error('Error updating service fee:', error)
+      return { error: 'Erro ao atualizar taxa de serviço' }
+    }
+
+    revalidatePath(`/eventos`)
+    revalidatePath(`/admin/eventos`)
+
+    return { success: true }
+  } catch (error) {
+    console.error('Unexpected error updating service fee:', error)
+    return { error: 'Erro inesperado ao atualizar taxa de serviço' }
+  }
 }

@@ -44,10 +44,18 @@ describe('formatCurrency', () => {
 })
 
 describe('calculateServiceFee', () => {
-  it('should calculate 10% service fee', () => {
-    expect(calculateServiceFee(100)).toBe(10)
-    expect(calculateServiceFee(150)).toBe(15)
-    expect(calculateServiceFee(99.99)).toBe(10)
+  it('should return 0 by default', () => {
+    expect(calculateServiceFee(100)).toBe(0)
+  })
+
+  it('should return fixed fee', () => {
+    expect(calculateServiceFee(100, 5.9, 'fixed')).toBe(5.9)
+  })
+
+  it('should calculate percentage fee', () => {
+    expect(calculateServiceFee(100, 10, 'percentage')).toBe(10)
+    expect(calculateServiceFee(150, 10, 'percentage')).toBe(15)
+    expect(calculateServiceFee(99.99, 10, 'percentage')).toBe(10)
   })
 
   it('should return 0 for invalid input', () => {

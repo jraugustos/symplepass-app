@@ -46,6 +46,8 @@ export async function updateEventAction(eventId: string, data: EventFormDataAdmi
       allow_page_access: data.allow_page_access,
       has_kit: data.has_kit,
       has_kit_pickup_info: data.has_kit_pickup_info,
+      service_fee: data.service_fee,
+      service_fee_type: data.service_fee_type,
     },
     result.user.id,
     result.profile.role

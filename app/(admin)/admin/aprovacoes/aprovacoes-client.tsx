@@ -159,15 +159,9 @@ export default function ApprovacoesPageClient() {
             return
         }
 
-        // For percentage, we store negative value to identify it
-        // Or we can store it with a prefix/metadata
-        // For simplicity, we'll store the value and type in notes or use a convention
-        // Actually, let's update the backend to support this properly
-        // For now, we'll pass the fee with a convention: percentage as negative
-        const feeToSave = feeType === 'percentage' ? -feeValue : feeValue
-
+        // Pass fee and type explicitly
         setProcessingId(selectedEvent.id)
-        const result = await approveEventAction(selectedEvent.id, feeToSave, approveNotes)
+        const result = await approveEventAction(selectedEvent.id, feeValue, feeType, approveNotes)
         setProcessingId(null)
 
         if (result.error) {

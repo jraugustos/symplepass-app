@@ -149,6 +149,7 @@ export interface Event {
   updated_at: string
   // Approval workflow fields
   service_fee: number
+  service_fee_type: 'percentage' | 'fixed'
   approval_status: ApprovalStatus | null
   approval_notes: string | null
   approved_by: string | null

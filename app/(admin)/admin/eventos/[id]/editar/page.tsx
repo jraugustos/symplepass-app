@@ -152,6 +152,7 @@ export default async function EditarEventoPage({ params }: { params: { id: strin
       {/* Main Form */}
       <div className="max-w-4xl space-y-8">
         <EventForm
+          userRole={result.profile.role}
           event={event}
           categories={categories}
           kitItems={kitItems || []}

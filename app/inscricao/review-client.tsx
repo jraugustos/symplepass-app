@@ -252,7 +252,7 @@ export function ReviewClient({
     // We treat kit items as additional cost that might or might not be subject to service fee
     // usually service fee is on the transaction total
     const subtotal = discountedCategoryPrice + kitItemsTotal
-    const serviceFee = calculateServiceFee(subtotal)
+    const serviceFee = calculateServiceFee(subtotal, event.service_fee, event.service_fee_type)
     const total = calculateTotal(subtotal, serviceFee)
 
     return {

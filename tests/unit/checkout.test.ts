@@ -113,14 +113,14 @@ describe('Checkout Create Session', () => {
     const PRICE_TOLERANCE = 0.01
 
     it('should calculate service fee correctly', () => {
-      expect(calculateServiceFee(100)).toBe(10)
-      expect(calculateServiceFee(150)).toBe(15)
-      expect(calculateServiceFee(99.99)).toBe(10)
+      expect(calculateServiceFee(100, 10, 'percentage')).toBe(10)
+      expect(calculateServiceFee(150, 10, 'percentage')).toBe(15)
+      expect(calculateServiceFee(99.99, 10, 'percentage')).toBe(10)
     })
 
     it('should calculate total correctly', () => {
       const subtotal = 100
-      const serviceFee = calculateServiceFee(subtotal)
+      const serviceFee = calculateServiceFee(subtotal, 10, 'percentage')
       const total = calculateTotal(subtotal, serviceFee)
 
       expect(total).toBe(110)

@@ -557,6 +557,7 @@ export async function getEventStats(eventId: string) {
 export async function approveEvent(
   eventId: string,
   serviceFee: number,
+  serviceFeeType: 'percentage' | 'fixed',
   adminId: string,
   notes?: string
 ) {
@@ -570,6 +571,7 @@ export async function approveEvent(
         status: "published" as EventStatus,
         approval_status: "approved",
         service_fee: serviceFee,
+        service_fee_type: serviceFeeType,
         approved_by: adminId,
         approved_at: new Date().toISOString(),
         approval_notes: notes || null,

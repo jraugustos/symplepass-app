@@ -36,6 +36,7 @@ import {
   ShirtSizesByGender,
   KitItemFormData,
 } from "@/types";
+import { UserRole } from "@/types/database.types";
 import { formatCurrency } from "@/lib/utils";
 import { GENDER_LABELS } from "@/lib/constants/shirt-sizes";
 
@@ -103,6 +104,8 @@ const publishSchema = z
     allow_page_access: z.boolean(),
     has_kit: z.boolean(),
     has_kit_pickup_info: z.boolean(),
+    service_fee: z.number().min(0).default(0),
+    service_fee_type: z.enum(['percentage', 'fixed']).default('percentage'),
   })
   .refine(
     (data) => {
@@ -194,6 +197,8 @@ const draftSchema = z.object({
   allow_page_access: z.boolean().optional(),
   has_kit: z.boolean().optional(),
   has_kit_pickup_info: z.boolean().optional(),
+  service_fee: z.number().optional(),
+  service_fee_type: z.enum(['percentage', 'fixed']).optional(),
 });
 
 interface EventFormProps {
@@ -216,6 +221,7 @@ interface EventFormProps {
   onKitItemsReorder?: (items: { id: string; display_order: number }[]) => Promise<void>;
   onKitPickupInfoUpdate?: (data: any) => Promise<void>;
   eventDetailsSection?: ReactNode;
+  userRole?: UserRole;
 }
 
 export function EventForm({
@@ -235,6 +241,7 @@ export function EventForm({
   onCategoryDelete,
   onCategoryReorder,
   eventDetailsSection,
+  userRole = 'organizer',
 }: EventFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -331,6 +338,8 @@ export function EventForm({
           event.allow_page_access !== undefined ? event.allow_page_access : true,
         has_kit: event.has_kit !== undefined ? event.has_kit : false,
         has_kit_pickup_info: event.has_kit_pickup_info !== undefined ? event.has_kit_pickup_info : false,
+        service_fee: event.service_fee || 0,
+        service_fee_type: event.service_fee_type || 'percentage',
       }
       : {
         title: "",
@@ -360,6 +369,8 @@ export function EventForm({
         allow_page_access: true,
         has_kit: false,
         has_kit_pickup_info: false,
+        service_fee: 0,
+        service_fee_type: 'percentage',
       },
   });
 
@@ -805,6 +816,55 @@ export function EventForm({
                 </p>
               </div>
             )}
+
+            {/* Service Fee - Only for Admins */}
+            {userRole === 'admin' && (
+              <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-100">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Taxa de Serviço
+                </label>
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        value="percentage"
+                        {...register("service_fee_type")}
+                        className="h-4 w-4 text-orange-600 focus:ring-orange-500"
+                      />
+                      <span className="text-sm text-gray-700">Porcentagem (%)</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        value="fixed"
+                        {...register("service_fee_type")}
+                        className="h-4 w-4 text-orange-600 focus:ring-orange-500"
+                      />
+                      <span className="text-sm text-gray-700">Valor Fixo (R$)</span>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className="w-32"
+                      {...register("service_fee", {
+                        setValueAs: (v) => v === "" ? 0 : Number(v),
+                      })}
+                    />
+                    <span className="text-sm text-gray-500">
+                      {watch("service_fee_type") === 'percentage' ? '%' : 'R$'}
+                    </span>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Taxa cobrada sobre o valor da inscrição. Visível apenas para administradores.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Tipo de Inscrição */}
@@ -847,40 +907,42 @@ export function EventForm({
           </div>
 
           {/* Team Size - Only show when team registration is enabled */}
-          {watch("allows_team_registration") && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-blue-900 mb-1">
-                    Tamanho da equipe *
-                  </label>
-                  <Input
-                    type="number"
-                    {...register("team_size", {
-                      setValueAs: (v) => {
-                        if (!v || v === "") return null;
-                        const parsed = parseInt(v, 10);
-                        return isNaN(parsed) ? null : parsed;
-                      },
-                    })}
-                    placeholder="Número de membros"
-                    min="2"
-                    error={errors.team_size?.message}
-                  />
-                  {errors.team_size && (
-                    <p className="mt-1 text-sm text-red-600">
-                      {errors.team_size.message}
-                    </p>
-                  )}
-                  {!errors.team_size && (
-                    <p className="text-xs text-blue-700 mt-1">
-                      Quantas pessoas devem compor cada equipe (mínimo 2)
-                    </p>
-                  )}
+          {
+            watch("allows_team_registration") && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-blue-900 mb-1">
+                      Tamanho da equipe *
+                    </label>
+                    <Input
+                      type="number"
+                      {...register("team_size", {
+                        setValueAs: (v) => {
+                          if (!v || v === "") return null;
+                          const parsed = parseInt(v, 10);
+                          return isNaN(parsed) ? null : parsed;
+                        },
+                      })}
+                      placeholder="Número de membros"
+                      min="2"
+                      error={errors.team_size?.message}
+                    />
+                    {errors.team_size && (
+                      <p className="mt-1 text-sm text-red-600">
+                        {errors.team_size.message}
+                      </p>
+                    )}
+                    {!errors.team_size && (
+                      <p className="text-xs text-blue-700 mt-1">
+                        Quantas pessoas devem compor cada equipe (mínimo 2)
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )
+          }
 
           {/* Configurações de Exibição */}
           <div className="space-y-3 pt-4 border-t border-neutral-200">
@@ -949,187 +1011,191 @@ export function EventForm({
               </div>
             </div>
           </div>
-        </div>
-      </Card>
+        </div >
+      </Card >
 
       {/* Kit do Atleta Section */}
       {/* Kit do Atleta Section */}
-      {watch("has_kit") && (
-        <>
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Kit do Atleta</h3>
+      {
+        watch("has_kit") && (
+          <>
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold mb-4">Kit do Atleta</h3>
 
-            <div className="space-y-6">
-              <div className="bg-neutral-50 rounded-lg p-4 border border-neutral-200">
-                <KitItemsForm
-                  eventId={event?.id || ""}
-                  items={kitItems}
-                  onCreate={onKitItemCreate || (async () => { })}
-                  onUpdate={onKitItemUpdate || (async () => { })}
-                  onDelete={onKitItemDelete || (async () => { })}
-                  onReorder={onKitItemsReorder || (async () => { })}
-                />
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <input
-                    type="checkbox"
-                    id="has_kit_pickup_info"
-                    {...register("has_kit_pickup_info")}
-                    className="mt-1 h-4 w-4 text-orange-600 focus:ring-orange-500 border-neutral-300 rounded"
+              <div className="space-y-6">
+                <div className="bg-neutral-50 rounded-lg p-4 border border-neutral-200">
+                  <KitItemsForm
+                    eventId={event?.id || ""}
+                    items={kitItems}
+                    onCreate={onKitItemCreate || (async () => { })}
+                    onUpdate={onKitItemUpdate || (async () => { })}
+                    onDelete={onKitItemDelete || (async () => { })}
+                    onReorder={onKitItemsReorder || (async () => { })}
                   />
-                  <div>
-                    <label htmlFor="has_kit_pickup_info" className="text-sm font-medium text-neutral-700 cursor-pointer">
-                      Deseja informar as informações de retirada do Kit?
-                    </label>
-                    <p className="text-xs text-neutral-500 mt-1">
-                      Local, datas e horários para retirada do kit.
-                    </p>
-                  </div>
                 </div>
 
-                {watch("has_kit_pickup_info") && (
-                  <div className="pl-7">
-                    <KitPickupForm
-                      pickupInfo={kitPickupInfo}
-                      onPickupInfoUpdate={onKitPickupInfoUpdate || (async () => { })}
+                <div className="space-y-4">
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      id="has_kit_pickup_info"
+                      {...register("has_kit_pickup_info")}
+                      className="mt-1 h-4 w-4 text-orange-600 focus:ring-orange-500 border-neutral-300 rounded"
                     />
+                    <div>
+                      <label htmlFor="has_kit_pickup_info" className="text-sm font-medium text-neutral-700 cursor-pointer">
+                        Deseja informar as informações de retirada do Kit?
+                      </label>
+                      <p className="text-xs text-neutral-500 mt-1">
+                        Local, datas e horários para retirada do kit.
+                      </p>
+                    </div>
                   </div>
-                )}
-              </div>
-            </div>
-          </Card>
 
-          {/* Shirt Sizes Config - Show immediately after Kit if shirt exists in kit */}
-          {hasShirtInKit && (
-            <ShirtSizesConfig
-              config={watch("shirt_sizes_config") as ShirtSizesByGender | null}
-              onChange={(config) => setValue("shirt_sizes_config", config)}
-              error={errors.shirt_sizes_config?.message}
-            />
-          )}
-
-          {/* Info message if no shirt in kit */}
-          {!hasShirtInKit && kitItems.length > 0 && (
-            <Card className="p-6 bg-blue-50 border-blue-200">
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 mt-0.5">
-                  <svg
-                    className="h-5 w-5 text-blue-600"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-blue-900 mb-1">
-                    Tamanhos de camiseta não disponíveis
-                  </h3>
-                  <p className="text-sm text-blue-800">
-                    Para configurar os tamanhos de camiseta, primeiro adicione o
-                    item "Camiseta" no "Kit do Atleta".
-                  </p>
+                  {watch("has_kit_pickup_info") && (
+                    <div className="pl-7">
+                      <KitPickupForm
+                        pickupInfo={kitPickupInfo}
+                        onPickupInfoUpdate={onKitPickupInfoUpdate || (async () => { })}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             </Card>
-          )}
-        </>
-      )}
 
-      {/* Categorias Section */}
-      {event && (
-        <Card className="p-6">
-          <div className="flex justify-between items-center mb-4">
-            <div>
-              <h3 className="text-lg font-semibold">Categorias</h3>
-              {localCategories.length > 1 && (
-                <p className="text-sm text-neutral-500 mt-1">
-                  Arraste para reordenar
-                </p>
-              )}
-            </div>
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => {
-                setEditingCategory(undefined);
-                setCategoryModalOpen(true);
-              }}
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Adicionar Categoria
-            </Button>
-          </div>
+            {/* Shirt Sizes Config - Show immediately after Kit if shirt exists in kit */}
+            {hasShirtInKit && (
+              <ShirtSizesConfig
+                config={watch("shirt_sizes_config") as ShirtSizesByGender | null}
+                onChange={(config) => setValue("shirt_sizes_config", config)}
+                error={errors.shirt_sizes_config?.message}
+              />
+            )}
 
-          {localCategories.length > 0 ? (
-            <div className="space-y-2">
-              {localCategories.map((category, index) => (
-                <div
-                  key={category.id}
-                  draggable
-                  onDragStart={() => handleCategoryDragStart(index)}
-                  onDragOver={(e) => handleCategoryDragOver(e, index)}
-                  onDragEnd={handleCategoryDragEnd}
-                  className="flex items-center gap-3 p-3 bg-neutral-50 rounded-lg cursor-move hover:bg-neutral-100 transition"
-                >
-                  <GripVertical className="h-5 w-5 text-neutral-400 flex-shrink-0" />
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-medium">{category.name}</p>
-                      {category.shirt_genders && category.shirt_genders.length > 0 && (
-                        category.shirt_genders.map((gender) => (
-                          <Badge key={gender} variant="info" className="text-xs">
-                            {GENDER_LABELS[gender]}
-                          </Badge>
-                        ))
-                      )}
-                    </div>
-                    <p className="text-sm text-neutral-600">
-                      {formatCurrency(category.price)} •{" "}
-                      {category.max_participants
-                        ? `${category.max_participants} vagas`
-                        : "Ilimitado"}
+            {/* Info message if no shirt in kit */}
+            {!hasShirtInKit && kitItems.length > 0 && (
+              <Card className="p-6 bg-blue-50 border-blue-200">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 mt-0.5">
+                    <svg
+                      className="h-5 w-5 text-blue-600"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-blue-900 mb-1">
+                      Tamanhos de camiseta não disponíveis
+                    </h3>
+                    <p className="text-sm text-blue-800">
+                      Para configurar os tamanhos de camiseta, primeiro adicione o
+                      item "Camiseta" no "Kit do Atleta".
                     </p>
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        setEditingCategory(category);
-                        setCategoryModalOpen(true);
-                      }}
-                    >
-                      Editar
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => onCategoryDelete?.(category.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
                 </div>
-              ))}
+              </Card>
+            )}
+          </>
+        )
+      }
+
+      {/* Categorias Section */}
+      {
+        event && (
+          <Card className="p-6">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h3 className="text-lg font-semibold">Categorias</h3>
+                {localCategories.length > 1 && (
+                  <p className="text-sm text-neutral-500 mt-1">
+                    Arraste para reordenar
+                  </p>
+                )}
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => {
+                  setEditingCategory(undefined);
+                  setCategoryModalOpen(true);
+                }}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Adicionar Categoria
+              </Button>
             </div>
-          ) : (
-            <p className="text-neutral-500 text-sm">
-              Nenhuma categoria criada ainda.
-            </p>
-          )}
-        </Card>
-      )}
+
+            {localCategories.length > 0 ? (
+              <div className="space-y-2">
+                {localCategories.map((category, index) => (
+                  <div
+                    key={category.id}
+                    draggable
+                    onDragStart={() => handleCategoryDragStart(index)}
+                    onDragOver={(e) => handleCategoryDragOver(e, index)}
+                    onDragEnd={handleCategoryDragEnd}
+                    className="flex items-center gap-3 p-3 bg-neutral-50 rounded-lg cursor-move hover:bg-neutral-100 transition"
+                  >
+                    <GripVertical className="h-5 w-5 text-neutral-400 flex-shrink-0" />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-medium">{category.name}</p>
+                        {category.shirt_genders && category.shirt_genders.length > 0 && (
+                          category.shirt_genders.map((gender) => (
+                            <Badge key={gender} variant="info" className="text-xs">
+                              {GENDER_LABELS[gender]}
+                            </Badge>
+                          ))
+                        )}
+                      </div>
+                      <p className="text-sm text-neutral-600">
+                        {formatCurrency(category.price)} •{" "}
+                        {category.max_participants
+                          ? `${category.max_participants} vagas`
+                          : "Ilimitado"}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setEditingCategory(category);
+                          setCategoryModalOpen(true);
+                        }}
+                      >
+                        Editar
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => onCategoryDelete?.(category.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-neutral-500 text-sm">
+                Nenhuma categoria criada ainda.
+              </p>
+            )}
+          </Card>
+        )
+      }
 
       {eventDetailsSection}
 
@@ -1199,6 +1265,6 @@ export function EventForm({
         eventType={watch("event_type")}
         kitItems={kitItems}
       />
-    </div>
+    </div >
   );
 }

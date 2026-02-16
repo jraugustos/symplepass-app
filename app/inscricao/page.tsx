@@ -61,7 +61,7 @@ export default async function ReviewPage({ searchParams }: ReviewPageProps) {
     : 'M') as ShirtSize
 
   const subtotal = category.price || 0
-  const serviceFee = calculateServiceFee(subtotal)
+  const serviceFee = calculateServiceFee(subtotal, eventData.service_fee, eventData.service_fee_type)
   const total = calculateTotal(subtotal, serviceFee)
   const priceBreakdown: PriceBreakdownData = {
     subtotal,

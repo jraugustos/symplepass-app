@@ -105,12 +105,20 @@ export function formatPricePerParticipant(
  * @param subtotal - Base amount for the calculation
  * @returns Service fee rounded to two decimal places
  */
-export function calculateServiceFee(subtotal: number): number {
+export function calculateServiceFee(
+  subtotal: number,
+  fee: number = 0,
+  feeType: 'percentage' | 'fixed' = 'fixed',
+): number {
   if (!subtotal || isNaN(subtotal)) {
     return 0
   }
 
-  return 0
+  if (feeType === 'percentage') {
+    return Math.round(((subtotal * fee) / 100) * 100) / 100
+  }
+
+  return fee
 }
 
 /**

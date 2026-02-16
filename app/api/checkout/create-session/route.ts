@@ -169,12 +169,12 @@ export async function POST(request: Request) {
     // Validate event (use admin client to bypass RLS for server-side validation)
     const { data: eventData, error: eventError } = await adminSupabase
       .from('events')
-      .select('id, title, slug')
+      .select('id, title, slug, service_fee, service_fee_type')
       .eq('id', eventId)
       .eq('status', 'published')
       .single()
 
-    const event = eventData as { id: string; title: string; slug: string } | null
+    const event = eventData as { id: string; title: string; slug: string; service_fee: number; service_fee_type: 'percentage' | 'fixed' } | null
 
     if (eventError || !event) {
       console.error('Evento não encontrado ou indisponível:', eventError)
@@ -297,7 +297,7 @@ export async function POST(request: Request) {
     // Server calculation:
     const discountedCategoryPrice = Math.max(0, categoryPrice - appliedDiscount)
     const serverSubtotal = discountedCategoryPrice + serverKitItemsTotal
-    const serverServiceFee = calculateServiceFee(serverSubtotal)
+    const serverServiceFee = calculateServiceFee(serverSubtotal, event.service_fee, event.service_fee_type)
     const serverTotal = calculateTotal(serverSubtotal, serverServiceFee)
 
     if (

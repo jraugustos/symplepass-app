@@ -550,6 +550,8 @@ export interface EventFormDataAdmin {
   allow_page_access: boolean
   has_kit: boolean
   has_kit_pickup_info: boolean
+  service_fee: number
+  service_fee_type: 'percentage' | 'fixed'
 }
 
 export interface CategoryFormData {

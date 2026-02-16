@@ -18,6 +18,7 @@ import { formatDateShort } from '@/lib/utils'
 export async function approveEventAction(
     eventId: string,
     serviceFee: number,
+    serviceFeeType: 'percentage' | 'fixed',
     notes?: string
 ) {
     const result = await getCurrentUser()
@@ -26,7 +27,7 @@ export async function approveEventAction(
         return { error: 'Você não tem permissão para aprovar eventos' }
     }
 
-    const approvalResult = await approveEvent(eventId, serviceFee, result.profile.id, notes)
+    const approvalResult = await approveEvent(eventId, serviceFee, serviceFeeType, result.profile.id, notes)
 
     if (approvalResult.error) {
         return { error: approvalResult.error }

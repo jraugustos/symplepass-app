@@ -17,7 +17,7 @@ export default function EventRegulations({
   regulationPdfUrl,
   regulationUpdatedAt,
 }: EventRegulationsProps) {
-  if (!regulations || regulations.length === 0) {
+  if ((!regulations || regulations.length === 0) && !regulationPdfUrl) {
     return (
       <section id="regulamento" className="py-12 scroll-mt-40">
         <div className={EVENT_PAGE_CONTENT_CLASS}>

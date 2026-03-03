@@ -38,7 +38,7 @@ type RegistrationRevenueRow = {
   created_at: string
   payment_status?: string | null
   status?: string | null
-  total_amount?: number | null
+  amount_paid?: number | null
   event_categories?:
   | {
     price?: number | null
@@ -89,6 +89,10 @@ function normalizeRelation<T>(value: T | T[] | null | undefined): T | null {
   return Array.isArray(value) ? value[0] ?? null : value
 }
 
+function getAmountPaid(row: RegistrationRevenueRow): number {
+  return Number(row.amount_paid || 0)
+}
+
 function extractPrice(category: RegistrationRevenueRow['event_categories']) {
   const normalized = normalizeRelation(category)
   return Number(normalized?.price || 0)
@@ -115,7 +119,7 @@ export async function getFinancialOverview(filters: ReportFilters = {}): Promise
         id,
         payment_status,
         status,
-        event_categories:category_id(price),
+        amount_paid,
         events:event_id!inner(id, sport_type, created_at, organizer_id)
       `)
 
@@ -158,19 +162,19 @@ export async function getFinancialOverview(filters: ReportFilters = {}): Promise
 
     const totalRevenue =
       registrations.reduce((sum, r) => {
-        return sum + extractPrice(r.event_categories)
+        return sum + getAmountPaid(r)
       }, 0) || 0
 
     const confirmedRevenue = registrations
       .filter(r => r.payment_status === 'paid')
       .reduce((sum, r) => {
-        return sum + extractPrice(r.event_categories)
+        return sum + getAmountPaid(r)
       }, 0) || 0
 
     const pendingRevenue = registrations
       .filter(r => r.payment_status === 'pending')
       .reduce((sum, r) => {
-        return sum + extractPrice(r.event_categories)
+        return sum + getAmountPaid(r)
       }, 0) || 0
 
     const averageTicketPrice = totalRegistrations > 0 ? totalRevenue / totalRegistrations : 0
@@ -202,7 +206,7 @@ export async function getSalesTrends(filters: ReportFilters = {}): Promise<Sales
       .select(`
         created_at,
         payment_status,
-        event_categories:category_id(price),
+        amount_paid,
         events:event_id!inner(sport_type, organizer_id)
       `)
 
@@ -247,7 +251,7 @@ export async function getSalesTrends(filters: ReportFilters = {}): Promise<Sales
       }
       acc[date].registrations += 1
       if (reg.payment_status === 'paid') {
-        acc[date].revenue += extractPrice(reg.event_categories)
+        acc[date].revenue += getAmountPaid(reg)
       }
       return acc
     }, {} as Record<string, { revenue: number; registrations: number }>)
@@ -271,7 +275,7 @@ export async function getSalesTrends(filters: ReportFilters = {}): Promise<Sales
 export async function getEventPerformance(filters: ReportFilters = {}): Promise<EventPerformanceData[]> {
   try {
     const supabase = await createClient()
-    const { start_date, end_date, sport_type, organizer_id } = filters
+    const { start_date, end_date, event_id, sport_type, organizer_id, payment_status } = filters
 
     let query = supabase
       .from('events')
@@ -282,9 +286,14 @@ export async function getEventPerformance(filters: ReportFilters = {}): Promise<
         registrations(
           id,
           payment_status,
-          event_categories:category_id(price)
+          amount_paid,
+          created_at
         )
       `)
+
+    if (event_id) {
+      query = query.eq('id', event_id)
+    }
 
     if (organizer_id) {
       query = query.eq('organizer_id', organizer_id)
@@ -292,14 +301,6 @@ export async function getEventPerformance(filters: ReportFilters = {}): Promise<
 
     if (sport_type) {
       query = query.eq('sport_type', sport_type)
-    }
-
-    if (start_date) {
-      query = query.gte('start_date', start_date)
-    }
-
-    if (end_date) {
-      query = query.lte('start_date', end_date)
     }
 
     const { data: events, error } = await query
@@ -310,12 +311,26 @@ export async function getEventPerformance(filters: ReportFilters = {}): Promise<
     }
 
     const performanceData: EventPerformanceData[] = (events || []).map(event => {
-      const registrations = event.registrations || []
+      let registrations = event.registrations || []
+
+      // Apply date filters on registration created_at
+      if (start_date) {
+        registrations = registrations.filter((r: any) => r.created_at >= start_date)
+      }
+      if (end_date) {
+        registrations = registrations.filter((r: any) => r.created_at <= end_date)
+      }
+
+      // Apply payment_status filter
+      if (payment_status) {
+        registrations = registrations.filter((r: any) => r.payment_status === payment_status)
+      }
+
       const totalRegistrations = registrations.length
-      const confirmedRegistrations = registrations.filter(r => r.payment_status === 'paid').length
+      const confirmedRegistrations = registrations.filter((r: any) => r.payment_status === 'paid').length
       const totalRevenue = registrations
-        .filter(r => r.payment_status === 'paid')
-        .reduce((sum, r) => sum + extractPrice(r.event_categories), 0)
+        .filter((r: any) => r.payment_status === 'paid')
+        .reduce((sum: number, r: any) => sum + (Number(r.amount_paid) || 0), 0)
       const conversionRate = totalRegistrations > 0 ? (confirmedRegistrations / totalRegistrations) * 100 : 0
 
       return {
@@ -328,8 +343,11 @@ export async function getEventPerformance(filters: ReportFilters = {}): Promise<
       }
     })
 
+    // Filter out events with no registrations after filtering
+    const filtered = performanceData.filter(e => e.totalRegistrations > 0)
+
     // Sort by revenue descending
-    return performanceData.sort((a, b) => b.totalRevenue - a.totalRevenue)
+    return filtered.sort((a, b) => b.totalRevenue - a.totalRevenue)
   } catch (error) {
     console.error('Error in getEventPerformance:', error)
     return []
@@ -345,7 +363,7 @@ export async function getPaymentStatusBreakdown(filters: ReportFilters = {}): Pr
       .from('registrations')
       .select(`
         payment_status,
-        event_categories:category_id(price),
+        amount_paid,
         events:event_id!inner(sport_type, organizer_id)
       `)
 
@@ -391,9 +409,7 @@ export async function getPaymentStatusBreakdown(filters: ReportFilters = {}): Pr
         acc[status] = { count: 0, revenue: 0 }
       }
       acc[status].count += 1
-      if (status === 'paid') {
-        acc[status].revenue += extractPrice(reg.event_categories)
-      }
+      acc[status].revenue += getAmountPaid(reg)
       return acc
     }, {} as Record<string, { count: number; revenue: number }>)
 
@@ -434,6 +450,7 @@ export async function exportFinancialReport(filters: ReportFilters = {}): Promis
       .select(`
         created_at,
         payment_status,
+        amount_paid,
         events:event_id!inner(title, organizer_id),
         event_categories:category_id(name, price),
         profiles:user_id(full_name, email, cpf),
@@ -492,7 +509,7 @@ export async function exportFinancialReport(filters: ReportFilters = {}): Promis
             : reg.payment_status === 'pending'
               ? 'Pendente'
               : 'Cancelado',
-        amount: `R$ ${extractPrice(reg.event_categories).toFixed(2)}`,
+        amount: `R$ ${getAmountPaid(reg).toFixed(2)}`,
         paymentMethod: payment?.payment_method || '',
         transactionId: payment?.transaction_id || '',
       }
@@ -501,6 +518,271 @@ export async function exportFinancialReport(filters: ReportFilters = {}): Promis
     return exportData
   } catch (error) {
     console.error('Error in exportFinancialReport:', error)
+    return []
+  }
+}
+
+// ============================================================
+// NEW CHART DATA FUNCTIONS
+// ============================================================
+
+export interface CategoryDistributionData {
+  categoryName: string
+  eventTitle: string
+  registrations: number
+  confirmedRegistrations: number
+  revenue: number
+}
+
+export async function getCategoryDistribution(filters: ReportFilters = {}): Promise<CategoryDistributionData[]> {
+  try {
+    const supabase = await createClient()
+    const { start_date, end_date, event_id, sport_type, organizer_id, payment_status } = filters
+
+    let query = supabase
+      .from('registrations')
+      .select(`
+        payment_status,
+        amount_paid,
+        created_at,
+        event_categories:category_id(name),
+        events:event_id!inner(title, sport_type, organizer_id)
+      `)
+
+    if (event_id) query = query.eq('event_id', event_id)
+    if (organizer_id) query = query.eq('events.organizer_id', organizer_id)
+    if (sport_type) query = query.eq('events.sport_type', sport_type)
+    if (payment_status) query = query.eq('payment_status', payment_status)
+    if (start_date) query = query.gte('created_at', start_date)
+    if (end_date) query = query.lte('created_at', end_date)
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('Error fetching category distribution:', error)
+      return []
+    }
+
+    const registrations = ((data ?? []) as unknown) as RegistrationRevenueRow[]
+
+    type GroupKey = string
+    const grouped = registrations.reduce((acc, reg) => {
+      const cat = normalizeRelation(reg.event_categories)
+      const evt = normalizeRelation(reg.events)
+      const key: GroupKey = `${evt?.title || 'N/A'} — ${cat?.name || 'N/A'}`
+
+      if (!acc[key]) {
+        acc[key] = {
+          categoryName: cat?.name || 'N/A',
+          eventTitle: evt?.title || 'N/A',
+          registrations: 0,
+          confirmedRegistrations: 0,
+          revenue: 0,
+        }
+      }
+      acc[key].registrations += 1
+      if (reg.payment_status === 'paid') {
+        acc[key].confirmedRegistrations += 1
+        acc[key].revenue += getAmountPaid(reg)
+      }
+      return acc
+    }, {} as Record<GroupKey, CategoryDistributionData>)
+
+    return Object.values(grouped).sort((a, b) => b.registrations - a.registrations)
+  } catch (error) {
+    console.error('Error in getCategoryDistribution:', error)
+    return []
+  }
+}
+
+export interface CouponUsageData {
+  couponCode: string
+  usageCount: number
+  totalDiscount: number
+}
+
+export async function getCouponUsageStats(filters: ReportFilters = {}): Promise<CouponUsageData[]> {
+  try {
+    const supabase = await createClient()
+    const { event_id } = filters
+
+    let query = supabase
+      .from('coupon_usages')
+      .select(`
+        discount_applied,
+        coupons(code),
+        registrations:registration_id(event_id)
+      `)
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('Error fetching coupon usage stats:', error)
+      return []
+    }
+
+    const usages = (data || []) as any[]
+
+    // Filter by event_id if provided
+    const filtered = event_id
+      ? usages.filter(u => {
+        const reg = Array.isArray(u.registrations) ? u.registrations[0] : u.registrations
+        return reg?.event_id === event_id
+      })
+      : usages
+
+    const grouped = filtered.reduce((acc, usage) => {
+      const coupon = Array.isArray(usage.coupons) ? usage.coupons[0] : usage.coupons
+      const code = coupon?.code || 'Desconhecido'
+
+      if (!acc[code]) {
+        acc[code] = { couponCode: code, usageCount: 0, totalDiscount: 0 }
+      }
+      acc[code].usageCount += 1
+      acc[code].totalDiscount += Number(usage.discount_applied || 0)
+      return acc
+    }, {} as Record<string, CouponUsageData>)
+
+    const result: CouponUsageData[] = Object.values(grouped)
+    return result.sort((a, b) => b.usageCount - a.usageCount)
+  } catch (error) {
+    console.error('Error in getCouponUsageStats:', error)
+    return []
+  }
+}
+
+export interface SportTypeRevenueData {
+  sportType: string
+  revenue: number
+  registrations: number
+  percentage: number
+}
+
+export async function getSportTypeRevenue(filters: ReportFilters = {}): Promise<SportTypeRevenueData[]> {
+  try {
+    const supabase = await createClient()
+    const { start_date, end_date, organizer_id, payment_status } = filters
+
+    let query = supabase
+      .from('registrations')
+      .select(`
+        payment_status,
+        amount_paid,
+        created_at,
+        events:event_id!inner(sport_type, organizer_id)
+      `)
+
+    if (organizer_id) query = query.eq('events.organizer_id', organizer_id)
+    if (payment_status) query = query.eq('payment_status', payment_status)
+    if (start_date) query = query.gte('created_at', start_date)
+    if (end_date) query = query.lte('created_at', end_date)
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('Error fetching sport type revenue:', error)
+      return []
+    }
+
+    const registrations = ((data ?? []) as unknown) as RegistrationRevenueRow[]
+
+    const grouped = registrations.reduce((acc, reg) => {
+      const evt = normalizeRelation(reg.events)
+      const sport = evt?.sport_type || 'outro'
+
+      if (!acc[sport]) {
+        acc[sport] = { sportType: sport, revenue: 0, registrations: 0, percentage: 0 }
+      }
+      acc[sport].registrations += 1
+      if (reg.payment_status === 'paid') {
+        acc[sport].revenue += getAmountPaid(reg)
+      }
+      return acc
+    }, {} as Record<string, SportTypeRevenueData>)
+
+    const result = Object.values(grouped)
+    const totalRevenue = result.reduce((sum, r) => sum + r.revenue, 0)
+
+    // Calculate percentages
+    result.forEach(r => {
+      r.percentage = totalRevenue > 0 ? (r.revenue / totalRevenue) * 100 : 0
+    })
+
+    return result.sort((a, b) => b.revenue - a.revenue)
+  } catch (error) {
+    console.error('Error in getSportTypeRevenue:', error)
+    return []
+  }
+}
+
+export interface RevenueComparisonData {
+  eventTitle: string
+  expectedRevenue: number // sum of category prices
+  actualRevenue: number   // sum of amount_paid
+  difference: number
+  discountPercentage: number
+}
+
+export async function getRevenueComparison(filters: ReportFilters = {}): Promise<RevenueComparisonData[]> {
+  try {
+    const supabase = await createClient()
+    const { start_date, end_date, event_id, sport_type, organizer_id } = filters
+
+    let query = supabase
+      .from('registrations')
+      .select(`
+        payment_status,
+        amount_paid,
+        created_at,
+        event_categories:category_id(price),
+        events:event_id!inner(id, title, sport_type, organizer_id)
+      `)
+      .eq('payment_status', 'paid')
+
+    if (event_id) query = query.eq('event_id', event_id)
+    if (organizer_id) query = query.eq('events.organizer_id', organizer_id)
+    if (sport_type) query = query.eq('events.sport_type', sport_type)
+    if (start_date) query = query.gte('created_at', start_date)
+    if (end_date) query = query.lte('created_at', end_date)
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('Error fetching revenue comparison:', error)
+      return []
+    }
+
+    const registrations = ((data ?? []) as unknown) as RegistrationRevenueRow[]
+
+    const grouped = registrations.reduce((acc, reg) => {
+      const evt = normalizeRelation(reg.events)
+      const eventId = evt?.id || 'unknown'
+
+      if (!acc[eventId]) {
+        acc[eventId] = {
+          eventTitle: evt?.title || 'N/A',
+          expectedRevenue: 0,
+          actualRevenue: 0,
+          difference: 0,
+          discountPercentage: 0,
+        }
+      }
+      acc[eventId].expectedRevenue += extractPrice(reg.event_categories)
+      acc[eventId].actualRevenue += getAmountPaid(reg)
+      return acc
+    }, {} as Record<string, RevenueComparisonData>)
+
+    const result = Object.values(grouped)
+    result.forEach(r => {
+      r.difference = r.expectedRevenue - r.actualRevenue
+      r.discountPercentage = r.expectedRevenue > 0
+        ? ((r.difference / r.expectedRevenue) * 100)
+        : 0
+    })
+
+    return result.sort((a, b) => b.difference - a.difference)
+  } catch (error) {
+    console.error('Error in getRevenueComparison:', error)
     return []
   }
 }

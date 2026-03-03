@@ -698,6 +698,35 @@ export interface FinancialReportExport {
   transactionId: string
 }
 
+export interface CategoryDistributionData {
+  categoryName: string
+  eventTitle: string
+  registrations: number
+  confirmedRegistrations: number
+  revenue: number
+}
+
+export interface CouponUsageData {
+  couponCode: string
+  usageCount: number
+  totalDiscount: number
+}
+
+export interface SportTypeRevenueData {
+  sportType: string
+  revenue: number
+  registrations: number
+  percentage: number
+}
+
+export interface RevenueComparisonData {
+  eventTitle: string
+  expectedRevenue: number
+  actualRevenue: number
+  difference: number
+  discountPercentage: number
+}
+
 // ===== Admin Coupon Management Types =====
 
 export interface CouponFilters {

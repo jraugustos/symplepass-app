@@ -8,6 +8,7 @@ export interface AdminDashboardStats {
   pendingRegistrations: number
   totalRevenue: number
   totalUsers: number
+  newUsers: number
   fetchedAt: string
 }
 
@@ -19,11 +20,28 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats | nu
   try {
     const supabase = await createClient()
 
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+    const [
+      { count: newUsersCount },
+      rpcResponse
+    ] = await Promise.all([
+      supabase.from('profiles').select('*', { count: 'exact', head: true }).gte('created_at', thirtyDaysAgo.toISOString()),
+      supabase.rpc('get_admin_dashboard_stats')
+    ])
+
+    const newUsers = newUsersCount || 0
+
     // Try using the RPC function first (single query, most efficient)
-    const { data: rpcData, error: rpcError } = await supabase.rpc('get_admin_dashboard_stats')
+    const { data: rpcData, error: rpcError } = rpcResponse
 
     if (!rpcError && rpcData) {
-      return rpcData as AdminDashboardStats
+      return {
+        ...(rpcData as any),
+        newUsers,
+        fetchedAt: new Date().toISOString()
+      } as AdminDashboardStats
     }
 
     // Fallback to individual queries if RPC fails or doesn't exist
@@ -56,6 +74,7 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats | nu
       pendingRegistrations: pendingRegistrations || 0,
       totalRevenue,
       totalUsers: totalUsers || 0,
+      newUsers,
       fetchedAt: new Date().toISOString()
     }
   } catch (error) {

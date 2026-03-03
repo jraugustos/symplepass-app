@@ -1,12 +1,16 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronRight, DollarSign, Users, TrendingUp, Download } from 'lucide-react'
+import { ChevronRight, DollarSign, Clock, CheckCircle2, Tag, Download } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth/actions'
 import {
   getFinancialOverview,
   getSalesTrends,
   getEventPerformance,
   getPaymentStatusBreakdown,
+  getCategoryDistribution,
+  getCouponUsageStats,
+  getSportTypeRevenue,
+  getRevenueComparison,
 } from '@/lib/data/admin-reports'
 import { getAllEventsForAdmin } from '@/lib/data/admin-events'
 import { Card } from '@/components/ui/card'
@@ -47,11 +51,25 @@ export default async function RelatoriosPage({
     organizer_id: result.profile.role === 'organizer' ? result.profile.id : undefined,
   }
 
-  const [overview, salesTrends, eventPerformance, paymentBreakdown, { events }] = await Promise.all([
+  const [
+    overview,
+    salesTrends,
+    eventPerformance,
+    paymentBreakdown,
+    categoryDistribution,
+    couponUsage,
+    sportTypeRevenue,
+    revenueComparison,
+    { events },
+  ] = await Promise.all([
     getFinancialOverview(filters),
     getSalesTrends(filters),
     getEventPerformance(filters),
     getPaymentStatusBreakdown(filters),
+    getCategoryDistribution(filters),
+    getCouponUsageStats(filters),
+    getSportTypeRevenue(filters),
+    getRevenueComparison(filters),
     getAllEventsForAdmin({ pageSize: 1000 }),
   ])
 
@@ -86,20 +104,6 @@ export default async function RelatoriosPage({
                 <DollarSign className="h-5 w-5 text-success" />
               </div>
               <div>
-                <p className="text-sm text-neutral-600">Receita Total</p>
-                <p className="text-2xl font-bold text-neutral-900">
-                  {formatCurrency(overview.totalRevenue)}
-                </p>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-success/10 rounded-lg">
-                <DollarSign className="h-5 w-5 text-success" />
-              </div>
-              <div>
                 <p className="text-sm text-neutral-600">Receita Confirmada</p>
                 <p className="text-2xl font-bold text-neutral-900">
                   {formatCurrency(overview.confirmedRevenue)}
@@ -110,13 +114,27 @@ export default async function RelatoriosPage({
 
           <Card className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary-100 rounded-lg">
-                <Users className="h-5 w-5 text-primary-600" />
+              <div className="p-2 bg-warning/10 rounded-lg">
+                <Clock className="h-5 w-5 text-warning" />
               </div>
               <div>
-                <p className="text-sm text-neutral-600">Total Inscrições</p>
+                <p className="text-sm text-neutral-600">Receita Pendente</p>
                 <p className="text-2xl font-bold text-neutral-900">
-                  {overview.totalRegistrations}
+                  {formatCurrency(overview.pendingRevenue)}
+                </p>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary-100 rounded-lg">
+                <CheckCircle2 className="h-5 w-5 text-primary-600" />
+              </div>
+              <div>
+                <p className="text-sm text-neutral-600">Inscr. Confirmadas</p>
+                <p className="text-2xl font-bold text-neutral-900">
+                  {overview.confirmedRegistrations}
                 </p>
               </div>
             </div>
@@ -125,12 +143,12 @@ export default async function RelatoriosPage({
           <Card className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-info/10 rounded-lg">
-                <TrendingUp className="h-5 w-5 text-info" />
+                <Tag className="h-5 w-5 text-info" />
               </div>
               <div>
-                <p className="text-sm text-neutral-600">Taxa de Conversão</p>
+                <p className="text-sm text-neutral-600">Ticket Médio</p>
                 <p className="text-2xl font-bold text-neutral-900">
-                  {overview.conversionRate.toFixed(1)}%
+                  {formatCurrency(overview.averageTicketPrice)}
                 </p>
               </div>
             </div>
@@ -143,6 +161,11 @@ export default async function RelatoriosPage({
         salesTrends={salesTrends}
         eventPerformance={eventPerformance}
         paymentBreakdown={paymentBreakdown}
+        categoryDistribution={categoryDistribution}
+        couponUsage={couponUsage}
+        sportTypeRevenue={sportTypeRevenue}
+        revenueComparison={revenueComparison}
+        overview={overview}
         events={events}
         filters={filters}
       />

@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { calculateServiceFee, calculateTotal, validateEmail, validateCPF } from '@/lib/utils'
+import { calculateServiceFee, calculateTotal, validateEmail, validateCPF, formatDateTimeLong, extractLocationString } from '@/lib/utils'
 import { getEnv } from '@/lib/env'
-import { createRegistration, updateRegistrationMpPreference } from '@/lib/data/registrations'
+import { createRegistration, updateRegistrationMpPreference, updateRegistrationQRCode } from '@/lib/data/registrations'
 import { createEventRegistrationPreference } from '@/lib/mercadopago/checkout'
 import { validateRegistration } from '@/lib/validations/registration-guards'
 import { getClubMemberDiscount } from '@/lib/data/subscriptions'
 import { validateCoupon, applyCoupon } from '@/lib/data/admin-coupons'
+import { sendConfirmationEmail } from '@/lib/email/send-confirmation'
+import { markContactAsEventParticipant } from '@/lib/email/contacts'
+import QRCode from 'qrcode'
 import type { CheckoutSessionRequest, ShirtSize, ShirtGender, ParticipantData } from '@/types'
 
 export const runtime = 'nodejs'
@@ -169,12 +172,12 @@ export async function POST(request: Request) {
     // Validate event (use admin client to bypass RLS for server-side validation)
     const { data: eventData, error: eventError } = await adminSupabase
       .from('events')
-      .select('id, title, slug, service_fee, service_fee_type')
+      .select('id, title, slug, service_fee, service_fee_type, start_date, location, event_type, solidarity_message')
       .eq('id', eventId)
       .eq('status', 'published')
       .single()
 
-    const event = eventData as { id: string; title: string; slug: string; service_fee: number; service_fee_type: 'percentage' | 'fixed' } | null
+    const event = eventData as { id: string; title: string; slug: string; service_fee: number; service_fee_type: 'percentage' | 'fixed'; start_date: string; location: any; event_type: string; solidarity_message: string | null } | null
 
     if (eventError || !event) {
       console.error('Evento não encontrado ou indisponível:', eventError)
@@ -429,6 +432,77 @@ export async function POST(request: Request) {
     }
 
     const env = getEnv()
+
+    if (serverTotal === 0) {
+      // 100% discount achieved (e.g., via coupon)
+      // Update registration to confirmed status immediately
+      const { error: updateError } = await (adminSupabase
+        .from('registrations') as any)
+        .update({
+          status: 'confirmed',
+          payment_status: 'paid',
+        })
+        .eq('id', registrationResult.data.id)
+
+      if (updateError) {
+        console.error('Erro ao confirmar inscrição com 100% de desconto:', updateError)
+        return NextResponse.json(
+          { error: 'Não foi possível confirmar sua inscrição com desconto. Tente novamente.' },
+          { status: 500 }
+        )
+      }
+
+      // Generate QR code
+      const ticketCode = `${event.slug.toUpperCase()}-${registrationResult.data.id.slice(0, 8).toUpperCase()}`
+      const qrCodeDataUrl = await QRCode.toDataURL(ticketCode, {
+        errorCorrectionLevel: 'H',
+        type: 'image/png',
+        width: 300,
+        margin: 2,
+      })
+
+      await updateRegistrationQRCode(registrationResult.data.id, qrCodeDataUrl, ticketCode, supabase)
+
+      // Send confirmation email
+      try {
+        await sendConfirmationEmail({
+          userEmail: normalizedEmail,
+          userName: normalizedName,
+          eventTitle: event.title,
+          eventDate: formatDateTimeLong(event.start_date || ''),
+          eventLocation: extractLocationString(event.location),
+          categoryName: category.name,
+          qrCodeDataUrl,
+          ticketCode,
+          registrationId: registrationResult.data.id,
+          partnerName: normalizedPartnerName || undefined,
+          partnerData: normalizedPartnerData || undefined,
+          eventType: event.event_type as any,
+          solidarityMessage: event.solidarity_message || undefined,
+        })
+      } catch (emailError) {
+        console.error('Erro ao enviar e-mail de confirmação para inscrição via cupom 100%:', emailError)
+      }
+
+      markContactAsEventParticipant(normalizedEmail).catch((err) => {
+        console.error('Failed to update Resend contact:', err)
+      })
+
+      // Register coupon usage if coupon was applied
+      if (discountType === 'coupon' && couponDiscountData.coupon) {
+        await applyCoupon(
+          couponDiscountData.coupon.id,
+          targetUserId,
+          registrationResult.data.id,
+          appliedDiscount
+        )
+      }
+
+      return NextResponse.json({
+        url: `/confirmacao?registration=${registrationResult.data.id}`,
+        registrationId: registrationResult.data.id,
+      })
+    }
 
     // Create Mercado Pago Checkout Pro preference
     console.log('[Checkout] About to create MP preference for registration:', registrationResult.data.id)

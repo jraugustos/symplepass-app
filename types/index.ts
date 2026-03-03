@@ -616,6 +616,10 @@ export interface UserFilters {
   registration_status?: 'active' | 'inactive'
   page?: number
   pageSize?: number
+  city?: string
+  preferred_sport?: string
+  event_sport?: string
+  is_benefits_club_member?: boolean
 }
 
 export interface UserStats {

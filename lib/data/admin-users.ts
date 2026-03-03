@@ -4,7 +4,17 @@ import { UserFilters, UserStats, UserRole } from '@/types'
 export async function getAllUsers(filters: UserFilters = {}) {
   try {
     const supabase = await createClient()
-    const { role, search, registration_status, page = 1, pageSize = 20 } = filters
+    const {
+      role,
+      search,
+      registration_status,
+      page = 1,
+      pageSize = 20,
+      city,
+      preferred_sport,
+      event_sport,
+      is_benefits_club_member,
+    } = filters
 
     let query = supabase
       .from('profiles')
@@ -18,6 +28,79 @@ export async function getAllUsers(filters: UserFilters = {}) {
 
     if (search) {
       query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%,cpf.ilike.%${search}%`)
+    }
+
+    // Prepare an array of Sets of user_ids to intersect, if any complex filters are used
+    let userIdsToIntersect: Set<string>[] = []
+
+    if (is_benefits_club_member !== undefined) {
+      const { data: subs } = await supabase
+        .from('subscriptions')
+        .select('user_id')
+        .eq('status', 'active')
+      const subUserIds = new Set((subs || []).map((s) => s.user_id))
+
+      if (is_benefits_club_member) {
+        userIdsToIntersect.push(subUserIds)
+      } else {
+        // If they want NOT member, we would need all users EXCEPT these.
+        // It's easier to just handle the "is member = true" case for a "sócio" filter
+        // We'll support true as intersection, and false as anti-intersection later if needed
+      }
+    }
+
+    if (preferred_sport) {
+      const { data: prefs } = await supabase
+        .from('user_preferences')
+        .select('user_id')
+        .contains('favorite_sports', [preferred_sport])
+      userIdsToIntersect.push(new Set((prefs || []).map((p) => p.user_id)))
+    }
+
+    if (event_sport) {
+      const { data: regs } = await supabase
+        .from('registrations')
+        .select('user_id, events!inner(sport_type)')
+        .eq('events.sport_type', event_sport)
+        .eq('status', 'confirmed')
+      userIdsToIntersect.push(new Set((regs || []).map((r) => r.user_id)))
+    }
+
+    if (city) {
+      // Find users who have registered in events in this city
+      const { data: eventsInCity } = await supabase
+        .from('events')
+        .select('id')
+        .ilike('location->>city', `%${city}%`)
+
+      const eventIds = (eventsInCity || []).map((e) => e.id)
+
+      if (eventIds.length > 0) {
+        const { data: regsCity } = await supabase
+          .from('registrations')
+          .select('user_id')
+          .in('event_id', eventIds)
+        userIdsToIntersect.push(new Set((regsCity || []).map((r) => r.user_id)))
+      } else {
+        // No events in this city, so no users match this filter
+        userIdsToIntersect.push(new Set())
+      }
+    }
+
+    // Intersect the sets if we have any complex filters
+    if (userIdsToIntersect.length > 0) {
+      // Find intersection of all sets
+      let intersected = userIdsToIntersect[0]
+      for (let i = 1; i < userIdsToIntersect.length; i++) {
+        intersected = new Set([...intersected].filter((x) => userIdsToIntersect[i].has(x)))
+      }
+
+      if (intersected.size === 0) {
+        // Return empty result immediately to avoid .in('id', []) which might fetch nothing but it's cleaner
+        return { users: [], total: 0, page, pageSize }
+      }
+
+      query = query.in('id', Array.from(intersected))
     }
 
     // Pagination

@@ -426,7 +426,9 @@ export function ReviewClient({
         }))
         : null
 
-      if (!isPaymentRequired) {
+      const useFreeEndpoint = isFreeEvent && (category.price || 0) === 0 && kitItemsTotal === 0
+
+      if (useFreeEndpoint) {
         // Free or solidarity event (and no paid kits) - direct registration
         const response = await fetch('/api/registration/create-free', {
           method: 'POST',

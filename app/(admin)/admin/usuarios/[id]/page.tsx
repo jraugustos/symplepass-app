@@ -11,6 +11,10 @@ import {
 import { UserDetailCardClient } from '@/components/admin/user-detail-card-client'
 import { UserRegistrationsTable } from '@/components/admin/user-registrations-table'
 import { UserPaymentHistoryTable } from '@/components/admin/user-payment-history-table'
+import { UserPreferencesAdmin } from '@/components/admin/user-preferences-admin'
+import { UserPhotoOrdersAdmin } from '@/components/admin/user-photo-orders-admin'
+import { getUserPreferences } from '@/lib/data/user-preferences'
+import { getUserPhotoOrders } from '@/lib/data/photo-orders'
 import { Card } from '@/components/ui/card'
 import { formatCurrency } from '@/lib/utils'
 
@@ -41,9 +45,19 @@ export default async function UsuarioDetalhePage({
     notFound()
   }
 
-  const { registrations } = await getUserRegistrations(params.id)
-  const { payments } = await getUserPaymentHistory(params.id)
-  const stats = await getUserStats(params.id)
+  const [
+    { registrations },
+    { payments },
+    stats,
+    { data: preferences },
+    { data: photoOrders }
+  ] = await Promise.all([
+    getUserRegistrations(params.id),
+    getUserPaymentHistory(params.id),
+    getUserStats(params.id),
+    getUserPreferences(params.id),
+    getUserPhotoOrders(params.id)
+  ])
 
   return (
     <div className="space-y-6">
@@ -124,20 +138,44 @@ export default async function UsuarioDetalhePage({
         </div>
       )}
 
-      {/* Registrations */}
-      <div className="bg-white rounded-lg border border-neutral-200 p-6">
-        <h2 className="text-xl font-semibold text-neutral-900 mb-4">
-          Inscrições ({registrations.length})
-        </h2>
-        <UserRegistrationsTable registrations={registrations} />
-      </div>
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* Main Content Area */}
+        <div className="xl:col-span-2 space-y-6">
+          {/* Registrations */}
+          <div className="bg-white rounded-lg border border-neutral-200 p-6">
+            <h2 className="text-xl font-semibold text-neutral-900 mb-4">
+              Inscrições ({registrations.length})
+            </h2>
+            <UserRegistrationsTable registrations={registrations} />
+          </div>
 
-      {/* Payment History */}
-      <div className="bg-white rounded-lg border border-neutral-200 p-6">
-        <h2 className="text-xl font-semibold text-neutral-900 mb-4">
-          Histórico de Pagamentos ({payments.length})
-        </h2>
-        <UserPaymentHistoryTable payments={payments} />
+          {/* Photo Orders */}
+          <div className="bg-white rounded-lg border border-neutral-200 p-6">
+            <h2 className="text-xl font-semibold text-neutral-900 mb-4">
+              Pedidos de Fotos ({photoOrders?.length || 0})
+            </h2>
+            <UserPhotoOrdersAdmin orders={photoOrders || []} />
+          </div>
+
+          {/* Payment History */}
+          <div className="bg-white rounded-lg border border-neutral-200 p-6">
+            <h2 className="text-xl font-semibold text-neutral-900 mb-4">
+              Histórico de Pagamentos ({payments.length})
+            </h2>
+            <UserPaymentHistoryTable payments={payments} />
+          </div>
+        </div>
+
+        {/* Sidebar */}
+        <div className="space-y-6">
+          {/* User Preferences */}
+          <div className="bg-white rounded-lg border border-neutral-200 p-6 shadow-sm">
+            <h2 className="text-xl font-semibold text-neutral-900 mb-4">
+              Preferências
+            </h2>
+            <UserPreferencesAdmin preferences={preferences} />
+          </div>
+        </div>
       </div>
     </div>
   )

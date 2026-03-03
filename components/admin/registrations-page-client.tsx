@@ -11,6 +11,9 @@ import { useRouter } from 'next/navigation'
 
 interface RegistrationsPageClientProps {
   registrations: any[]
+  total: number
+  currentPage: number
+  pageSize: number
   categories: EventCategory[]
   eventId: string
   eventSlug: string
@@ -22,6 +25,9 @@ interface RegistrationsPageClientProps {
 
 export function RegistrationsPageClient({
   registrations: initialRegistrations,
+  total,
+  currentPage,
+  pageSize,
   categories,
   eventId,
   eventSlug,
@@ -46,6 +52,7 @@ export function RegistrationsPageClient({
     if (newFilters.status) queryParams.set('status', newFilters.status)
     if (newFilters.category_id) queryParams.set('category_id', newFilters.category_id)
     if (newFilters.search) queryParams.set('search', newFilters.search)
+    if (newFilters.page && newFilters.page > 1) queryParams.set('page', newFilters.page.toString())
 
     router.push(`/admin/eventos/${eventId}/inscricoes?${queryParams.toString()}`)
   }
@@ -123,6 +130,9 @@ export function RegistrationsPageClient({
     <>
       <RegistrationsTable
         registrations={registrations}
+        total={total}
+        currentPage={currentPage}
+        pageSize={pageSize}
         categories={categories}
         onFilterChange={handleFilterChange}
         onExport={handleExport}

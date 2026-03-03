@@ -152,6 +152,9 @@ export default async function InscricoesEventoPage({
       <div className="bg-white rounded-lg border border-neutral-200 p-6">
         <RegistrationsPageClient
           registrations={registrations}
+          total={total}
+          currentPage={filters.page!}
+          pageSize={filters.pageSize!}
           categories={categories}
           eventId={params.id}
           eventSlug={event.slug}

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Download, Search, Trash2, ExternalLink, Pencil } from 'lucide-react'
+import { Download, Search, Trash2, ExternalLink, Pencil, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,6 +13,9 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 
 interface RegistrationsTableProps {
   registrations: any[]
+  total: number
+  currentPage: number
+  pageSize: number
   categories: EventCategory[]
   onFilterChange: (filters: RegistrationFilters) => void
   onExport: () => Promise<void>
@@ -24,6 +27,9 @@ interface RegistrationsTableProps {
 
 export function RegistrationsTable({
   registrations,
+  total,
+  currentPage,
+  pageSize,
   categories,
   onFilterChange,
   onExport,
@@ -52,7 +58,14 @@ export function RegistrationsTable({
   }
 
   const handleFilterChange = (key: keyof RegistrationFilters, value: string) => {
-    const newFilters = { ...filters, [key]: value || undefined }
+    const newFilters = { ...filters, [key]: value || undefined, page: 1 }
+    setFilters(newFilters)
+    onFilterChange(newFilters)
+  }
+
+  const handlePageChange = (newPage: number) => {
+    // Keep existing filters, just update the page
+    const newFilters = { ...filters, page: newPage }
     setFilters(newFilters)
     onFilterChange(newFilters)
   }
@@ -454,6 +467,73 @@ export function RegistrationsTable({
       {registrations.length === 0 && (
         <div className="text-center py-12 bg-neutral-50 rounded-lg border-2 border-dashed border-neutral-300">
           <p className="text-neutral-600">Nenhuma inscrição encontrada</p>
+        </div>
+      )}
+
+      {/* Pagination Controls */}
+      {Math.max(1, Math.ceil(total / pageSize)) > 1 && (
+        <div className="flex items-center justify-between bg-white px-4 py-3 border border-neutral-200 rounded-lg sm:px-6">
+          <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm text-neutral-700">
+                Mostrando <span className="font-medium">{(currentPage - 1) * pageSize + 1}</span> a{' '}
+                <span className="font-medium">
+                  {Math.min(currentPage * pageSize, total)}
+                </span>{' '}
+                de <span className="font-medium">{total}</span> resultados
+              </p>
+            </div>
+            <div>
+              <nav className="flex items-center gap-2" aria-label="Pagination">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  iconOnly
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                >
+                  <span className="sr-only">Anterior</span>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <div className="text-sm font-medium text-neutral-700 px-2">
+                  Página {currentPage} de {Math.max(1, Math.ceil(total / pageSize))}
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  iconOnly
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === Math.max(1, Math.ceil(total / pageSize))}
+                >
+                  <span className="sr-only">Próxima</span>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </nav>
+            </div>
+          </div>
+
+          {/* Mobile pagination */}
+          <div className="flex flex-1 items-center justify-between sm:hidden">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+            >
+              Anterior
+            </Button>
+            <span className="text-sm text-neutral-700">
+              {currentPage} / {Math.max(1, Math.ceil(total / pageSize))}
+            </span>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === Math.max(1, Math.ceil(total / pageSize))}
+            >
+              Próxima
+            </Button>
+          </div>
         </div>
       )}
     </div>

@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth/actions'
 import { getAllUsers } from '@/lib/data/admin-users'
+import { getFilterOptions } from '@/lib/data/events'
 import { UsersPageClient } from '@/components/admin/users-page-client'
 import { UserRole } from '@/types/database.types'
 
@@ -11,9 +12,13 @@ export const metadata = {
 }
 
 interface SearchParams {
-  role?: UserRole
+  role?: string
   search?: string
   page?: string
+  city?: string
+  preferred_sport?: string
+  event_sport?: string
+  is_benefits_club_member?: string
 }
 
 export default async function UsuariosPage({
@@ -28,13 +33,20 @@ export default async function UsuariosPage({
   }
 
   const filters = {
-    role: searchParams.role,
+    role: searchParams.role as UserRole | undefined,
     search: searchParams.search,
     page: searchParams.page ? parseInt(searchParams.page) : 1,
     pageSize: 50,
+    city: searchParams.city,
+    preferred_sport: searchParams.preferred_sport,
+    event_sport: searchParams.event_sport,
+    is_benefits_club_member: searchParams.is_benefits_club_member === 'true' ? true : searchParams.is_benefits_club_member === 'false' ? false : undefined,
   }
 
-  const { users, total } = await getAllUsers(filters)
+  const [{ users, total }, { cities }] = await Promise.all([
+    getAllUsers(filters),
+    getFilterOptions(),
+  ])
 
   return (
     <div className="space-y-6">
@@ -59,7 +71,14 @@ export default async function UsuariosPage({
 
       {/* Users Table */}
       <div className="bg-white rounded-lg border border-neutral-200 p-6">
-        <UsersPageClient users={users} />
+        <UsersPageClient
+          users={users}
+          total={total}
+          currentPage={filters.page as number}
+          pageSize={filters.pageSize as number}
+          filters={filters}
+          availableCities={cities}
+        />
       </div>
     </div>
   )

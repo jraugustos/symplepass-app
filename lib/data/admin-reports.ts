@@ -107,6 +107,34 @@ export interface ReportFilters {
   payment_status?: string
 }
 
+async function fetchAllRows(queryBuilder: any): Promise<{ data: any[] | null; error: any }> {
+  let allData: any[] = []
+  let page = 0
+  const pageSize = 1000 // Supabase default max rows
+
+  while (true) {
+    const { data, error } = await queryBuilder.range(page * pageSize, (page + 1) * pageSize - 1)
+
+    if (error) {
+      return { data: null, error }
+    }
+
+    if (!data || data.length === 0) {
+      break
+    }
+
+    allData = allData.concat(data)
+
+    if (data.length < pageSize) {
+      break
+    }
+
+    page++
+  }
+
+  return { data: allData, error: null }
+}
+
 export async function getFinancialOverview(filters: ReportFilters = {}): Promise<FinancialOverview | null> {
   try {
     const supabase = await createClient()
@@ -147,7 +175,7 @@ export async function getFinancialOverview(filters: ReportFilters = {}): Promise
       regQuery = regQuery.lte('created_at', end_date)
     }
 
-    const { data, error } = await regQuery
+    const { data, error } = await fetchAllRows(regQuery)
 
     if (error) {
       console.error('Error fetching registrations for overview:', error)
@@ -234,7 +262,7 @@ export async function getSalesTrends(filters: ReportFilters = {}): Promise<Sales
       query = query.lte('created_at', end_date)
     }
 
-    const { data, error } = await query
+    const { data, error } = await fetchAllRows(query)
 
     if (error) {
       console.error('Error fetching sales trends:', error)
@@ -278,76 +306,65 @@ export async function getEventPerformance(filters: ReportFilters = {}): Promise<
     const { start_date, end_date, event_id, sport_type, organizer_id, payment_status } = filters
 
     let query = supabase
-      .from('events')
+      .from('registrations')
       .select(`
         id,
-        title,
-        sport_type,
-        registrations(
-          id,
-          payment_status,
-          amount_paid,
-          created_at
-        )
+        payment_status,
+        amount_paid,
+        created_at,
+        events:event_id!inner(id, title, sport_type, organizer_id)
       `)
 
-    if (event_id) {
-      query = query.eq('id', event_id)
-    }
+    if (event_id) query = query.eq('event_id', event_id)
+    if (organizer_id) query = query.eq('events.organizer_id', organizer_id)
+    if (sport_type) query = query.eq('events.sport_type', sport_type)
+    if (payment_status) query = query.eq('payment_status', payment_status)
+    if (start_date) query = query.gte('created_at', start_date)
+    if (end_date) query = query.lte('created_at', end_date)
 
-    if (organizer_id) {
-      query = query.eq('organizer_id', organizer_id)
-    }
-
-    if (sport_type) {
-      query = query.eq('sport_type', sport_type)
-    }
-
-    const { data: events, error } = await query
+    const { data, error } = await fetchAllRows(query)
 
     if (error) {
       console.error('Error fetching event performance:', error)
       return []
     }
 
-    const performanceData: EventPerformanceData[] = (events || []).map(event => {
-      let registrations = event.registrations || []
+    const registrations = ((data ?? []) as unknown) as RegistrationRevenueRow[]
 
-      // Apply date filters on registration created_at
-      if (start_date) {
-        registrations = registrations.filter((r: any) => r.created_at >= start_date)
-      }
-      if (end_date) {
-        registrations = registrations.filter((r: any) => r.created_at <= end_date)
+    // Group by event
+    const grouped = registrations.reduce((acc, reg) => {
+      const evt = normalizeRelation(reg.events)
+      if (!evt || !evt.id) return acc
+
+      if (!acc[evt.id]) {
+        acc[evt.id] = {
+          eventId: evt.id,
+          eventTitle: evt.title || 'N/A',
+          totalRevenue: 0,
+          totalRegistrations: 0,
+          confirmedRegistrations: 0,
+          conversionRate: 0,
+        }
       }
 
-      // Apply payment_status filter
-      if (payment_status) {
-        registrations = registrations.filter((r: any) => r.payment_status === payment_status)
+      acc[evt.id].totalRegistrations += 1
+      if (reg.payment_status === 'paid') {
+        acc[evt.id].confirmedRegistrations += 1
+        acc[evt.id].totalRevenue += getAmountPaid(reg)
       }
 
-      const totalRegistrations = registrations.length
-      const confirmedRegistrations = registrations.filter((r: any) => r.payment_status === 'paid').length
-      const totalRevenue = registrations
-        .filter((r: any) => r.payment_status === 'paid')
-        .reduce((sum: number, r: any) => sum + (Number(r.amount_paid) || 0), 0)
-      const conversionRate = totalRegistrations > 0 ? (confirmedRegistrations / totalRegistrations) * 100 : 0
+      return acc
+    }, {} as Record<string, EventPerformanceData>)
 
-      return {
-        eventId: event.id,
-        eventTitle: event.title,
-        totalRevenue,
-        totalRegistrations,
-        confirmedRegistrations,
-        conversionRate,
-      }
+    const performanceData = Object.values(grouped)
+
+    // Calculate conversion rates
+    performanceData.forEach(e => {
+      e.conversionRate = e.totalRegistrations > 0 ? (e.confirmedRegistrations / e.totalRegistrations) * 100 : 0
     })
 
-    // Filter out events with no registrations after filtering
-    const filtered = performanceData.filter(e => e.totalRegistrations > 0)
-
     // Sort by revenue descending
-    return filtered.sort((a, b) => b.totalRevenue - a.totalRevenue)
+    return performanceData.sort((a, b) => b.totalRevenue - a.totalRevenue)
   } catch (error) {
     console.error('Error in getEventPerformance:', error)
     return []
@@ -391,7 +408,7 @@ export async function getPaymentStatusBreakdown(filters: ReportFilters = {}): Pr
       query = query.lte('created_at', end_date)
     }
 
-    const { data, error } = await query
+    const { data, error } = await fetchAllRows(query)
 
     if (error) {
       console.error('Error fetching payment status breakdown:', error)
@@ -481,7 +498,7 @@ export async function exportFinancialReport(filters: ReportFilters = {}): Promis
       query = query.lte('created_at', end_date)
     }
 
-    const { data, error } = await query
+    const { data, error } = await fetchAllRows(query)
 
     if (error) {
       console.error('Error exporting financial report:', error)
@@ -556,7 +573,7 @@ export async function getCategoryDistribution(filters: ReportFilters = {}): Prom
     if (start_date) query = query.gte('created_at', start_date)
     if (end_date) query = query.lte('created_at', end_date)
 
-    const { data, error } = await query
+    const { data, error } = await fetchAllRows(query)
 
     if (error) {
       console.error('Error fetching category distribution:', error)
@@ -614,7 +631,7 @@ export async function getCouponUsageStats(filters: ReportFilters = {}): Promise<
         registrations:registration_id(event_id)
       `)
 
-    const { data, error } = await query
+    const { data, error } = await fetchAllRows(query)
 
     if (error) {
       console.error('Error fetching coupon usage stats:', error)
@@ -677,7 +694,7 @@ export async function getSportTypeRevenue(filters: ReportFilters = {}): Promise<
     if (start_date) query = query.gte('created_at', start_date)
     if (end_date) query = query.lte('created_at', end_date)
 
-    const { data, error } = await query
+    const { data, error } = await fetchAllRows(query)
 
     if (error) {
       console.error('Error fetching sport type revenue:', error)
@@ -745,7 +762,7 @@ export async function getRevenueComparison(filters: ReportFilters = {}): Promise
     if (start_date) query = query.gte('created_at', start_date)
     if (end_date) query = query.lte('created_at', end_date)
 
-    const { data, error } = await query
+    const { data, error } = await fetchAllRows(query)
 
     if (error) {
       console.error('Error fetching revenue comparison:', error)

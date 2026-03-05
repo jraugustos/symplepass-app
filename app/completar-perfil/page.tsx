@@ -45,7 +45,7 @@ export default async function CompleteProfilePage({ searchParams }: CompleteProf
   const safeCallbackUrl = sanitizeRedirectUrl(searchParams.callbackUrl || '/conta')
 
   // If profile is already complete, redirect to callback or /conta
-  if (isProfileComplete(profile, preferences)) {
+  if (isProfileComplete(profile, preferences, profile?.role as any)) {
     redirect(safeCallbackUrl)
   }
 

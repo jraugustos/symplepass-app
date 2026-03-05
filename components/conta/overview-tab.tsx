@@ -3,8 +3,10 @@
 import Image from 'next/image'
 import { useMemo, useState } from 'react'
 import {
+  AlertTriangle,
   ArrowRight,
   CalendarDays,
+  CreditCard,
   Download,
   MapPin,
   QrCode,
@@ -59,6 +61,34 @@ export function OverviewTab({
     null
   )
   const [downloadTarget, setDownloadTarget] = useState<string | null>(null)
+  const [payingTarget, setPayingTarget] = useState<string | null>(null)
+
+  const isPending = (registration: RegistrationWithDetails) =>
+    registration.status === 'pending' && registration.payment_status !== 'paid'
+
+  const handlePayNow = async (registration: RegistrationWithDetails) => {
+    try {
+      setPayingTarget(registration.id)
+      const response = await fetch(
+        `/api/registrations/payment-url?registrationId=${registration.id}`
+      )
+      const data = await response.json()
+
+      if (!response.ok) {
+        alert(data.error || 'Não foi possível recuperar o link de pagamento.')
+        return
+      }
+
+      if (data.url) {
+        window.location.href = data.url
+      }
+    } catch (error) {
+      console.error('Erro ao recuperar link de pagamento:', error)
+      alert('Erro ao recuperar o link de pagamento. Tente novamente.')
+    } finally {
+      setPayingTarget(null)
+    }
+  }
 
   const highlightedSports = useMemo(() => {
     if (!preferences.favorite_sports?.length) return ['Descubra novos esportes']
@@ -201,33 +231,59 @@ export function OverviewTab({
                   </div>
 
                   <div className="flex flex-col gap-2 md:flex-row">
-                    <Button
-                      variant="secondary"
-                      className="rounded-xl"
-                      onClick={() => setSelectedRegistration(registration)}
-                    >
-                      <QrCode className="h-4 w-4" />
-                      QR Code
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      className="rounded-xl border border-neutral-200 bg-white text-neutral-700"
-                      isLoading={downloadTarget === registration.id}
-                      onClick={() => handleDownloadReceipt(registration.id)}
-                    >
-                      <Download className="h-4 w-4" />
-                      PDF
-                    </Button>
-                    <Button
-                      variant="primary"
-                      className="rounded-xl"
-                      asChild
-                      ripple={false}
-                    >
-                      <a href={`/eventos/${registration.event.slug}`} className="flex items-center gap-2">
-                        Detalhes
-                      </a>
-                    </Button>
+                    {isPending(registration) ? (
+                      <>
+                        <Button
+                          variant="primary"
+                          className="rounded-xl"
+                          isLoading={payingTarget === registration.id}
+                          onClick={() => handlePayNow(registration)}
+                        >
+                          <CreditCard className="h-4 w-4" />
+                          Pagar agora
+                        </Button>
+                        <Button
+                          variant="primary"
+                          className="rounded-xl"
+                          asChild
+                          ripple={false}
+                        >
+                          <a href={`/eventos/${registration.event.slug}`} className="flex items-center gap-2">
+                            Detalhes
+                          </a>
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button
+                          variant="secondary"
+                          className="rounded-xl"
+                          onClick={() => setSelectedRegistration(registration)}
+                        >
+                          <QrCode className="h-4 w-4" />
+                          QR Code
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          className="rounded-xl border border-neutral-200 bg-white text-neutral-700"
+                          isLoading={downloadTarget === registration.id}
+                          onClick={() => handleDownloadReceipt(registration.id)}
+                        >
+                          <Download className="h-4 w-4" />
+                          PDF
+                        </Button>
+                        <Button
+                          variant="primary"
+                          className="rounded-xl"
+                          asChild
+                          ripple={false}
+                        >
+                          <a href={`/eventos/${registration.event.slug}`} className="flex items-center gap-2">
+                            Detalhes
+                          </a>
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
               ))}

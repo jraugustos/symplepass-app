@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Download, ReceiptText } from 'lucide-react'
+import { CreditCard, Download, ReceiptText } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Modal, ModalBody, ModalFooter, ModalHeader, ModalTitle } from '@/components/ui/modal'
@@ -28,6 +28,31 @@ export function PaymentsTab({
 }: PaymentsTabProps) {
   const [selectedPayment, setSelectedPayment] = useState<PaymentHistoryItem | null>(null)
   const [downloadTarget, setDownloadTarget] = useState<string | null>(null)
+  const [payingTarget, setPayingTarget] = useState<string | null>(null)
+
+  const handlePayNow = async (payment: PaymentHistoryItem) => {
+    try {
+      setPayingTarget(payment.id)
+      const response = await fetch(
+        `/api/registrations/payment-url?registrationId=${payment.registration_id}`
+      )
+      const data = await response.json()
+
+      if (!response.ok) {
+        alert(data.error || 'Não foi possível recuperar o link de pagamento.')
+        return
+      }
+
+      if (data.url) {
+        window.location.href = data.url
+      }
+    } catch (error) {
+      console.error('Erro ao recuperar link de pagamento:', error)
+      alert('Erro ao recuperar o link de pagamento. Tente novamente.')
+    } finally {
+      setPayingTarget(null)
+    }
+  }
 
   const pageNumbers = useMemo(() => {
     const pages = []
@@ -117,22 +142,36 @@ export function PaymentsTab({
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            className="rounded-xl border border-neutral-200 bg-neutral-50 text-neutral-700"
-                            onClick={() => setSelectedPayment(payment)}
-                          >
-                            Detalhes
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            className="rounded-xl"
-                            isLoading={downloadTarget === payment.id}
-                            onClick={() => handleDownload(payment)}
-                          >
-                            <Download className="h-4 w-4" />
-                            Recibo
-                          </Button>
+                          {payment.payment_status === 'pending' ? (
+                            <Button
+                              variant="primary"
+                              className="rounded-xl"
+                              isLoading={payingTarget === payment.id}
+                              onClick={() => handlePayNow(payment)}
+                            >
+                              <CreditCard className="h-4 w-4" />
+                              Pagar agora
+                            </Button>
+                          ) : (
+                            <>
+                              <Button
+                                variant="ghost"
+                                className="rounded-xl border border-neutral-200 bg-neutral-50 text-neutral-700"
+                                onClick={() => setSelectedPayment(payment)}
+                              >
+                                Detalhes
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                className="rounded-xl"
+                                isLoading={downloadTarget === payment.id}
+                                onClick={() => handleDownload(payment)}
+                              >
+                                <Download className="h-4 w-4" />
+                                Recibo
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -158,21 +197,35 @@ export function PaymentsTab({
                     {formatCurrency(payment.amount)}
                   </p>
                   <div className="flex gap-2">
-                    <Button
-                      variant="ghost"
-                      className="flex-1 rounded-xl border border-neutral-200 bg-neutral-50 text-neutral-700"
-                      onClick={() => setSelectedPayment(payment)}
-                    >
-                      Detalhes
-                    </Button>
-                    <Button
-                      variant="primary"
-                      className="flex-1 rounded-xl"
-                      isLoading={downloadTarget === payment.id}
-                      onClick={() => handleDownload(payment)}
-                    >
-                      Recibo
-                    </Button>
+                    {payment.payment_status === 'pending' ? (
+                      <Button
+                        variant="primary"
+                        className="flex-1 rounded-xl"
+                        isLoading={payingTarget === payment.id}
+                        onClick={() => handlePayNow(payment)}
+                      >
+                        <CreditCard className="h-4 w-4" />
+                        Pagar agora
+                      </Button>
+                    ) : (
+                      <>
+                        <Button
+                          variant="ghost"
+                          className="flex-1 rounded-xl border border-neutral-200 bg-neutral-50 text-neutral-700"
+                          onClick={() => setSelectedPayment(payment)}
+                        >
+                          Detalhes
+                        </Button>
+                        <Button
+                          variant="primary"
+                          className="flex-1 rounded-xl"
+                          isLoading={downloadTarget === payment.id}
+                          onClick={() => handleDownload(payment)}
+                        >
+                          Recibo
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
               ))}
@@ -188,11 +241,10 @@ export function PaymentsTab({
                     key={page}
                     type="button"
                     onClick={() => onPageChange(page)}
-                    className={`h-9 w-9 rounded-lg border text-sm font-semibold transition ${
-                      page === currentPage
+                    className={`h-9 w-9 rounded-lg border text-sm font-semibold transition ${page === currentPage
                         ? 'border-neutral-900 bg-neutral-900 text-white'
                         : 'border-neutral-200 text-neutral-600 hover:border-neutral-400'
-                    }`}
+                      }`}
                   >
                     {page}
                   </button>

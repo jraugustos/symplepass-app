@@ -137,17 +137,24 @@ export function sanitizeRedirectUrl(url: string): string {
 /**
  * Checks if user profile is complete (has required fields for onboarding)
  * Used to determine if OAuth users need to complete their profile
+ * Organizers only need basic info (name + phone), not sport preferences
  */
 export function isProfileComplete(
   profile: Profile | null,
-  preferences: UserPreferences | null
+  preferences: UserPreferences | null,
+  role?: UserRole | null
 ): boolean {
   if (!profile) return false
 
   // Check required profile fields
   const hasBasicInfo = !!(profile.full_name && profile.phone)
 
-  // Check if user has at least 1 favorite sport
+  // Organizers and admins don't need sport preferences
+  if (role === 'organizer' || role === 'admin') {
+    return hasBasicInfo
+  }
+
+  // Regular users need at least 1 favorite sport
   const hasSportsInterests = !!(
     preferences?.favorite_sports && preferences.favorite_sports.length > 0
   )

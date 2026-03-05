@@ -409,9 +409,21 @@ export function EventsTable({
       <ConfirmDialog
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
-        title="Deletar Evento"
-        description="Tem certeza que deseja deletar este evento? Esta ação não pode ser desfeita."
-        confirmText="Deletar"
+        title={
+          eventToDelete && events.find(e => e.id === eventToDelete)?.status === 'cancelled'
+            ? 'Excluir Evento Permanentemente'
+            : 'Deletar Evento'
+        }
+        description={
+          eventToDelete && events.find(e => e.id === eventToDelete)?.status === 'cancelled'
+            ? 'Este evento já está cancelado. Deseja excluí-lo permanentemente do sistema? Esta ação não pode ser desfeita.'
+            : 'Tem certeza que deseja cancelar este evento? O evento será marcado como cancelado.'
+        }
+        confirmText={
+          eventToDelete && events.find(e => e.id === eventToDelete)?.status === 'cancelled'
+            ? 'Excluir Permanentemente'
+            : 'Deletar'
+        }
         cancelText="Cancelar"
         destructive
         onConfirm={handleDelete}

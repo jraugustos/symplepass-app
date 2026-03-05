@@ -213,15 +213,19 @@ export async function createEvent(
   try {
     const supabase = await createClient();
 
+    // Use admin client for slug checking to bypass RLS
+    // This ensures we see ALL events, not just the current user's
+    const adminSupabase = createAdminClient();
+
     // Generate unique slug
     const baseSlug = slugify(eventData.title);
     let slug = baseSlug;
     let counter = 1;
 
-    // Check if slug exists
+    // Check if slug exists (using admin client to bypass RLS)
     while (true) {
-      const { data: existing } = await supabase
-        .from("events")
+      const { data: existing } = await (adminSupabase
+        .from("events") as any)
         .select("id")
         .eq("slug", slug)
         .single();
@@ -266,6 +270,10 @@ export async function createEvent(
 
     if (error) {
       console.error("Error creating event:", error);
+      // Handle duplicate slug constraint violation with friendly message
+      if (error.message?.includes('events_slug_key') || error.code === '23505') {
+        return { data: null, error: "Já existe um evento cadastrado com esse nome. Por favor, escolha um título diferente." };
+      }
       return { data: null, error: error.message };
     }
 
@@ -395,7 +403,24 @@ export async function deleteEvent(
     // This is safe because we already verified permissions above
     const adminSupabase = createAdminClient();
 
-    if (hardDelete) {
+    // If hardDelete requested, or event is already cancelled, do a hard delete
+    let shouldHardDelete = hardDelete;
+
+    if (!shouldHardDelete) {
+      // Check current event status to auto-detect cancelled events
+      const { data: currentEvent } = await (adminSupabase
+        .from("events") as any)
+        .select("status")
+        .eq("id", eventId)
+        .single();
+
+      if ((currentEvent as any)?.status === "cancelled") {
+        shouldHardDelete = true;
+        console.log(`[deleteEvent] Event ${eventId} is already cancelled, performing hard delete`);
+      }
+    }
+
+    if (shouldHardDelete) {
       const { error } = await (adminSupabase
         .from("events") as any)
         .delete()

@@ -2,14 +2,18 @@
 
 import Image from 'next/image'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
+  AlertTriangle,
   ArrowRight,
   CalendarDays,
+  CreditCard,
   Download,
   ExternalLink,
   MapPin,
   QrCode,
   Ticket,
+  XCircle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -30,10 +34,14 @@ type EventsTabProps = {
 }
 
 export function EventsTab({ registrations }: EventsTabProps) {
+  const router = useRouter()
   const [selectedRegistration, setSelectedRegistration] = useState<RegistrationWithDetails | null>(
     null
   )
   const [downloadTarget, setDownloadTarget] = useState<string | null>(null)
+  const [payingTarget, setPayingTarget] = useState<string | null>(null)
+  const [cancellingTarget, setCancellingTarget] = useState<string | null>(null)
+  const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null)
 
   const openQrModal = (registration: RegistrationWithDetails) => {
     setSelectedRegistration(registration)
@@ -62,6 +70,60 @@ export function EventsTab({ registrations }: EventsTabProps) {
       setDownloadTarget(null)
     }
   }
+
+  const handlePayNow = async (registration: RegistrationWithDetails) => {
+    try {
+      setPayingTarget(registration.id)
+      const response = await fetch(
+        `/api/registrations/payment-url?registrationId=${registration.id}`
+      )
+      const data = await response.json()
+
+      if (!response.ok) {
+        alert(data.error || 'Não foi possível recuperar o link de pagamento.')
+        return
+      }
+
+      if (data.url) {
+        window.location.href = data.url
+      }
+    } catch (error) {
+      console.error('Erro ao recuperar link de pagamento:', error)
+      alert('Erro ao recuperar o link de pagamento. Tente novamente.')
+    } finally {
+      setPayingTarget(null)
+    }
+  }
+
+  const handleCancelRegistration = async (registrationId: string) => {
+    try {
+      setCancellingTarget(registrationId)
+      setCancelConfirmId(null)
+
+      const response = await fetch('/api/registrations/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ registrationId }),
+      })
+      const data = await response.json()
+
+      if (!response.ok) {
+        alert(data.error || 'Não foi possível cancelar a inscrição.')
+        return
+      }
+
+      // Refresh the page to update registration list
+      router.refresh()
+    } catch (error) {
+      console.error('Erro ao cancelar inscrição:', error)
+      alert('Erro ao cancelar a inscrição. Tente novamente.')
+    } finally {
+      setCancellingTarget(null)
+    }
+  }
+
+  const isPending = (registration: RegistrationWithDetails) =>
+    registration.status === 'pending' && registration.payment_status !== 'paid'
 
   if (registrations.length === 0) {
     return (
@@ -120,13 +182,12 @@ export function EventsTab({ registrations }: EventsTabProps) {
                 <div className="absolute left-4 top-4 flex flex-col gap-2">
                   <Badge
                     variant={getStatusBadgeVariant(registration.payment_status)}
-                    className={`shadow-lg border-0 ${
-                      registration.payment_status === 'paid'
-                        ? 'bg-emerald-500 text-white'
-                        : registration.payment_status === 'pending'
-                          ? 'bg-amber-500 text-white'
-                          : 'bg-red-500 text-white'
-                    }`}
+                    className={`shadow-lg border-0 ${registration.payment_status === 'paid'
+                      ? 'bg-emerald-500 text-white'
+                      : registration.payment_status === 'pending'
+                        ? 'bg-amber-500 text-white'
+                        : 'bg-red-500 text-white'
+                      }`}
                   >
                     {formatPaymentStatus(registration.payment_status)}
                   </Badge>
@@ -148,6 +209,17 @@ export function EventsTab({ registrations }: EventsTabProps) {
                     {registration.event.description?.slice(0, 110) ?? 'Evento confirmado'}
                   </p>
                 </div>
+
+                {/* Pending payment alert */}
+                {isPending(registration) && (
+                  <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" />
+                    <p className="text-xs text-amber-800">
+                      Finalize o pagamento para confirmar sua inscrição. Você também pode cancelar e
+                      refazer a inscrição se necessário.
+                    </p>
+                  </div>
+                )}
 
                 <dl className="space-y-2 text-sm text-neutral-600">
                   <div className="flex items-center gap-2">
@@ -174,23 +246,50 @@ export function EventsTab({ registrations }: EventsTabProps) {
                 </dl>
 
                 <div className="mt-auto grid gap-2 sm:grid-cols-2">
-                  <Button
-                    variant="secondary"
-                    className="rounded-xl"
-                    onClick={() => openQrModal(registration)}
-                  >
-                    <QrCode className="h-4 w-4" />
-                    QR Code
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="rounded-xl border border-neutral-200 bg-white text-neutral-700"
-                    isLoading={downloadTarget === registration.id}
-                    onClick={() => handleDownloadReceipt(registration)}
-                  >
-                    <Download className="h-4 w-4" />
-                    Recibo
-                  </Button>
+                  {isPending(registration) ? (
+                    <>
+                      {/* Pending registration: primary Pay Now + subtle Cancel link */}
+                      <Button
+                        variant="primary"
+                        className="rounded-xl sm:col-span-2"
+                        isLoading={payingTarget === registration.id}
+                        onClick={() => handlePayNow(registration)}
+                      >
+                        <CreditCard className="h-4 w-4" />
+                        Pagar agora
+                      </Button>
+                      <button
+                        type="button"
+                        className="inline-flex items-center justify-center gap-1.5 text-xs text-neutral-500 transition hover:text-red-600 sm:col-span-2"
+                        disabled={cancellingTarget === registration.id}
+                        onClick={() => setCancelConfirmId(registration.id)}
+                      >
+                        <XCircle className="h-3.5 w-3.5" />
+                        {cancellingTarget === registration.id ? 'Cancelando...' : 'Cancelar inscrição'}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      {/* Confirmed/other: show QR Code + Receipt */}
+                      <Button
+                        variant="secondary"
+                        className="rounded-xl"
+                        onClick={() => openQrModal(registration)}
+                      >
+                        <QrCode className="h-4 w-4" />
+                        QR Code
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="rounded-xl border border-neutral-200 bg-white text-neutral-700"
+                        isLoading={downloadTarget === registration.id}
+                        onClick={() => handleDownloadReceipt(registration)}
+                      >
+                        <Download className="h-4 w-4" />
+                        Recibo
+                      </Button>
+                    </>
+                  )}
                   <Button variant="primary" className="rounded-xl sm:col-span-2" asChild>
                     <a
                       href={`/eventos/${registration.event.slug}`}
@@ -207,6 +306,7 @@ export function EventsTab({ registrations }: EventsTabProps) {
         </div>
       </div>
 
+      {/* QR Code Modal */}
       <Modal open={!!selectedRegistration} onOpenChange={() => setSelectedRegistration(null)}>
         <ModalHeader onClose={() => setSelectedRegistration(null)}>
           <ModalTitle>Ingresso digital</ModalTitle>
@@ -240,6 +340,36 @@ export function EventsTab({ registrations }: EventsTabProps) {
         <ModalFooter centered>
           <Button variant="secondary" onClick={() => setSelectedRegistration(null)}>
             Fechar
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Cancel Confirmation Modal */}
+      <Modal open={!!cancelConfirmId} onOpenChange={() => setCancelConfirmId(null)}>
+        <ModalHeader onClose={() => setCancelConfirmId(null)}>
+          <ModalTitle>Cancelar inscrição</ModalTitle>
+        </ModalHeader>
+        <ModalBody>
+          <div className="flex flex-col items-center gap-4 text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
+              <AlertTriangle className="h-8 w-8 text-red-600" />
+            </div>
+            <p className="text-sm text-neutral-700">
+              Tem certeza que deseja cancelar esta inscrição? Você poderá se inscrever novamente
+              depois.
+            </p>
+          </div>
+        </ModalBody>
+        <ModalFooter centered>
+          <Button variant="secondary" onClick={() => setCancelConfirmId(null)}>
+            Voltar
+          </Button>
+          <Button
+            variant="destructive"
+            isLoading={cancellingTarget === cancelConfirmId}
+            onClick={() => cancelConfirmId && handleCancelRegistration(cancelConfirmId)}
+          >
+            Confirmar cancelamento
           </Button>
         </ModalFooter>
       </Modal>

@@ -86,7 +86,10 @@ export async function middleware(request: NextRequest) {
   const hasSportsInterests = !!(
     preferences?.favorite_sports && preferences.favorite_sports.length > 0
   )
-  const isProfileComplete = hasBasicInfo && hasSportsInterests
+  const profileRole = (profile?.role as UserRole) ?? 'user'
+  const isProfileComplete = profileRole === 'organizer' || profileRole === 'admin'
+    ? hasBasicInfo
+    : hasBasicInfo && hasSportsInterests
 
   // If profile is incomplete and not already on completar-perfil, redirect
   if (!isProfileComplete && !pathname.startsWith('/completar-perfil')) {

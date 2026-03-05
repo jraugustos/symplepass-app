@@ -30,7 +30,8 @@ import {
     Clock,
     DollarSign,
     Percent,
-    Trophy
+    Trophy,
+    ExternalLink
 } from 'lucide-react'
 import {
     getPendingEventsAction,
@@ -281,6 +282,19 @@ export default function ApprovacoesPageClient() {
                                 >
                                     <XCircle className="w-4 h-4 mr-2" />
                                     Rejeitar
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    asChild
+                                >
+                                    <a
+                                        href={`/admin/eventos/${event.id}/editar`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        <ExternalLink className="w-4 h-4 mr-2" />
+                                        Ver Detalhes
+                                    </a>
                                 </Button>
                             </div>
                         </CardContent>

@@ -43,6 +43,10 @@ const BUCKET_CONFIG: Record<string, { maxSize: number; allowedTypes: string[] }>
     maxSize: 10 * 1024 * 1024, // 10MB - compressed with watermark
     allowedTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
   },
+  'club-partners': {
+    maxSize: 5 * 1024 * 1024, // 5MB
+    allowedTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/svg+xml'],
+  },
 }
 
 export async function POST(request: NextRequest) {
@@ -184,6 +188,14 @@ export async function POST(request: NextRequest) {
       if (profile.role !== 'admin' && folder !== user.id) {
         return NextResponse.json(
           { error: 'Você só pode fazer upload na sua própria pasta.' },
+          { status: 403 }
+        )
+      }
+    } else if (bucket === 'club-partners') {
+      // Club partners: admin only
+      if (profile.role !== 'admin') {
+        return NextResponse.json(
+          { error: 'Apenas administradores podem fazer upload de logos de parceiros.' },
           { status: 403 }
         )
       }

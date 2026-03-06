@@ -13,7 +13,8 @@ export type StorageBucket =
   | 'organizer-assets'
   | 'event-banners'
   | 'event-photos'
-  | 'event-photos-watermarked';
+  | 'event-photos-watermarked'
+  | 'club-partners';
 
 export interface FileConstraints {
   maxSize: number; // in bytes

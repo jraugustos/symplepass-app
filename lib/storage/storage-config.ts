@@ -139,6 +139,22 @@ export const STORAGE_BUCKETS: Record<string, BucketConfig> = {
       allowedExtensions: ['.jpg', '.jpeg', '.png', '.webp'],
     },
   },
+  CLUB_PARTNERS: {
+    name: 'club-partners',
+    public: true,
+    fileType: 'image',
+    constraints: {
+      maxSize: 5 * 1024 * 1024, // 5MB
+      allowedTypes: [
+        'image/jpeg',
+        'image/jpg',
+        'image/png',
+        'image/webp',
+        'image/svg+xml',
+      ],
+      allowedExtensions: ['.jpg', '.jpeg', '.png', '.webp', '.svg'],
+    },
+  },
 };
 
 // Helper to get bucket config by name

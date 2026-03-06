@@ -15,20 +15,24 @@ import {
   Percent,
   Calendar,
   AlertCircle,
+  ExternalLink,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { formatDateShort } from '@/lib/utils'
 import type { Subscription } from '@/types/database.types'
+import type { ClubPartner } from '@/lib/data/club-partners'
 
 interface ClubBenefitsPageClientProps {
   isAuthenticated: boolean
   subscription: Subscription | null
+  partners: ClubPartner[]
 }
 
 export function ClubBenefitsPageClient({
   isAuthenticated,
   subscription,
+  partners,
 }: ClubBenefitsPageClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -459,6 +463,70 @@ export function ClubBenefitsPageClient({
           </div>
         </div>
       </section>
+
+      {/* Partners Section */}
+      {partners.length > 0 && (
+        <section className="py-20 bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-12">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-orange-50 rounded-full mb-4">
+                <Users className="w-4 h-4 text-orange-600" />
+                <span className="text-sm font-medium text-orange-700">Parceiros</span>
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-bold text-neutral-900 mb-4">
+                Estabelecimentos Parceiros
+              </h2>
+              <p className="text-lg text-neutral-600">
+                Descontos e benefícios exclusivos para membros do clube
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {partners.map((partner) => (
+                <div
+                  key={partner.id}
+                  className="group bg-white border border-neutral-200 rounded-2xl p-6 shadow-[0_4px_20px_rgba(15,23,42,0.04)] hover:shadow-[0_8px_30px_rgba(15,23,42,0.08)] hover:border-orange-200 transition-all duration-300"
+                >
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="flex-shrink-0 w-16 h-16 rounded-xl bg-neutral-50 border border-neutral-100 flex items-center justify-center overflow-hidden">
+                      {partner.logo_url ? (
+                        <img
+                          src={partner.logo_url}
+                          alt={partner.name}
+                          className="w-full h-full object-contain p-2"
+                        />
+                      ) : (
+                        <Crown className="w-7 h-7 text-orange-400" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="font-semibold text-neutral-900 truncate">{partner.name}</h3>
+                    </div>
+                  </div>
+
+                  {partner.description && (
+                    <p className="text-sm text-neutral-600 leading-relaxed mb-4">
+                      {partner.description}
+                    </p>
+                  )}
+
+                  {partner.link && (
+                    <a
+                      href={partner.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-sm font-medium text-orange-600 hover:text-orange-700 transition-colors"
+                    >
+                      Visitar
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Regulation Section */}
       <section className="py-20 bg-white">

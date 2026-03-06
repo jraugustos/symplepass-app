@@ -1,6 +1,7 @@
 import { Metadata } from 'next'
 import { getCurrentUser } from '@/lib/auth/actions'
 import { getActiveSubscription } from '@/lib/data/subscriptions'
+import { getActivePartners } from '@/lib/data/club-partners'
 import { Header } from '@/components/layout/header'
 import { Footer } from '@/components/layout/footer'
 import { ClubBenefitsPageClient } from './club-benefits-page-client'
@@ -22,14 +23,18 @@ export default async function ClubeBeneficiosPage() {
     subscription = data
   }
 
+  const { data: partners } = await getActivePartners()
+
   return (
     <div className="min-h-screen bg-white">
       <Header variant="gradient" />
       <ClubBenefitsPageClient
         isAuthenticated={!!userData?.user}
         subscription={subscription}
+        partners={partners || []}
       />
       <Footer variant="light" />
     </div>
   )
 }
+

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LayoutDashboard, Calendar, Users, BarChart3, Ticket, Settings, Building2, Camera, UserPlus, ClipboardCheck } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, BarChart3, Ticket, Settings, Building2, Camera, UserPlus, ClipboardCheck, Crown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -58,6 +58,12 @@ export function Sidebar({ className, userRole = 'admin', pendingApprovalCount = 
             href: "/admin/cupons",
             label: "Cupons",
             icon: Ticket,
+            roles: ['admin'],
+        },
+        {
+            href: "/admin/parceiros-clube",
+            label: "Parceiros Clube",
+            icon: Crown,
             roles: ['admin'],
         },
         {

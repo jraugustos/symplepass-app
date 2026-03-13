@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth/actions'
 import { createEvent } from '@/lib/data/admin-events'
-import { EventForm } from '@/components/admin'
+import { EventWizard } from '@/components/admin'
 import { EventFormDataAdmin } from '@/types'
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -29,22 +29,10 @@ export default async function NovoEventoPage() {
     }
 
     const createResult = await createEvent({
-      title: data.title,
-      description: data.description,
-      location: data.location,
-      start_date: data.start_date,
-      sport_type: data.sport_type as any,
-      event_type: data.event_type,
-      event_format: data.event_format,
+      ...data,
       organizer_id: result.user.id,
-      banner_url: data.banner_url,
-      end_date: data.end_date,
-      max_participants: data.max_participants,
-      registration_start: data.registration_start,
-      registration_end: data.registration_end,
-      solidarity_message: data.solidarity_message,
+      sport_type: data.sport_type as any,
       status: data.status as any,
-      is_featured: data.is_featured,
     }, result.profile.role as 'admin' | 'organizer')
 
     if (createResult.error) {
@@ -53,10 +41,8 @@ export default async function NovoEventoPage() {
 
     revalidatePath('/admin/eventos')
 
-    // If organizer, redirect to events list with success message
-    // If admin, redirect to edit page
-    if (result.profile.role === 'organizer') {
-      // Notify admins about new pending event
+    // If organizer and published/pending, notify admins
+    if (result.profile.role === 'organizer' && data.status !== 'draft') {
       try {
         const supabase = createAdminClient()
         const { data: admins } = await supabase
@@ -85,6 +71,29 @@ export default async function NovoEventoPage() {
     }
   }
 
+  async function autoSaveAction(data: EventFormDataAdmin) {
+    'use server'
+    const result = await getCurrentUser()
+    if (!result || !result.user || !result.profile) {
+      throw new Error('User not authenticated')
+    }
+
+    const createResult = await createEvent({
+      ...data,
+      organizer_id: result.user.id,
+      sport_type: data.sport_type as any,
+      status: 'draft',
+    }, result.profile.role as 'admin' | 'organizer')
+
+    if (createResult.error) {
+      throw new Error(createResult.error)
+    }
+
+    // Redirect to the edit page where the wizard will continue
+    // Pass ?step=1 because the user just finished step 0 and wants to go to step 1
+    redirect(`/admin/eventos/${createResult.data?.id}/editar?step=1`)
+  }
+
   return (
     <div className="space-y-6">
       {/* Breadcrumb */}
@@ -110,7 +119,7 @@ export default async function NovoEventoPage() {
 
       {/* Form */}
       <div className="max-w-4xl">
-        <EventForm onSubmit={createEventAction} />
+        <EventWizard onSubmit={createEventAction} onAutoSaveDraft={autoSaveAction} />
       </div>
     </div>
   )

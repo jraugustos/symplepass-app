@@ -1,5 +1,5 @@
-// Event Management
 export { EventForm } from './event-form'
+export { EventWizard } from './event-wizard'
 export { CategoryFormModal } from './category-form-modal'
 export { EventsTable } from './events-table'
 export { RegistrationsTable } from './registrations-table'

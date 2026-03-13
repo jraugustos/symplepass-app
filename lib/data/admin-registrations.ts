@@ -207,11 +207,37 @@ export async function exportRegistrationsToCSV(eventId: string) {
       return []
     }
 
+    // Fetch coupon usage data for all registrations in this event
+    const registrationIds = registrations?.map((r: any) => r.id) || []
+    let couponMap: Record<string, { code: string; discount: number }> = {}
+
+    if (registrationIds.length > 0) {
+      const { data: couponUsages } = await supabase
+        .from('coupon_usages')
+        .select(`
+          registration_id,
+          discount_applied,
+          coupons:coupon_id(code)
+        `)
+        .in('registration_id', registrationIds)
+
+      if (couponUsages) {
+        couponMap = couponUsages.reduce((acc: Record<string, { code: string; discount: number }>, usage: any) => {
+          acc[usage.registration_id] = {
+            code: usage.coupons?.code || '',
+            discount: usage.discount_applied || 0,
+          }
+          return acc
+        }, {})
+      }
+    }
+
     // Format data for CSV including partner data from registration_data
     const exportData = registrations?.map((reg: any) => {
       const partnerData = reg.registration_data?.partner
       const userData = reg.registration_data?.user
       const customFieldValues = reg.registration_data?.custom_fields || {}
+      const couponInfo = couponMap[reg.id]
 
       const customFieldsExport = Object.entries(customFieldsMap).reduce((acc, [name, label]) => {
         acc[label] = customFieldValues[name] || ''
@@ -231,6 +257,8 @@ export async function exportRegistrationsToCSV(eventId: string) {
         data_inscricao: formatDate(reg.created_at),
         tamanho_camisa: userData?.shirtSize || reg.shirt_size || 'N/A',
         genero_camisa: userData?.shirtGender || 'N/A',
+        cupom_codigo: couponInfo?.code || '',
+        cupom_desconto: couponInfo?.discount ? formatCurrency(couponInfo.discount) : '',
         nome_parceiro: partnerData?.name || reg.partner_name || '',
         email_parceiro: partnerData?.email || '',
         cpf_parceiro: partnerData?.cpf || '',

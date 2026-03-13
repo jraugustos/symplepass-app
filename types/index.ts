@@ -24,6 +24,7 @@ import type {
   Subscription,
   SubscriptionWithUser,
   SubscriptionStatus,
+  ApprovalStatus,
 } from './database.types'
 
 // Re-export subscription types explicitly for convenience
@@ -552,6 +553,7 @@ export interface EventFormDataAdmin {
   has_kit_pickup_info: boolean
   service_fee: number
   service_fee_type: 'percentage' | 'fixed'
+  approval_status?: ApprovalStatus | null
 }
 
 export interface CategoryFormData {

@@ -138,10 +138,10 @@ export default async function EditarEventoPage({ params }: { params: { id: strin
         </div>
 
         {/* Quick Actions */}
-        <div className="flex gap-3">
+        <div className="flex items-center">
           <Link
             href={`/admin/eventos/${eventId}/fotos`}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors border border-orange-200"
           >
             <Image className="h-4 w-4" />
             Gerenciar Fotos

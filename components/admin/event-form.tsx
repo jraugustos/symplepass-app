@@ -9,13 +9,14 @@ import {
 } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Trash2, GripVertical, ExternalLink } from "lucide-react";
+import { Plus, Trash2, GripVertical, ExternalLink, CheckCircle2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FileUpload } from "@/components/ui/file-upload";
+import { Progress } from "@/components/ui/progress";
 import { CategoryFormModal } from "./category-form-modal";
 import { ShirtSizesConfig } from "./shirt-sizes-config";
 import { KitItemsForm } from "./kit-items-form";
@@ -253,6 +254,7 @@ export function EventForm({
   >();
   const [draggedCategoryIndex, setDraggedCategoryIndex] = useState<number | null>(null);
   const [localCategories, setLocalCategories] = useState<EventCategory[]>(categories);
+  const [activeSection, setActiveSection] = useState("1-info");
 
   // Keep localCategories in sync with prop
   useEffect(() => {
@@ -298,6 +300,7 @@ export function EventForm({
     handleSubmit,
     watch,
     setValue,
+    getValues,
     formState: { errors },
     trigger,
   } = useForm<EventFormDataAdmin>({
@@ -464,9 +467,66 @@ export function EventForm({
       console.error("Validation errors:", validationErrors);
     }
   );
-
   const bannerUrl = watch("banner_url");
   const status = watch("status");
+
+  // --- Completeness Logic ---
+  const title = watch("title");
+  const description = watch("description");
+  const city = watch("location.city");
+  const state = watch("location.state");
+  const startDate = watch("start_date");
+  const isSolidarity = watch("event_type") === "solidarity";
+  const solidarityMessage = watch("solidarity_message");
+  const allowsTeam = watch("allows_team_registration");
+  const teamSize = watch("team_size");
+
+  const calculateCompleteness = () => {
+    let requiredFields = 0;
+    let filledFields = 0;
+
+    const checkField = (value: any) => {
+      requiredFields++;
+      if (value && String(value).trim() !== "") filledFields++;
+    };
+
+    checkField(title);
+    checkField(description);
+    checkField(bannerUrl);
+    checkField(city);
+    checkField(state);
+    checkField(startDate);
+    
+    requiredFields++;
+    if (localCategories.length > 0) filledFields++;
+
+    if (isSolidarity) {
+      checkField(solidarityMessage);
+    }
+    
+    if (allowsTeam) {
+      checkField(teamSize);
+    }
+
+    return Math.round((filledFields / requiredFields) * 100);
+  };
+  
+  const completionPercentage = calculateCompleteness();
+  const isFormComplete = completionPercentage === 100;
+
+  const sectionCompleteness: Record<string, boolean> = {
+    "1-info": Boolean(title && String(title).trim() !== "" && description && String(description).trim() !== ""),
+    "2-location": Boolean(city && String(city).trim() !== "" && state && String(state).trim() !== ""),
+    "3-dates": Boolean(
+      startDate && String(startDate).trim() !== "" && 
+      (!isSolidarity || (solidarityMessage && String(solidarityMessage).trim() !== "")) && 
+      (!allowsTeam || (teamSize && String(teamSize).trim() !== ""))
+    ),
+    "4-kit": Boolean(bannerUrl && String(bannerUrl).trim() !== ""),
+    "5-categories": localCategories.length > 0,
+    "6-details": true
+  };
+  // --------------------------
 
   const handleFormSubmit: SubmitHandler<EventFormDataAdmin> = async (data) => {
     setIsSubmitting(true);
@@ -508,6 +568,39 @@ export function EventForm({
     }
   };
 
+  const handleRequestApproval = async () => {
+    setIsSubmitting(true);
+    setError(null);
+    setSuccess(null);
+    
+    try {
+      if (!event?.id) throw new Error("Evento não encontrado");
+      
+      const payload: EventFormDataAdmin = {
+        ...getValues(),
+        status: "pending_approval",
+        approval_status: "pending",
+        start_date: formatDateTimeForBackend(getValues("start_date")) as string,
+        end_date: getValues("end_date") ? formatDateTimeForBackend(getValues("end_date")) : null,
+        registration_start: getValues("registration_start")
+          ? formatDateTimeForBackend(getValues("registration_start"))
+          : null,
+        registration_end: getValues("registration_end")
+          ? formatDateTimeForBackend(getValues("registration_end"))
+          : null,
+      };
+      
+      await onSubmit(payload);
+      setSuccess("Evento enviado para aprovação com sucesso!");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erro ao enviar para aprovação";
+      setError(message);
+      console.error("Error requesting approval:", err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleCategorySubmit = async (data: CategoryFormData) => {
     if (editingCategory) {
       await onCategoryUpdate?.(editingCategory.id, data);
@@ -525,6 +618,46 @@ export function EventForm({
     setEditingCategory(undefined);
   };
 
+  const SECTIONS = [
+    { id: "1-info", label: "Informações Básicas" },
+    { id: "2-location", label: "Localização" },
+    { id: "3-dates", label: "Datas e Inscrições" },
+    { id: "4-kit", label: "Identidade e Kit" },
+    { id: "5-categories", label: "Categorias" },
+    { id: "6-details", label: "Informações Adicionais" }
+  ];
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setActiveSection(entry.target.id);
+          }
+        });
+      },
+      // trigger when element hits top of screen
+      { rootMargin: "-100px 0px -60% 0px" } 
+    );
+
+    SECTIONS.forEach((s) => {
+      const el = document.getElementById(s.id);
+      if (el) observer.observe(el);
+    });
+
+    return () => observer.disconnect();
+  }, [SECTIONS]);
+
+  const scrollToSection = (id: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    const el = document.getElementById(id);
+    if (el) {
+      const offset = 80; // Height of just the sticky nav wrapper + padding
+      const y = el.getBoundingClientRect().top + window.scrollY - offset;
+      window.scrollTo({ top: y, behavior: "smooth" });
+    }
+  };
+
   return (
     <div className="space-y-6 pb-32">
       {/* Feedbacks no topo para melhor visibilidade */}
@@ -539,124 +672,173 @@ export function EventForm({
         </div>
       )}
 
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Informações Básicas</h3>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1">
-              Título do Evento *
-            </label>
-            <Input
-              {...register("title")}
-              placeholder="Ex: Corrida de São Paulo 2025"
-              error={errors.title?.message}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1">
-              Descrição *
-            </label>
-            <textarea
-              {...register("description")}
-              rows={4}
-              placeholder="Descrição completa do evento"
-              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
-            />
-            {errors.description && (
-              <p className="mt-1 text-sm text-red-600">
-                {errors.description.message}
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1">
-              Banner do Evento
-            </label>
-            <FileUpload
-              bucket="event-banners"
-              folder={event?.id || event?.slug || undefined}
-              disabled={!event?.id && !event?.slug}
-              value={bannerUrl || undefined}
-              onChange={(url) => setValue("banner_url", url)}
-              compress={true}
-              showPreview={true}
-              placeholder="Arraste uma imagem ou clique para selecionar"
-            />
-            {!event?.id && !event?.slug && (
-              <p className="text-sm text-gray-600 mt-2">
-                💡 Salve o evento como rascunho primeiro para habilitar o upload do banner
-              </p>
-            )}
+      {/* Barra de Progresso */}
+      {isFormComplete ? (
+        <div className="bg-green-50/50 border border-green-200/50 p-4 rounded-xl flex items-center justify-between mb-6 shadow-sm">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5 text-green-600" />
+            <span className="text-sm font-medium text-green-800">
+              Evento 100% preenchido
+            </span>
           </div>
         </div>
-      </Card>
-
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Localização</h3>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1">
-              Cidade *
-            </label>
-            <Input
-              {...register("location.city")}
-              placeholder="Ex: São Paulo"
-              error={errors.location?.city?.message}
-            />
+      ) : (
+        <div className="bg-white p-4 rounded-xl border border-neutral-200 shadow-sm shadow-neutral-200/50 mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex flex-col">
+              <span className="text-sm font-medium text-neutral-900">
+                Progresso do Preenchimento
+              </span>
+              <span className="text-xs text-neutral-500">
+                Preencha os campos obrigatórios para poder enviar para aprovação
+              </span>
+            </div>
+            <span className="text-sm font-bold text-orange-600">
+              {completionPercentage}%
+            </span>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1">
-              Estado *
-            </label>
-            <Input
-              {...register("location.state")}
-              placeholder="Ex: SP"
-              error={errors.location?.state?.message}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1">
-              Local
-            </label>
-            <Input
-              {...register("location.venue")}
-              placeholder="Ex: Parque Ibirapuera"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1">
-              Endereço
-            </label>
-            <Input
-              {...register("location.address")}
-              placeholder="Ex: Av. Pedro Álvares Cabral"
-            />
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-neutral-700 mb-1">
-              Link Google Maps
-            </label>
-            <Input
-              {...register("location.google_maps_url")}
-              placeholder="Ex: https://maps.google.com/..."
-            />
-            <p className="text-xs text-neutral-500 mt-1">
-              Cole o link do Google Maps para o local do evento
-            </p>
-          </div>
+          <Progress value={completionPercentage} className="h-2 w-full" />
         </div>
-      </Card>
+      )}
 
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Datas e Configurações</h3>
+      {/* Scrollspy Navigation - Agora apenas ele é sticky no topo real */}
+      <div className="bg-white p-2 rounded-2xl border border-neutral-200 overflow-x-auto shadow-sm shadow-neutral-200/50 scrollbar-hide sticky top-4 z-40 mb-6">
+        <nav className="flex items-center gap-2 min-w-max">
+          {SECTIONS.map((section, index) => {
+            const isActive = activeSection === section.id;
+            const isComplete = sectionCompleteness[section.id];
+            
+            return (
+              <button
+                key={section.id}
+                type="button"
+                onClick={(e) => scrollToSection(section.id, e)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+                  isActive
+                    ? "bg-orange-600 text-white"
+                    : isComplete
+                    ? "bg-green-50 text-green-700 hover:bg-green-100 border border-green-200/50"
+                    : "bg-neutral-50 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700"
+                }`}
+              >
+                <span
+                  className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
+                    isActive
+                      ? "bg-white/20 text-white"
+                      : isComplete
+                      ? "bg-green-600 text-white"
+                      : "bg-neutral-200 text-neutral-500"
+                  }`}
+                >
+                  {index + 1}
+                </span>
+                {section.label}
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+
+      <div className="w-full space-y-8 mt-6">
+          <Card id="1-info" className="p-6 scroll-mt-40">
+            <h3 className="text-lg font-semibold mb-4">Informações Básicas</h3>
+    
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                  Título do Evento *
+                </label>
+                <Input
+                  {...register("title")}
+                  placeholder="Ex: Corrida de São Paulo 2025"
+                  error={errors.title?.message}
+                />
+              </div>
+    
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                  Descrição *
+                </label>
+                <textarea
+                  {...register("description")}
+                  rows={4}
+                  placeholder="Descrição completa do evento"
+                  className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
+                />
+                {errors.description && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {errors.description.message}
+                  </p>
+                )}
+              </div>
+    
+
+            </div>
+          </Card>
+
+          <Card id="2-location" className="p-6 scroll-mt-40">
+            <h3 className="text-lg font-semibold mb-4">Localização</h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                  Cidade *
+                </label>
+                <Input
+                  {...register("location.city")}
+                  placeholder="Ex: São Paulo"
+                  error={errors.location?.city?.message}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                  Estado *
+                </label>
+                <Input
+                  {...register("location.state")}
+                  placeholder="Ex: SP"
+                  error={errors.location?.state?.message}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                  Local
+                </label>
+                <Input
+                  {...register("location.venue")}
+                  placeholder="Ex: Parque Ibirapuera"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                  Endereço
+                </label>
+                <Input
+                  {...register("location.address")}
+                  placeholder="Ex: Av. Pedro Álvares Cabral"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-neutral-700 mb-1">
+                  Link Google Maps
+                </label>
+                <Input
+                  {...register("location.google_maps_url")}
+                  placeholder="Ex: https://maps.google.com/..."
+                />
+                <p className="text-xs text-neutral-500 mt-1">
+                  Cole o link do Google Maps para o local do evento
+                </p>
+              </div>
+            </div>
+          </Card>
+
+          <Card id="3-dates" className="p-6 scroll-mt-40">
+            <h3 className="text-lg font-semibold mb-4">Datas e Configurações</h3>
 
         <div className="space-y-4">
           {/* Status - Full width at top */}
@@ -1011,10 +1193,33 @@ export function EventForm({
               </div>
             </div>
           </div>
-        </div >
-      </Card >
+        </div>
+        </Card>
+      <div id="4-kit" className="space-y-6 scroll-mt-40">
+        <Card className="p-6">
+          <h3 className="text-lg font-semibold mb-4">Identidade Visual</h3>
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">
+              Banner do Evento
+            </label>
+            <FileUpload
+              bucket="event-banners"
+              folder={event?.id || event?.slug || undefined}
+              disabled={!event?.id && !event?.slug}
+              value={bannerUrl || undefined}
+              onChange={(url) => setValue("banner_url", url)}
+              compress={true}
+              showPreview={true}
+              placeholder="Arraste uma imagem ou clique para selecionar"
+            />
+            {!event?.id && !event?.slug && (
+              <p className="text-sm text-gray-600 mt-2">
+                💡 Salve o evento como rascunho primeiro para habilitar o upload do banner
+              </p>
+            )}
+          </div>
+        </Card>
 
-      {/* Kit do Atleta Section */}
       {/* Kit do Atleta Section */}
       {
         watch("has_kit") && (
@@ -1107,11 +1312,12 @@ export function EventForm({
           </>
         )
       }
+      </div>
 
       {/* Categorias Section */}
       {
         event && (
-          <Card className="p-6">
+          <Card id="5-categories" className="p-6 scroll-mt-40">
             <div className="flex justify-between items-center mb-4">
               <div>
                 <h3 className="text-lg font-semibold">Categorias</h3>
@@ -1196,8 +1402,11 @@ export function EventForm({
           </Card>
         )
       }
+      <div id="6-details" className="scroll-mt-40">
+        {eventDetailsSection}
+      </div>
 
-      {eventDetailsSection}
+    </div>
 
       {/* Shirt Sizes Config - Only show if there's a shirt in kit or if it's a new event */}
 
@@ -1220,24 +1429,61 @@ export function EventForm({
               >
                 Cancelar
               </Button>
-              <Button
-                type="button"
-                size="sm"
-                disabled={isSubmitting}
-                onClick={handleSaveDraft}
-              >
-                {isSubmitting ? "Salvando..." : "Salvar como Rascunho"}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                disabled={isSubmitting}
-                onClick={handlePublish}
-              >
-                {isSubmitting
-                  ? (status === "published" ? "Atualizando..." : "Publicando...")
-                  : (status === "published" ? "Atualizar" : "Publicar")}
-              </Button>
+              {userRole === "admin" ? (
+                <>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={isSubmitting}
+                    onClick={handleSaveDraft}
+                  >
+                    {isSubmitting ? "Salvando..." : "Salvar como Rascunho"}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={isSubmitting}
+                    onClick={handlePublish}
+                  >
+                    {isSubmitting
+                      ? (status === "published" ? "Atualizando..." : "Publicando...")
+                      : (status === "published" ? "Atualizar" : "Publicar")}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={isSubmitting}
+                    onClick={handleSaveDraft}
+                  >
+                    {isSubmitting ? "Salvando..." : "Salvar como Rascunho"}
+                  </Button>
+
+                  <div className="relative group/tooltip">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="primary"
+                      className="bg-orange-600 hover:bg-orange-700"
+                      disabled={isSubmitting || !isFormComplete || status === "pending_approval"}
+                      onClick={handleRequestApproval}
+                    >
+                      {status === "pending_approval" 
+                        ? "Em Análise" 
+                        : (isSubmitting ? "Enviando..." : "Enviar para Aprovação")}
+                    </Button>
+                    {!isFormComplete && status !== "pending_approval" && (
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-2 py-1 bg-neutral-800 text-white text-xs rounded opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all">
+                        Preencha todos os campos obrigatórios (100%)
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
               {event?.slug && (
                 <Button
                   type="button"

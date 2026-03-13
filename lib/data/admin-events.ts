@@ -189,7 +189,7 @@ export async function createEvent(
       venue?: string;
       address?: string;
     };
-    start_date: string;
+    start_date?: string | null;
     sport_type: SportType;
     event_type: EventType;
     event_format: EventFormat;
@@ -236,41 +236,62 @@ export async function createEvent(
       counter++;
     }
 
-    // Prepare data for insertion, removing shirt_sizes field
-    const { shirt_sizes, ...dataWithoutShirtSizes } = eventData;
-
     // Determine status and approval_status based on user role
     let finalStatus: EventStatus = eventData.status || "draft";
     let approvalStatus: 'pending' | 'approved' | null = null;
 
     if (userRole === 'organizer') {
-      // Organizers create events in pending_approval status
       finalStatus = 'pending_approval';
       approvalStatus = 'pending';
     } else if (userRole === 'admin') {
-      // Admins create events that are auto-approved
       approvalStatus = 'approved';
     }
 
+    // Explicitly pick only valid DB columns to prevent unknown field errors
+    const insertData: Record<string, any> = {
+      title: eventData.title,
+      slug,
+      description: eventData.description || '',
+      organizer_id: eventData.organizer_id,
+      location: eventData.location || null,
+      sport_type: eventData.sport_type,
+      event_format: eventData.event_format,
+      event_type: eventData.event_type,
+      status: finalStatus,
+      approval_status: approvalStatus,
+      // Dates: sanitize empty strings to null
+      start_date: eventData.start_date || null,
+      end_date: eventData.end_date || null,
+      registration_start: eventData.registration_start || null,
+      registration_end: eventData.registration_end || null,
+      // Optional fields
+      banner_url: eventData.banner_url || null,
+      max_participants: eventData.max_participants || null,
+      solidarity_message: eventData.solidarity_message || null,
+      allows_individual_registration: eventData.allows_individual_registration !== false,
+      allows_pair_registration: eventData.allows_pair_registration || false,
+      allows_team_registration: (eventData as any).allows_team_registration || false,
+      team_size: (eventData as any).team_size || null,
+      shirt_sizes_config: eventData.shirt_sizes_config || null,
+      is_featured: eventData.is_featured || false,
+      has_organizer: eventData.has_organizer !== undefined ? eventData.has_organizer : true,
+      show_course_info: (eventData as any).show_course_info !== undefined ? (eventData as any).show_course_info : true,
+      show_championship_format: (eventData as any).show_championship_format !== undefined ? (eventData as any).show_championship_format : true,
+      has_kit: (eventData as any).has_kit || false,
+      has_kit_pickup_info: (eventData as any).has_kit_pickup_info || false,
+      allow_page_access: (eventData as any).allow_page_access !== undefined ? (eventData as any).allow_page_access : true,
+      service_fee: (eventData as any).service_fee || 0,
+      service_fee_type: (eventData as any).service_fee_type || 'percentage',
+    };
+
     const { data, error } = await supabase
       .from("events")
-      .insert({
-        ...dataWithoutShirtSizes,
-        slug,
-        status: finalStatus,
-        approval_status: approvalStatus,
-        is_featured: eventData.is_featured || false,
-        has_organizer:
-          eventData.has_organizer !== undefined
-            ? eventData.has_organizer
-            : true,
-      })
+      .insert(insertData)
       .select()
       .single();
 
     if (error) {
       console.error("Error creating event:", error);
-      // Handle duplicate slug constraint violation with friendly message
       if (error.message?.includes('events_slug_key') || error.code === '23505') {
         return { data: null, error: "Já existe um evento cadastrado com esse nome. Por favor, escolha um título diferente." };
       }
@@ -329,6 +350,20 @@ export async function updateEvent(
 
     // Remove shirt_sizes field if present (we only use shirt_sizes_config now)
     const { shirt_sizes, ...dataWithoutShirtSizes } = eventData as any;
+
+    // Sanitize empty strings to null for date fields
+    if ('start_date' in dataWithoutShirtSizes && !dataWithoutShirtSizes.start_date) {
+      dataWithoutShirtSizes.start_date = null;
+    }
+    if ('end_date' in dataWithoutShirtSizes && !dataWithoutShirtSizes.end_date) {
+      dataWithoutShirtSizes.end_date = null;
+    }
+    if ('registration_start' in dataWithoutShirtSizes && !dataWithoutShirtSizes.registration_start) {
+      dataWithoutShirtSizes.registration_start = null;
+    }
+    if ('registration_end' in dataWithoutShirtSizes && !dataWithoutShirtSizes.registration_end) {
+      dataWithoutShirtSizes.registration_end = null;
+    }
 
     console.log(`[updateEvent] Updating event ${eventId} with data keys: ${Object.keys(dataWithoutShirtSizes).join(', ')}`);
 

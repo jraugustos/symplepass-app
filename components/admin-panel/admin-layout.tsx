@@ -40,13 +40,13 @@ export function AdminLayout({ children, user, profile }: AdminLayoutProps) {
             </aside>
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col md:pl-64 transition-all duration-300">
+            <div className="flex-1 flex flex-col md:pl-64 transition-all duration-300 min-h-screen">
                 <Navbar
                     user={user}
                     profile={profile}
                     onMenuClick={() => setSidebarOpen(!sidebarOpen)}
                 />
-                <main className="flex-1 p-4 md:p-8 overflow-y-auto bg-neutral-50">
+                <main className="flex-1 p-4 md:p-8 bg-neutral-50 relative">
                     {children}
                 </main>
             </div>

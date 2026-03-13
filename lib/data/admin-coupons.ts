@@ -202,16 +202,8 @@ export async function applyCoupon(
       return { success: false, error: usageError.message }
     }
 
-    // Increment current_uses
-    const { error: updateError } = await supabase.rpc('increment_coupon_uses', {
-      coupon_id: couponId,
-    })
-
-    if (updateError) {
-      console.error('Error incrementing coupon uses:', updateError)
-      // Note: Usage was already inserted, but counter wasn't incremented
-      // In production, consider using a transaction or database trigger
-    }
+    // Note: current_uses on the coupons table is automatically incremented
+    // by the database trigger (coupon_usage_increment_trigger)
 
     return { success: true, error: null }
   } catch (error) {

@@ -109,7 +109,7 @@ export function RegistrationsTable({
       {/* Filters */}
       <div className="flex flex-col md:flex-row gap-3 items-start md:items-center justify-between">
         <div className="flex flex-col md:flex-row gap-3 flex-1 w-full">
-          <div className="relative flex-1">
+          <div className="relative flex-1 min-w-[250px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
             <Input
               placeholder="Buscar por nome ou email..."

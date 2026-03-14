@@ -976,7 +976,7 @@ export function EventWizard({
       </div>
 
       {/* Navigation Buttons Fixed at bottom */}
-      <div className="fixed inset-x-0 bottom-0 z-30 pointer-events-none">
+      <div className="fixed left-0 md:left-64 right-0 bottom-0 z-30 pointer-events-none">
         <div className="pointer-events-auto border-t border-neutral-200 bg-white/90 backdrop-blur-xl shadow-[0_-12px_30px_rgba(0,0,0,0.08)]">
           <div className="mx-auto w-full max-w-5xl px-4 py-4 flex items-center justify-between">
             <div>

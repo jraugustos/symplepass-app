@@ -1414,7 +1414,7 @@ export function EventForm({
       <div className="pt-8 border-t border-neutral-200" />
 
       {/* Action Buttons - Fixed at bottom */}
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30">
+      <div className="pointer-events-none fixed left-0 md:left-64 right-0 bottom-0 z-30">
         <div className="pointer-events-auto border-t border-neutral-200 bg-white/70 backdrop-blur-xl shadow-[0_-12px_30px_rgba(0,0,0,0.08)]">
           <div className="mx-auto w-full px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
